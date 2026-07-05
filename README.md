@@ -2,11 +2,25 @@
 
 [中文](./README.md) | [English](./README_EN.md)
 
+[![CI](https://github.com/nnrj/threejson/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/nnrj/threejson/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/nnrj/threejson)](./LICENSE)
+
 这是一个由 JSON 驱动的 [Three.js](https://threejs.org/) 场景运行时：你可以通过配置来构建 3D 场景，而不必手写大量 Three.js 模板代码。
+
+**仓库**：[github.com/nnrj/threejson](https://github.com/nnrj/threejson) · **问题反馈**：[Issues](https://github.com/nnrj/threejson/issues)
 
 ## 开发环境
 
-在本仓库内运行测试、示例与外置工具（Agent bridge、MCP）需要 **Node.js 24+**。克隆后执行 `nvm use`（读取 [`.nvmrc`](.nvmrc)），再 `npm ci && npm test`。详见 **[`doc/development.md`](doc/development.md)**。
+在本仓库内运行测试、示例与外置工具（Agent bridge、MCP）需要 **Node.js 24+**。
+
+```bash
+git clone https://github.com/nnrj/threejson.git
+cd threejson
+nvm use          # 读取 .nvmrc
+npm ci && npm test
+```
+
+详见 **[`doc/development.md`](doc/development.md)**。
 
 ## 贡献与 AI 生成代码
 
@@ -58,4 +72,4 @@ import { applyJsonPatchToJsonDocument } from "threejson/patch-core";
 
 ## 许可证
 
-MIT
+[MIT](./LICENSE)

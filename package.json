@@ -3,6 +3,14 @@
   "version": "0.1.0-alpha.0",
   "description": "JSON-driven Three.js scene runtime: declarative 3D scenes, builders, and handlers.",
   "author": "nnrj <tianhehechu2017@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nnrj/threejson.git"
+  },
+  "homepage": "https://github.com/nnrj/threejson#readme",
+  "bugs": {
+    "url": "https://github.com/nnrj/threejson/issues"
+  },
   "type": "module",
   "exports": {
     ".": "./builtins/full.js",

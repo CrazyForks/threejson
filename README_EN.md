@@ -2,11 +2,25 @@
 
 [中文](./README.md) | [English](./README_EN.md)
 
+[![CI](https://github.com/nnrj/threejson/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/nnrj/threejson/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/nnrj/threejson)](./LICENSE)
+
 JSON-driven [Three.js](https://threejs.org/) scene runtime: build 3D scenes from configuration instead of hand-writing large chunks of Three.js boilerplate.
+
+**Repository**: [github.com/nnrj/threejson](https://github.com/nnrj/threejson) · **Issues**: [GitHub Issues](https://github.com/nnrj/threejson/issues)
 
 ## Development environment
 
-To run tests, examples, and external tools (agent bridges, MCP) in this repo, use **Node.js 24+**. After clone: `nvm use` (reads [`.nvmrc`](.nvmrc)), then `npm ci && npm test`. See **[`doc/development.md`](doc/development.md)**.
+To run tests, examples, and external tools (agent bridges, MCP) in this repo, use **Node.js 24+**.
+
+```bash
+git clone https://github.com/nnrj/threejson.git
+cd threejson
+nvm use          # reads .nvmrc
+npm ci && npm test
+```
+
+See **[`doc/development.md`](doc/development.md)** (Chinese; English: [`doc/en/development.md`](doc/en/development.md)).
 
 ## Contributing and AI-generated code
 
@@ -56,4 +70,4 @@ After starting a static server, open [`index.html`](index.html) at the repo root
 
 ## License
 
-MIT
+[MIT](./LICENSE)
