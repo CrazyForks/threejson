@@ -113,7 +113,6 @@ test("cabinet door leaves get ELM dblclick bindings via domain peer bind", async
       ]
     };
     await invokeAllDomainBindSceneEvents(scene, bindCtx);
-    await invokeDomainBindSceneEvents("door", scene, bindCtx);
 
     for (const leaf of leaves) {
       const bindings = getBindings(leaf.id, "dblclick");
