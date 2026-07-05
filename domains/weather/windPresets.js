@@ -2,7 +2,7 @@
  * weather domain strip wind presets → core `createPlane` records (Plane + texture UV scroll).
  */
 
-import { assetUrl } from "../../assets/assetsBase.js";
+import { assetUrl } from "../../core/util/assetsBase.js";
 import { applyWindVisualScale } from "./windRecordNormalize.js";
 
 const SKIP_MERGE_KEYS = new Set(["domain", "handler", "objType", "options", "payload", "items"]);

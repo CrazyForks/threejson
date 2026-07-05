@@ -2,7 +2,7 @@
  * Port domain fragment templates and constants: `createGroup`-compatible snippets (clone then edit geometry/pose), same role as cabinet `cabinet.js`.
  * Texture placeholders match {@link portShow.json}; replace as needed.
  */
-import { assetUrl } from "../../assets/assetsBase.js";
+import { assetUrl } from "../../core/util/assetsBase.js";
 
 const PORT_WOOD_TEXTURE_URL = assetUrl("textures/building/floor/wood_floor.webp");
 

@@ -37,10 +37,10 @@
 </head>
 <body>
 <div id="rootContainer">
-  <canvas id="canvasContainer">需要 WebGL</canvas>
-  <div id="loadingMask">加载中…</div>
+  <canvas id="canvasContainer">需�?WebGL</canvas>
+  <div id="loadingMask">加载中�?/div>
   <div id="hint">
-    【Track 2 · particleEmitter】<code>/assets/json/tutorial/track-02/02-09-particle-emitter-gpu.json</code><br>
+    【Track 2 · particleEmitter�?code>/assets/json/tutorial/track-02/02-09-particle-emitter-gpu.json</code><br>
     中央 <code>simulation: gpuCompute</code> 下落粒子 · 左侧 <code>simulation: cpu</code> twinkle 对比
   </div>
 </div>
@@ -62,13 +62,13 @@
       const sceneData = await response.json();
       sceneData.canvasWidth = window.innerWidth;
       sceneData.canvasHeight = window.innerHeight;
-      sceneRuntime = await createJsonScene(sceneData, { canvas, resetScene: true });
+      sceneRuntime = await createJsonScene(sceneData, { canvas, resetScene: true, assetsBase: "/assets" });
       window.addEventListener("resize", () => sceneRuntime?.resize?.(window.innerWidth, window.innerHeight));
       sceneRuntime.start();
       loadingMask.style.display = "none";
     } catch (err) {
       console.error(err);
-      loadingMask.textContent = "加载失败：" + err.message;
+      loadingMask.textContent = "加载失败�? + err.message;
     }
   }
 </script>

@@ -4,7 +4,7 @@
 import { createInfoPanelDescriptor } from "../../../core/builder/infoPanelBuilder.js";
 import { STAT_UTIL_MID_TEAL } from "../../stat/statShared.js";
 import { DEVICE_SHELL_SIDE } from "../devicePalette.js";
-import { assetUrl } from "../../../assets/assetsBase.js";
+import { assetUrl } from "../../../core/util/assetsBase.js";
 import { computeHingeOffsetFromCenter, DOOR_OPEN_ANGLE_PRESETS } from "../../door/doorDescriptor.js";
 import { createDoorGroupJson, normalizeLeafCount, normalizeSwing } from "../../door/doorGroupBuilder.js";
 import { cloneJson } from "../../../core/util/cloneJson.js";

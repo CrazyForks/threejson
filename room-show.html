@@ -869,6 +869,7 @@
     setLoadingMessage("正在创建 3D 场景...");
     sceneRuntime = await createJsonScene(sysConfig.jsonData, {
       canvas: canvasContainer,
+      assetsBase: "/assets",
       context: {
         jsonData: sysConfig.jsonData,
         sceneJsonRoot: sysConfig.jsonData

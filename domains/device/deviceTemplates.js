@@ -1,4 +1,4 @@
-import { assetUrl } from '../../assets/assetsBase.js';
+import { assetUrl } from "../../core/util/assetsBase.js";
 import {
   DEVICE_BOX_NEUTRAL,
   DEVICE_BRAND_FOREGROUND,

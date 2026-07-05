@@ -1,6 +1,7 @@
 /**
  * Stat label descriptors: legacy box+statLabel or objType:text (sdf / texture / mesh).
  */
+import { assetUrl } from "../../core/util/assetsBase.js";
 import { clonePlainObject } from "./statShared.js";
 
 const TEXT_LABEL_MODES = new Set(["sdf", "texture", "mesh"]);
@@ -216,7 +217,7 @@ export function buildStatTextLabelRecord({
   } else if (mode === "mesh") {
     record.fontSize = Number(labelStyle.fontSize ?? options.labelFontSize ?? 1.1);
     record.mesh = {
-      fontJsonUrl: "/assets/fonts/helvetiker_bold.typeface.json",
+      fontJsonUrl: assetUrl("fonts/helvetiker_bold.typeface.json"),
       depth: 0.12,
       bevelEnabled: true,
       bevelThickness: 0.03,

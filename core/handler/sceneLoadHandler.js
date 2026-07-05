@@ -32,6 +32,7 @@ import {
   ensureDefaultSceneLightsInScene,
   mergeRuntimeDefaultOptions
 } from "../util/sceneRuntimeDefaults.js";
+import { applyAssetsBaseForLoad } from "../util/assetsBase.js";
 import { resolveRenderLoopFpsPolicy } from "../util/renderLoopPolicy.js";
 import { runScenePostLoadIntroIfConfigured } from "../runtime/sceneIntroOverlay.js";
 import { warnIntroSkippedOnSyncPath } from "../runtime/sceneIntroConfig.js";
@@ -1370,6 +1371,7 @@ function resolveRuntimeLoadOptions(normalized, callerOptions = {}) {
 }
 
 async function createJsonScene(payload, options = {}) {
+  const restoreAssetsBase = applyAssetsBaseForLoad(payload, options);
   const css3dIntegration = integrateCss3dIntoSceneLoad(options);
   const eventIntegration = integrateEventMechanismIntoSceneLoad(css3dIntegration.loadOptions);
   const mergedLoadOptions = eventIntegration.loadOptions;
@@ -1463,6 +1465,8 @@ async function createJsonScene(payload, options = {}) {
       error
     });
     throw error;
+  } finally {
+    restoreAssetsBase();
   }
 }
 
@@ -1547,6 +1551,8 @@ async function createJsonSceneFromObjectRecord(record, options = {}) {
   if (!isObjectRecordEntry(record)) {
     throw new Error("createJsonSceneFromObjectRecord: expected object record with objType");
   }
+  const restoreAssetsBase = applyAssetsBaseForLoad({}, options);
+  try {
   const { bus } = resolveLifecycleHooks(options);
   bindPluginHostToLifecycleBus(options, bus);
   const loadOptions = { ...options, _lifecycleBus: bus };
@@ -1594,6 +1600,9 @@ async function createJsonSceneFromObjectRecord(record, options = {}) {
   }
   attachLifecycleBusToRuntime(result, bus);
   return result;
+  } finally {
+    restoreAssetsBase();
+  }
 }
 
 async function createJsonSceneFromArchive(input, options = {}) {

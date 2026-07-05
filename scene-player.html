@@ -4118,6 +4118,7 @@ Powered by ThreeJSON and Three.js</div>
     };
     sceneRuntime = await createJsonScene(buildPlayerScenePayload(), {
       canvas: canvasContainer,
+      assetsBase: "/assets",
       autoFillLights: true,
       autoFillCamera: true,
       sceneAutoRotate: sysConfig.sceneAutoRotate,

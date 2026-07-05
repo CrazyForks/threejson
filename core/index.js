@@ -311,6 +311,18 @@ export {
   TEXTURE_EXPLICIT_PROP_KEYS,
   BUILTIN_PROFILES
 } from "./util/textureSampling.js";
+export {
+  assetUrl,
+  resolvePublicAssetUrl,
+  getAssetsBaseUrl,
+  setAssetsBaseUrl,
+  normalizeAssetsBase,
+  resolveAssetsBaseFromLoad,
+  applyAssetsBaseForLoad,
+  DEFAULT_CDN_ASSETS_BASE,
+  LOCAL_ASSETS_BASE,
+  ASSETS_PACKAGE_VERSION
+} from "./util/assetsBase.js";
 export { registerCoreParticleMechanism } from "./builder/particle/registerCoreParticle.js";
 
 import "./builder/shader/registerCoreShader.js";

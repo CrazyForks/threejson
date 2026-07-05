@@ -50,6 +50,7 @@ import {
 } from './heatmap/heatmapTexture.js';
 import { attachGifCanvasTextureFromMaterialJson, createGifCanvasTextureFromMaterialJson } from "../util/gifAnimatedTexture.js";
 import { resolveBoxDefaultTextureUrl } from "../util/boxTextureUrl.js";
+import { resolvePublicAssetUrl } from "../util/assetsBase.js";
 import { cloneJson } from "../util/cloneJson.js";
 import {
     loadTextureFromMaterialJson,
@@ -507,6 +508,10 @@ function resolveAssetUrl(baseUrl, rawUrl) {
     const input = rawUrl.trim();
     if (/^(data:|blob:|https?:\/\/)/i.test(input) || input.startsWith("//")) {
         return input;
+    }
+    const publicResolved = resolvePublicAssetUrl(input);
+    if (publicResolved !== input) {
+        return publicResolved;
     }
     try {
         const base = hasText(baseUrl)

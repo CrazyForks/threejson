@@ -56,6 +56,25 @@ import { applyJsonPatchToJsonDocument } from "threejson/patch-core";
 
 For pure core without built-in domains: `import { createSceneRuntime } from "threejson/core"`. To control registration order yourself, add `import "threejson/builtins/register"`.
 
+### Static assets (textures / models / scene JSON)
+
+After `npm install`, built-in domains and `/assets/...` paths in scene JSON **default** to jsDelivr [`@threejson/assets`](https://www.npmjs.com/package/@threejson/assets) (version pinned in runtime `ASSETS_PACKAGE_VERSION`). You do not need to install the assets package for CDN loading.
+
+**Use a local static mount** (clone, self-hosted):
+
+```js
+import { createJsonScene, LOCAL_ASSETS_BASE, setAssetsBaseUrl } from "threejson/core";
+
+setAssetsBaseUrl(LOCAL_ASSETS_BASE); // "/assets"
+
+await createJsonScene(payload, {
+  canvas,
+  assetsBase: "/assets" // or sceneConfig.assetsBase in JSON
+});
+```
+
+Priority (high → low): `createJsonScene({ assetsBase })` → `sceneConfig.assetsBase` → `setAssetsBaseUrl()` → built-in CDN default. Keep `/assets/textures/...` in JSON; the loader rewrites against the active base. Full `https://` URLs are unchanged.
+
 Bundlers (Vite, Webpack, etc.) resolve `three` and addons from `node_modules`.
 
 **npm + bundler vs import map + CDN**: npm builds give **locked versions**, **reproducible installs**, and tree-shaking, at the cost of a build step. Import maps pointing at **esm.sh / jsdelivr** work in **no-build** HTML demos but depend on **CDN availability**; pin major versions in URLs to reduce drift.

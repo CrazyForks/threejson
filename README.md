@@ -56,6 +56,25 @@ import { applyJsonPatchToJsonDocument } from "threejson/patch-core";
 
 若你只想使用纯 core（不自动注册内置域），使用：`import { createSceneRuntime } from "threejson/core"`。需要自行控制注册顺序时，可再 `import "threejson/builtins/register"`。
 
+### 静态资源（纹理 / 模型 / 场景 JSON）
+
+npm 安装后，内置 domain 与场景 JSON 中的 `/assets/...` 路径**默认**解析到 jsDelivr 上的 [`@threejson/assets`](https://www.npmjs.com/package/@threejson/assets)（版本见运行时 `ASSETS_PACKAGE_VERSION`）。无需单独安装资源包即可通过 CDN 加载。
+
+**切换为本地静态目录**（克隆仓库、自托管时）：
+
+```js
+import { createJsonScene, LOCAL_ASSETS_BASE, setAssetsBaseUrl } from "threejson/core";
+
+setAssetsBaseUrl(LOCAL_ASSETS_BASE); // "/assets"
+
+await createJsonScene(payload, {
+  canvas,
+  assetsBase: "/assets" // 或仅在 JSON 中写 sceneConfig.assetsBase
+});
+```
+
+优先级（高覆盖低）：`createJsonScene({ assetsBase })` → `sceneConfig.assetsBase` → `setAssetsBaseUrl()` → 内置 CDN 默认。场景 JSON 内可继续写 `/assets/textures/...`，加载时按当前 base 重写；完整 `https://` URL 不受影响。
+
 第二、三行为可选：**L3 Patch**（写回 `objJson` 并标记 binding 脏）与 **纯 JSON Patch**（无 Three 依赖，便于测试/自定义脏策略）。
 
 打包工具（如 Vite、Webpack 等）会从 `node_modules` 中解析 `three` 及其附加模块。

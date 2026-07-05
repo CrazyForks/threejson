@@ -1,0 +1,26 @@
+{
+  "name": "@threejson/assets",
+  "version": "1.0.0",
+  "description": "Static textures, models, fonts, audio, and scene JSON for ThreeJSON",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nnrj/threejson.git",
+    "directory": "assets"
+  },
+  "homepage": "https://github.com/nnrj/threejson#readme",
+  "bugs": {
+    "url": "https://github.com/nnrj/threejson/issues"
+  },
+  "files": [
+    "textures",
+    "json",
+    "model",
+    "fonts",
+    "audio",
+    "img"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

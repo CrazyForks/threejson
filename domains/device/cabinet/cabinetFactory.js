@@ -3,7 +3,7 @@
  */
 import { log } from "../../../core/util/logger.js";
 
-import { assetUrl } from "../../../assets/assetsBase.js";
+import { assetUrl } from "../../../core/util/assetsBase.js";
 import { finalizeDomainDeployRoot } from "../../../core/handler/domainDeployDescriptor.js";
 import { coalesceBoxModelList } from "../../../core/handler/boxModelListCoalescer.js";
 import {

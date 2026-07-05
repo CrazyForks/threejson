@@ -1,7 +1,7 @@
 /**
  * device domain: rack device and standalone enclosure group descriptor builders.
  */
-import { assetUrl } from "../../assets/assetsBase.js";
+import { assetUrl } from "../../core/util/assetsBase.js";
 import { finalizeDomainDeployRoot } from "../../core/handler/domainDeployDescriptor.js";
 import {
   createGroupFromDescriptor,

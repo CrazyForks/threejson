@@ -47,7 +47,7 @@ test("buildObjTexturePlans map mode only plans diffuse slot", () => {
   assert.equal(state.slotPlans.normalMap, undefined);
   assert.ok(
     state.slotPlans.map.candidates.some((url) =>
-      url.includes("/assets/model/obj/maps_fallback/maps/map.jpg")
+      url.includes("model/obj/maps_fallback/maps/map.jpg")
     )
   );
 });

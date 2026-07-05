@@ -696,7 +696,8 @@
 
   async function initSceneRuntime() {
     sceneRuntime = await createJsonScene(buildAutoScenePayload(), {
-      canvas: canvasContainer
+      canvas: canvasContainer,
+      assetsBase: "/assets"
     });
     scene = sceneRuntime.scene;
     camera = sceneRuntime.camera;

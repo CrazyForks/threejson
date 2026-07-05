@@ -2,7 +2,7 @@
  * weather domain presets → core `points` records (merge logic unit-testable).
  */
 
-import { assetUrl } from "../../assets/assetsBase.js";
+import { assetUrl } from "../../core/util/assetsBase.js";
 import { WEATHER_PARTICLE_DEFAULT_OPACITY } from "./weatherPalette.js";
 
 const SKIP_MERGE_KEYS = new Set(["domain", "handler", "objType", "options", "payload", "items"]);
