@@ -26,11 +26,24 @@ npm ci && npm test
 
 See **[`doc/development.md`](doc/development.md)** (Chinese; English: [`doc/en/development.md`](doc/en/development.md)).
 
-## npm installation
+## Use in your project
 
 ```bash
 npm install threejson
 ```
+
+## English Version
+
+### The philosophy of ThreeJSON, distilled into four lines:
+
+> **Scene as Data** — The scene is data.
+>  **Runtime as Engine** — The runtime is the engine.
+>  **Domain as Extension** — Domains are extensions.
+>  **Agent as Operator** — Agents are operators.
+
+**In plain English:**
+
+> **You define the world. AI creates and reshapes it. ThreeJSON brings it to life.**
 
 ## Contributing and AI-generated code
 

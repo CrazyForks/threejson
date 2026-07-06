@@ -26,11 +26,22 @@ npm ci && npm test
 
 详见 **[`doc/development.md`](doc/development.md)**。
 
-## npm 安装
+## 在你的项目中使用
 
 ```bash
 npm install threejson
 ```
+
+### ThreeJSON 的哲学，浓缩成四句话：
+
+> **Scene as Data —— 场景即数据**
+>  **Runtime as Engine —— 运行时即引擎**
+>  **Domain as Extension —— 业务域即扩展**
+>  **Agent as Operator —— Agent 即操作者**
+
+**说人话就是：**
+
+> **你定义世界，AI 创造与改变世界，ThreeJSON 让世界运行起来。**
 
 ## 贡献与 AI 生成代码
 
