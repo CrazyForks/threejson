@@ -17,12 +17,12 @@ const content = `<!DOCTYPE html>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ThreeJSON Tutorial \u00b7 Track 0 \u00b7 sceneConfig.intro</title>
-  <link rel="icon" href="/assets/img/threejson.ico" type="image/x-icon">
+  <link rel="icon" href="../../../assets/img/threejson.ico" type="image/x-icon">
   <script type="importmap">
     {
       "imports": {
-        "threejson": "/builtins/full.js",
-        "threejson/core": "/core/index.js",
+        "threejson": "../../../builtins/full.js",
+        "threejson/core": "../../../core/index.js",
         "three": "https://esm.sh/three@0.184.0",
         "three/examples/jsm/": "https://esm.sh/three@0.184.0/examples/jsm/",
         "@tweenjs/tween.js": "https://esm.sh/@tweenjs/tween.js@25.0.0",
@@ -52,12 +52,12 @@ const content = `<!DOCTYPE html>
 <div id="rootContainer">
   <canvas id="canvasContainer">\u9700\u8981 WebGL</canvas>
   <div id="loadingMask">\u52a0\u8f7d\u4e2d\u2026</div>
-  <div id="hint">\u3010Track 0 \u00b7 intro\u3011<code>sceneConfig.intro.postLoad</code> \u00b7 \u90e8\u7f72\u5b8c\u6210\u540e\u7247\u5934\uff08Logo + \u6587\u5b57\uff0c\u70b9\u51fb\u8df3\u8fc7\uff09\u00b7 \u6570\u636e\uff1a<code>/assets/json/tutorial/track-00/00-08-scene-intro.json</code></div>
+  <div id="hint">\u3010Track 0 \u00b7 intro\u3011<code>sceneConfig.intro.postLoad</code> \u00b7 \u90e8\u7f72\u5b8c\u6210\u540e\u7247\u5934\uff08Logo + \u6587\u5b57\uff0c\u70b9\u51fb\u8df3\u8fc7\uff09\u00b7 \u6570\u636e\uff1a<code>../../../assets/json/tutorial/track-00/00-08-scene-intro.json</code></div>
 </div>
 <script type="module">
   import { createJsonScene } from "threejson/core";
 
-  const sceneJsonUrl = "/assets/json/tutorial/track-00/00-08-scene-intro.json";
+  const sceneJsonUrl = "../../../assets/json/tutorial/track-00/00-08-scene-intro.json";
   const canvas = document.getElementById("canvasContainer");
   const loadingMask = document.getElementById("loadingMask");
   let sceneRuntime;
@@ -72,7 +72,7 @@ const content = `<!DOCTYPE html>
       const sceneData = await response.json();
       sceneData.canvasWidth = window.innerWidth;
       sceneData.canvasHeight = window.innerHeight;
-      sceneRuntime = await createJsonScene(sceneData, { canvas, resetScene: true, assetsBase: "/assets" });
+      sceneRuntime = await createJsonScene(sceneData, { canvas, resetScene: true, assetsBase: "../../../assets" });
       window.addEventListener("resize", () => sceneRuntime?.resize?.(window.innerWidth, window.innerHeight));
       sceneRuntime.start();
       loadingMask.style.display = "none";

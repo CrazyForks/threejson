@@ -9,8 +9,8 @@
     
     {
       "imports": {
-        "threejson": "/builtins/full.js",
-        "threejson/core": "/core/index.js",
+        "threejson": "./builtins/full.js",
+        "threejson/core": "./core/index.js",
         "three": "https://esm.sh/three@0.184.0",
         "three/examples/jsm/": "https://esm.sh/three@0.184.0/examples/jsm/",
         "fflate": "https://esm.sh/fflate@0.8.3",
@@ -3546,7 +3546,7 @@
         </div>
       </div>
       <div id="leftSubPanelAiConfig" class="leftSubPanel" role="tabpanel" aria-labelledby="leftSubTabAiConfig" hidden>
-        <div class="panelCard">
+        <form class="panelCard" id="aiCredentialsForm" autocomplete="off" onsubmit="return false">
           <div class="panelTitle">AI 凭据</div>
           <div class="leftPanelAiField">
             <label class="leftPanelAiLabel" for="aiProviderSelect">Provider</label>
@@ -3576,7 +3576,7 @@
             <span>记住当前配置（仅存本机浏览器；含 API Key，共用设备请勿勾选）</span>
           </label>
           <div class="leftPanelAiHint">取消勾选将立即清除已保存的配置。</div>
-        </div>
+        </form>
         <div class="panelCard">
           <div class="panelTitle">Agent（多轮）</div>
           <label class="leftPanelAiCheckboxLabel">
