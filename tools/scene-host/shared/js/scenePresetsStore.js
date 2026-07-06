@@ -5,7 +5,10 @@ import {
   editorSessionIdbDelete
 } from "./editorSessionIdb.js";
 
-export const PRESET_SCENE_BASE_URL = "/assets/json/other/demo-json/";
+export const PRESET_SCENE_BASE_URL = new URL(
+  "../../../../assets/json/other/demo-json/",
+  import.meta.url
+).href;
 export const PRESET_MANIFEST_URL = `${PRESET_SCENE_BASE_URL}presets.manifest.json`;
 
 export const PRESET_SCENES_FALLBACK = [
@@ -78,7 +81,11 @@ export async function syncScenePresetsFromManifest() {
   const entries = normalizePresetSceneEntries(manifest);
   const record = await readScenePresetsRecord();
   const baseUrl = String(manifest?.baseUrl || PRESET_SCENE_BASE_URL).trim();
-  const normalizedBase = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+  const normalizedBase = baseUrl.startsWith("/assets/")
+    ? new URL(`../../../../${baseUrl.slice(1)}`, import.meta.url).href.replace(/\/?$/, "/")
+    : baseUrl.endsWith("/")
+      ? baseUrl
+      : `${baseUrl}/`;
   const forceRefreshAllBuiltin = manifestVersion > (Number(record.manifestVersion) || 0);
   let changed = false;
 

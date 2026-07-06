@@ -12,7 +12,10 @@ import {
 export const EDITOR_SETTINGS_STORAGE_KEY = "sceneEditor_settings_v1";
 export const OBJECT_IMPORT_SESSION_FILL_LIGHTS = "sceneEditor_objectImportFillLights";
 export const OBJECT_IMPORT_SESSION_FILL_CAMERA = "sceneEditor_objectImportFillCamera";
-export const EDITOR_SETTINGS_JSON_URL = "/assets/json/other/scene-editor/setting.json";
+export const EDITOR_SETTINGS_JSON_URL = new URL(
+  "../../../../assets/json/other/scene-editor/setting.json",
+  import.meta.url
+).href;
 export const LOADING_MASK_ACTIVITY_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 export const EDITOR_SETTINGS_DEFAULTS = {
@@ -21,9 +24,9 @@ export const EDITOR_SETTINGS_DEFAULTS = {
     general: {
       locale: "",
       baseTitle: "Scene Editor",
-      defaultSceneUrl: "/assets/json/portShow.json",
+      defaultSceneUrl: "../../../../assets/json/portShow.json",
       openLastSceneOnStartup: false,
-      exitNavigateUrl: "/demo.html",
+      exitNavigateUrl: "../../../../demo.html",
       loadingMaskText: "Loading 3D scene…",
       loadingActivityIntervalMs: 120,
       messageToastDurationMs: 2600,
@@ -827,4 +830,3 @@ export const EDITOR_SETTINGS_FIELDS = [
       ]
     }
   ];
-

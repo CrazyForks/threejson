@@ -4,7 +4,10 @@ import {
 } from "../../../../domains/sceneHighlight/channels.js";
 
 const PLAYER_SETTINGS_STORAGE_KEY = "scenePlayer_settings_v1";
-const PLAYER_SETTINGS_JSON_URL = "/assets/json/other/scene-player/setting.json";
+const PLAYER_SETTINGS_JSON_URL = new URL(
+  "../../../../assets/json/other/scene-player/setting.json",
+  import.meta.url
+).href;
 
 export { PLAYER_SETTINGS_STORAGE_KEY };
 
@@ -14,7 +17,7 @@ export const PLAYER_SETTINGS_DEFAULTS = {
   general: {
     locale: "",
     baseTitle: "Scene Player",
-    defaultSceneUrl: "/assets/json/portShow.json",
+    defaultSceneUrl: "../../../../assets/json/portShow.json",
     loadingMaskText: "Loading 3D scene…",
     messageToastDurationMs: 2600,
     progressOverlayEnabled: true,
@@ -134,7 +137,14 @@ export async function loadPlayerSettingsBundle() {
 }
 
 export function getDefaultSceneUrl(playerSettings) {
-  return playerSettings?.general?.defaultSceneUrl || PLAYER_SETTINGS_DEFAULTS.general.defaultSceneUrl;
+  const value = playerSettings?.general?.defaultSceneUrl || PLAYER_SETTINGS_DEFAULTS.general.defaultSceneUrl;
+  if (String(value).startsWith("/assets/")) {
+    return new URL(`../../../../${String(value).slice(1)}`, import.meta.url).href;
+  }
+  if (String(value) === "/demo.html") {
+    return new URL("../../../../demo.html", import.meta.url).href;
+  }
+  return value;
 }
 
 export function getPlayerLoadingMaskText(playerSettings) {

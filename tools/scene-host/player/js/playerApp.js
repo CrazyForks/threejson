@@ -539,7 +539,7 @@ export async function bootstrapPlayerApp() {
   function buildCreateJsonSceneOptions() {
     const opts = {
       canvas: canvasContainer,
-      assetsBase: "/assets",
+      assetsBase: new URL("../../../../assets/", import.meta.url).href,
       autoFillLights: true,
       autoFillCamera: true,
       sceneAutoRotate: sysConfig.sceneAutoRotate,

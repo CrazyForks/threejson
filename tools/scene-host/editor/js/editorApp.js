@@ -670,7 +670,7 @@ export async function bootstrapSceneHostEditor() {
     };
     const opts = {
       canvas: canvasContainer,
-      assetsBase: "/assets",
+      assetsBase: new URL("../../../../assets/", import.meta.url).href,
       cameraFallbackPosition: editorSettings?.render?.cameraFallbackPosition,
       defaultFov: editorSettings?.render?.defaultFov,
       orbitDampingFactor: editorSettings?.render?.orbitDampingFactor,

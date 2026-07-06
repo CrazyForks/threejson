@@ -124,7 +124,14 @@ export function persistEditorSettings(settings, { rememberAiKey = false } = {}) 
 }
 
 export function getDefaultSceneJsonUrl(settings) {
-  return settings?.general?.defaultSceneUrl || EDITOR_SETTINGS_DEFAULTS.general.defaultSceneUrl;
+  const value = settings?.general?.defaultSceneUrl || EDITOR_SETTINGS_DEFAULTS.general.defaultSceneUrl;
+  if (String(value).startsWith("/assets/")) {
+    return new URL(`../../../../${String(value).slice(1)}`, import.meta.url).href;
+  }
+  if (String(value) === "/demo.html") {
+    return new URL("../../../../demo.html", import.meta.url).href;
+  }
+  return value;
 }
 
 export function getLoadingMaskDefaultText(settings) {
