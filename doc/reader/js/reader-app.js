@@ -259,11 +259,29 @@ function normalizeSourceRequest() {
   };
 }
 
+function getProjectRootUrl() {
+  return new URL("../../", window.location.href);
+}
+
+function resolveRootRelativeSource(rawValue) {
+  const projectRoot = getProjectRootUrl();
+  if (
+    projectRoot.pathname !== "/"
+    && rawValue.startsWith("/")
+    && !rawValue.startsWith(projectRoot.pathname)
+  ) {
+    return new URL("." + rawValue, projectRoot.href);
+  }
+  return new URL(rawValue, window.location.href);
+}
+
 function resolveSourceUrl(rawValue) {
   if (!rawValue) {
     return null;
   }
-  const resolved = new URL(rawValue, window.location.href);
+  const resolved = rawValue.startsWith("/") && !rawValue.startsWith("//")
+    ? resolveRootRelativeSource(rawValue)
+    : new URL(rawValue, window.location.href);
   const fetchUrl = new URL(resolved.href);
   fetchUrl.hash = "";
   return fetchUrl;

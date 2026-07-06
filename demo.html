@@ -2000,12 +2000,26 @@
   const readerEntryPath = "./doc/reader/reader.html";
   const readerTextFilePattern = /\.(md|markdown|json|js|mjs|cjs|ts|tsx|jsx|html|htm|vue|css|txt|text|yml|yaml|bash|sh|ps1|cmd|bat|obj|mtl|csv)$/i;
 
+  function getProjectRootUrl() {
+    return new URL("./", window.location.href);
+  }
+
+  function resolveProjectHref(href) {
+    if (typeof href !== "string") {
+      return null;
+    }
+    if (href.startsWith("/") && !href.startsWith("//")) {
+      return new URL("." + href, getProjectRootUrl());
+    }
+    return new URL(href, window.location.href);
+  }
+
   function shouldOpenWithReader(href) {
     if (!href || typeof href !== "string") {
       return false;
     }
     try {
-      const resolved = new URL(href, window.location.href);
+      const resolved = resolveProjectHref(href);
       return resolved.origin === window.location.origin && readerTextFilePattern.test(resolved.pathname);
     } catch (_error) {
       return false;
@@ -2017,7 +2031,7 @@
   }
 
   function buildReaderLink(href) {
-    const resolved = new URL(href, window.location.href);
+    const resolved = resolveProjectHref(href);
     const readerUrl = new URL(readerEntryPath, window.location.href);
     readerUrl.searchParams.set("src", resolved.pathname + resolved.search);
     readerUrl.hash = resolved.hash;

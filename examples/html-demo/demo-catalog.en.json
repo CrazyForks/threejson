@@ -6,7 +6,7 @@
     "path": "./examples/html-demo/track-00-runtime/00-01-minimal-mesh.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-00/00-01-minimal-mesh.json"
+        "json": "./assets/json/tutorial/track-00/00-01-minimal-mesh.json"
       }
     ],
     "prerequisites": [],
@@ -42,7 +42,7 @@
     "path": "./examples/html-demo/track-00-runtime/00-02-primitives-materials.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-00/00-02-primitives.json"
+        "json": "./assets/json/tutorial/track-00/00-02-primitives.json"
       }
     ],
     "prerequisites": [
@@ -76,7 +76,7 @@
     "path": "./examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-00/00-03-friendly-full-scene.json"
+        "json": "./assets/json/tutorial/track-00/00-03-friendly-full-scene.json"
       }
     ],
     "prerequisites": [
@@ -110,7 +110,7 @@
     "path": "./examples/html-demo/track-00-runtime/00-04-standard-objectlist.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-00/00-04-standard-objectlist.json"
+        "json": "./assets/json/tutorial/track-00/00-04-standard-objectlist.json"
       }
     ],
     "prerequisites": [
@@ -144,7 +144,7 @@
     "path": "./examples/html-demo/track-00-runtime/00-05-import-paths.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-00/00-03-friendly-full-scene.json"
+        "json": "./assets/json/tutorial/track-00/00-03-friendly-full-scene.json"
       }
     ],
     "prerequisites": [
@@ -238,7 +238,7 @@
     "path": "./examples/html-demo/track-00-runtime/00-08-scene-intro.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-00/00-08-scene-intro.json"
+        "json": "./assets/json/tutorial/track-00/00-08-scene-intro.json"
       }
     ],
     "prerequisites": [
@@ -273,7 +273,7 @@
     "path": "./examples/html-demo/track-01-geometry/01-01-group-line-panel.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-01/01-01-group-line-panel.json"
+        "json": "./assets/json/tutorial/track-01/01-01-group-line-panel.json"
       }
     ],
     "prerequisites": [
@@ -315,7 +315,7 @@
     "path": "./examples/html-demo/track-01-geometry/01-02-plane-line-topology.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-01/01-02-plane-line-topology.json"
+        "json": "./assets/json/tutorial/track-01/01-02-plane-line-topology.json"
       }
     ],
     "prerequisites": [
@@ -349,7 +349,7 @@
     "path": "./examples/html-demo/track-01-geometry/01-03-preset-objtypes.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-01/01-03-preset-objtypes.json"
+        "json": "./assets/json/tutorial/track-01/01-03-preset-objtypes.json"
       }
     ],
     "prerequisites": [
@@ -379,7 +379,7 @@
     "path": "./examples/html-demo/track-01-geometry/01-04-csg-joins.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-01/01-04-csg-joins.json"
+        "json": "./assets/json/tutorial/track-01/01-04-csg-joins.json"
       }
     ],
     "prerequisites": [
@@ -409,7 +409,7 @@
     "path": "./examples/html-demo/track-01-geometry/01-05-helpers-irregular-geometry.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-01/01-05-helpers-irregular.json"
+        "json": "./assets/json/tutorial/track-01/01-05-helpers-irregular.json"
       }
     ],
     "prerequisites": [
@@ -447,7 +447,7 @@
     "path": "./examples/html-demo/track-01-geometry/01-06-native-object-dispatch.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-01/01-06-native-objects.json"
+        "json": "./assets/json/tutorial/track-01/01-06-native-objects.json"
       }
     ],
     "prerequisites": [
@@ -482,7 +482,7 @@
     "path": "./examples/html-demo/track-01-geometry/01-07-jsm-geometries.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-01/01-07-jsm-geometries.json"
+        "json": "./assets/json/tutorial/track-01/01-07-jsm-geometries.json"
       }
     ],
     "prerequisites": [
@@ -516,7 +516,7 @@
     "path": "./examples/html-demo/track-01-geometry/01-08-ortho-fly.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-01/01-08-ortho-fly.json"
+        "json": "./assets/json/tutorial/track-01/01-08-ortho-fly.json"
       }
     ],
     "prerequisites": [
@@ -550,7 +550,7 @@
     "path": "./examples/html-demo/track-02-visual-fx/02-01-heatmap-wind.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-02/02-01-heatmap-wind.json"
+        "json": "./assets/json/tutorial/track-02/02-01-heatmap-wind.json"
       }
     ],
     "prerequisites": [
@@ -584,7 +584,7 @@
     "path": "./examples/html-demo/track-02-visual-fx/02-02-points-motion.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-02/02-02-points-motion.json"
+        "json": "./assets/json/tutorial/track-02/02-02-points-motion.json"
       }
     ],
     "prerequisites": [
@@ -614,7 +614,7 @@
     "path": "./examples/html-demo/track-02-visual-fx/02-03-weather-domain.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-02/02-03-weather-domain.json"
+        "json": "./assets/json/tutorial/track-02/02-03-weather-domain.json"
       }
     ],
     "prerequisites": [
@@ -648,7 +648,7 @@
     "path": "./examples/html-demo/track-02-visual-fx/02-04-sprite-tube-instanced.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-02/02-04-sprite-tube-instanced.json"
+        "json": "./assets/json/tutorial/track-02/02-04-sprite-tube-instanced.json"
       }
     ],
     "prerequisites": [
@@ -686,7 +686,7 @@
     "path": "./examples/html-demo/track-02-visual-fx/02-05-scene-background.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-02/02-05-scene-background.json"
+        "json": "./assets/json/tutorial/track-02/02-05-scene-background.json"
       }
     ],
     "prerequisites": [
@@ -716,7 +716,7 @@
     "path": "./examples/html-demo/track-02-visual-fx/02-06-audio-spatial.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-02/02-06-audio-spatial.json"
+        "json": "./assets/json/tutorial/track-02/02-06-audio-spatial.json"
       }
     ],
     "prerequisites": [
@@ -746,7 +746,7 @@
     "path": "./examples/html-demo/track-02-visual-fx/02-09-particle-emitter-gpu.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-02/02-09-particle-emitter-gpu.json"
+        "json": "./assets/json/tutorial/track-02/02-09-particle-emitter-gpu.json"
       }
     ],
     "prerequisites": [
@@ -776,7 +776,7 @@
     "path": "./examples/html-demo/track-02-visual-fx/02-10-particle-nebula-provider.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-02/02-10-particle-nebula-provider.json"
+        "json": "./assets/json/tutorial/track-02/02-10-particle-nebula-provider.json"
       }
     ],
     "prerequisites": [
@@ -810,7 +810,7 @@
     "path": "./examples/html-demo/track-02-visual-fx/02-11-texture-sampling-toggle.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-02/02-11-texture-sampling-toggle.json"
+        "json": "./assets/json/tutorial/track-02/02-11-texture-sampling-toggle.json"
       }
     ],
     "prerequisites": [
@@ -844,7 +844,7 @@
     "path": "./examples/html-demo/track-02-visual-fx/02-08-shader-sky-cycle.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-02/02-08-shader-sky-cycle.json"
+        "json": "./assets/json/tutorial/track-02/02-08-shader-sky-cycle.json"
       }
     ],
     "prerequisites": [
@@ -877,7 +877,7 @@
         "path": "./examples/html-demo/track-02-visual-fx/02-07-shader-sky-water.html",
         "jsonFiles": [
           {
-            "json": "/assets/json/tutorial/track-02/02-07-shader-sky-water.json"
+            "json": "./assets/json/tutorial/track-02/02-07-shader-sky-water.json"
           }
         ],
         "prerequisites": [
@@ -901,7 +901,7 @@
         "path": "./examples/html-demo/track-02-visual-fx/02-08-shader-sky-cycle.html",
         "jsonFiles": [
           {
-            "json": "/assets/json/tutorial/track-02/02-08-shader-sky-cycle.json"
+            "json": "./assets/json/tutorial/track-02/02-08-shader-sky-cycle.json"
           }
         ],
         "prerequisites": [
@@ -928,7 +928,7 @@
     "path": "./examples/html-demo/track-03-assets/03-01-external-gltf.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-03/03-01-external-gltf.json"
+        "json": "./assets/json/tutorial/track-03/03-01-external-gltf.json"
       }
     ],
     "prerequisites": [
@@ -958,7 +958,7 @@
     "path": "./examples/html-demo/track-03-assets/03-02-gltf-animation-mixer.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-03/03-02-gltf-animation-mixer.json"
+        "json": "./assets/json/tutorial/track-03/03-02-gltf-animation-mixer.json"
       }
     ],
     "prerequisites": [
@@ -988,7 +988,7 @@
     "path": "./examples/html-demo/track-03-assets/03-03-native-three-domain.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-03/03-03-native-three-domain.json"
+        "json": "./assets/json/tutorial/track-03/03-03-native-three-domain.json"
       }
     ],
     "prerequisites": [
@@ -1018,7 +1018,7 @@
     "path": "./examples/html-demo/track-03-assets/03-04-obj-maps-fallback.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-03/03-04-obj-maps-fallback.json"
+        "json": "./assets/json/tutorial/track-03/03-04-obj-maps-fallback.json"
       }
     ],
     "prerequisites": [
@@ -1048,7 +1048,7 @@
     "path": "./examples/html-demo/track-03-assets/03-06-animation-graph.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-03/03-06-animation-graph.json"
+        "json": "./assets/json/tutorial/track-03/03-06-animation-graph.json"
       }
     ],
     "prerequisites": [
@@ -1078,7 +1078,7 @@
     "path": "./examples/html-demo/track-04-interaction/04-01-object-registry.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-04/04-01-object-registry.json"
+        "json": "./assets/json/tutorial/track-04/04-01-object-registry.json"
       }
     ],
     "prerequisites": [
@@ -1108,7 +1108,7 @@
     "path": "./examples/html-demo/track-04-interaction/04-02-plugin-physics.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-04/04-02-plugin-physics.json"
+        "json": "./assets/json/tutorial/track-04/04-02-plugin-physics.json"
       }
     ],
     "prerequisites": [
@@ -1142,7 +1142,7 @@
     "path": "./examples/html-demo/track-04-interaction/04-05-fps-rapier-collision.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-04/04-05-fps-rapier-collision.json"
+        "json": "./assets/json/tutorial/track-04/04-05-fps-rapier-collision.json"
       }
     ],
     "prerequisites": [
@@ -1179,7 +1179,7 @@
         "path": "./examples/html-demo/track-04-interaction/04-03-fps-walk.html",
         "jsonFiles": [
           {
-            "json": "/assets/json/tutorial/track-04/04-03-fps-walk.json"
+            "json": "./assets/json/tutorial/track-04/04-03-fps-walk.json"
           }
         ],
         "prerequisites": [
@@ -1203,7 +1203,7 @@
         "path": "./examples/html-demo/track-04-interaction/04-04-fps-player-rig.html",
         "jsonFiles": [
           {
-            "json": "/assets/json/tutorial/track-04/04-04-fps-player-rig.json"
+            "json": "./assets/json/tutorial/track-04/04-04-fps-player-rig.json"
           }
         ],
         "prerequisites": [
@@ -1227,7 +1227,7 @@
         "path": "./examples/html-demo/track-04-interaction/04-05-fps-rapier-collision.html",
         "jsonFiles": [
           {
-            "json": "/assets/json/tutorial/track-04/04-05-fps-rapier-collision.json"
+            "json": "./assets/json/tutorial/track-04/04-05-fps-rapier-collision.json"
           }
         ],
         "prerequisites": [
@@ -1255,7 +1255,7 @@
     "path": "./examples/html-demo/track-04-interaction/04-09-event-mechanism.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-04/04-09-event-mechanism.json"
+        "json": "./assets/json/tutorial/track-04/04-09-event-mechanism.json"
       }
     ],
     "prerequisites": [
@@ -1295,7 +1295,7 @@
     "path": "./examples/html-demo/track-04-interaction/04-10-object-lifecycle.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-04/04-10-object-lifecycle.json"
+        "json": "./assets/json/tutorial/track-04/04-10-object-lifecycle.json"
       }
     ],
     "prerequisites": [
@@ -1325,7 +1325,7 @@
     "path": "./examples/html-demo/track-04-interaction/04-11-declarative-actions.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-04/04-11-declarative-actions.json"
+        "json": "./assets/json/tutorial/track-04/04-11-declarative-actions.json"
       }
     ],
     "prerequisites": [
@@ -1355,7 +1355,7 @@
     "path": "./examples/html-demo/track-04-interaction/04-08-info-panel-gallery.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-04/04-08-info-panel-gallery.json"
+        "json": "./assets/json/tutorial/track-04/04-08-info-panel-gallery.json"
       }
     ],
     "prerequisites": [
@@ -1390,7 +1390,7 @@
     "path": "./examples/html-demo/track-04-interaction/04-06-css3d-panel.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-04/04-06-css3d-panel.json"
+        "json": "./assets/json/tutorial/track-04/04-06-css3d-panel.json"
       }
     ],
     "prerequisites": [
@@ -1419,7 +1419,7 @@
         "path": "./examples/html-demo/track-04-interaction/04-07-css3d-curved-browser.html",
         "jsonFiles": [
           {
-            "json": "/assets/json/tutorial/track-04/04-07-css3d-curved-google.json"
+            "json": "./assets/json/tutorial/track-04/04-07-css3d-curved-google.json"
           }
         ],
         "prerequisites": [],
@@ -1444,7 +1444,7 @@
     "path": "./examples/html-demo/track-05-tooling/05-01-ai-scene.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-05/05-01-ai-scene.json"
+        "json": "./assets/json/tutorial/track-05/05-01-ai-scene.json"
       }
     ],
     "prerequisites": [
@@ -1479,7 +1479,7 @@
     "path": "./examples/html-demo/track-05-tooling/05-02-nested-domain.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-05/05-02-nested-domain.json"
+        "json": "./assets/json/tutorial/track-05/05-02-nested-domain.json"
       }
     ],
     "prerequisites": [
@@ -1513,7 +1513,7 @@
     "path": "./room-show.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/roomShow.json"
+        "json": "./assets/json/roomShow.json"
       }
     ],
     "prerequisites": [
@@ -1543,7 +1543,7 @@
     "path": "./port-show.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/portShow.json"
+        "json": "./assets/json/portShow.json"
       }
     ],
     "prerequisites": [
@@ -1573,7 +1573,7 @@
     "path": "./scene-editor.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/portShow.json"
+        "json": "./assets/json/portShow.json"
       }
     ],
     "prerequisites": [
@@ -1603,7 +1603,7 @@
     "path": "./scene-player.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/portShow.json"
+        "json": "./assets/json/portShow.json"
       }
     ],
     "prerequisites": [
@@ -1633,7 +1633,7 @@
     "path": "./examples/html-demo/track-06-stat/06-02-stat-grid.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-06/06-02-stat-grid.json"
+        "json": "./assets/json/tutorial/track-06/06-02-stat-grid.json"
       }
     ],
     "prerequisites": [
@@ -1666,7 +1666,7 @@
         "path": "./examples/html-demo/track-06-stat/06-01-stat-bar.html",
         "jsonFiles": [
           {
-            "json": "/assets/json/tutorial/track-06/06-01-stat-bar.json"
+            "json": "./assets/json/tutorial/track-06/06-01-stat-bar.json"
           }
         ],
         "prerequisites": [
@@ -1690,7 +1690,7 @@
         "path": "./examples/html-demo/track-06-stat/06-02-stat-grid.html",
         "jsonFiles": [
           {
-            "json": "/assets/json/tutorial/track-06/06-02-stat-grid.json"
+            "json": "./assets/json/tutorial/track-06/06-02-stat-grid.json"
           }
         ],
         "prerequisites": [
@@ -1714,7 +1714,7 @@
         "path": "./examples/html-demo/track-06-stat/06-03-stat-panel.html",
         "jsonFiles": [
           {
-            "json": "/assets/json/tutorial/track-06/06-03-stat-panel.json"
+            "json": "./assets/json/tutorial/track-06/06-03-stat-panel.json"
           }
         ],
         "prerequisites": [
@@ -1738,7 +1738,7 @@
         "path": "./examples/html-demo/track-06-stat/06-04-stat-chart-echarts.html",
         "jsonFiles": [
           {
-            "json": "/assets/json/tutorial/track-06/06-04-stat-chart-echarts.json"
+            "json": "./assets/json/tutorial/track-06/06-04-stat-chart-echarts.json"
           }
         ],
         "prerequisites": [
@@ -1772,7 +1772,7 @@
         "path": "./examples/html-demo/track-06-stat/06-05-stat-line.html",
         "jsonFiles": [
           {
-            "json": "/assets/json/tutorial/track-06/06-05-stat-line.json"
+            "json": "./assets/json/tutorial/track-06/06-05-stat-line.json"
           }
         ],
         "prerequisites": [
@@ -1796,7 +1796,7 @@
         "path": "./examples/html-demo/track-06-stat/06-06-stat-pie.html",
         "jsonFiles": [
           {
-            "json": "/assets/json/tutorial/track-06/06-06-stat-pie.json"
+            "json": "./assets/json/tutorial/track-06/06-06-stat-pie.json"
           }
         ],
         "prerequisites": [
@@ -1820,7 +1820,7 @@
         "path": "./examples/html-demo/track-06-stat/06-07-stat-pie-ring.html",
         "jsonFiles": [
           {
-            "json": "/assets/json/tutorial/track-06/06-07-stat-pie-ring.json"
+            "json": "./assets/json/tutorial/track-06/06-07-stat-pie-ring.json"
           }
         ],
         "prerequisites": [
@@ -1847,7 +1847,7 @@
     "path": "./examples/html-demo/track-07-text/07-02-text-mesh.html",
     "jsonFiles": [
       {
-        "json": "/assets/json/tutorial/track-07/07-02-text-mesh.json"
+        "json": "./assets/json/tutorial/track-07/07-02-text-mesh.json"
       }
     ],
     "prerequisites": [
@@ -1880,7 +1880,7 @@
         "path": "./examples/html-demo/track-07-text/07-01-text-modes.html",
         "jsonFiles": [
           {
-            "json": "/assets/json/tutorial/track-07/07-01-text-modes.json"
+            "json": "./assets/json/tutorial/track-07/07-01-text-modes.json"
           }
         ],
         "prerequisites": [
@@ -1904,7 +1904,7 @@
         "path": "./examples/html-demo/track-07-text/07-02-text-mesh.html",
         "jsonFiles": [
           {
-            "json": "/assets/json/tutorial/track-07/07-02-text-mesh.json"
+            "json": "./assets/json/tutorial/track-07/07-02-text-mesh.json"
           }
         ],
         "prerequisites": [
