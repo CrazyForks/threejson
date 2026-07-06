@@ -223,7 +223,7 @@ The unified entry normalizes friendly or standard JSON into a standard `objectLi
 - `lowFps`: host default low-FPS mode switch.
 - `overrideSceneRenderLoop`: when `true`, explicitly overrides scene JSON `fps/lowFps`; when `false`, merges with “scene JSON first, missing items fall back to host settings”.
 
-**Static asset base (`options.assetsBase`, optional)**: per-load override for resolving `/assets/...` paths (see [`sceneConfig.assetsBase`](./json-format.md#sceneconfigassetsbase-optional-static-asset-base-url)). Takes priority over `sceneConfig.assetsBase` and global `setAssetsBaseUrl()`. Cloned-repo demos often use `assetsBase: "/assets"`; npm users omit it to use the default CDN.
+**Static asset base (`options.assetsBase`, optional)**: per-load override for resolving `/assets/...` paths (see [`sceneConfig.assetsBase`](./json-format.md#sceneconfigassetsbase-optional-static-asset-base-url)). Takes priority over `sceneConfig.assetsBase` and global `setAssetsBaseUrl()`. The loader now tries the active base first and falls back to the published CDN automatically. Cloned-repo demos often use `assetsBase: "/assets"`; npm users can omit it and still get CDN fallback.
 
 ### `deployJsonScene(target, payload, options?)`
 
@@ -255,9 +255,11 @@ Public base URL module for textures, models, fonts, and built-in domain defaults
 | `resolveAssetsBaseFromLoad(payload, options)` | Read `options.assetsBase` or `sceneConfig.assetsBase` |
 | `applyAssetsBaseForLoad(payload, options)` | Used in load pipeline; returns restore function |
 
-**Priority (low → high):** `DEFAULT_CDN_ASSETS_BASE` → `setAssetsBaseUrl()` → `sceneConfig.assetsBase` → `createJsonScene({ assetsBase })`.
+**Priority (low → high):** `createJsonScene({ assetsBase })` → `sceneConfig.assetsBase` → `setAssetsBaseUrl()` → active-base-first CDN fallback.
 
 npm users usually do not need to install [`@threejson/assets`](https://www.npmjs.com/package/@threejson/assets) for CDN loading; alternatively install it and serve `node_modules/@threejson/assets` as static files with `setAssetsBaseUrl(...)`.
+
+When a base is provided, the loader tries that base first and falls back to CDN on failure.
 
 ```js
 import {

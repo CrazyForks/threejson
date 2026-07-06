@@ -2,83 +2,48 @@
 
 [中文](./README.md) | [English](./en/README.md)
 
-ThreeJSON 是一个基于 ThreeJS 的 Web3D JSON 解析引擎。调用者不直接编写大量 ThreeJS 场景、渲染循环、控制器、光源和模型创建代码，而是定义描述场景与对象的配置，ThreeJSON core 负责解析配置、创建 ThreeJS 对象、启动渲染循环并更新声明式动画。
+ThreeJSON 是一个基于 Three.js 的 Web3D JSON 运行时。调用者不需要直接手写大量 Three.js 场景搭建、渲染循环、控制器、光源和模型创建代码，而是通过配置来描述场景与对象。ThreeJSON core 负责解析配置、创建 Three.js 对象、启动渲染循环，并更新声明式动画。
 
-本手册面向引擎调用者，重点说明 `core/handler/` 中的场景管线与 `core/builder/` 下的通用模型解析与绘制（如 `core/builder/modelBuilder.js`）；`core/` 目录的理想职责划分（builder / handler / runtime）见 [设计原则](./design-principles.md#core-源码目录builder--handler--runtime理想参照非强制)（**非强制**）。项目中当前仍包含一些机房业务方法和机柜模型，这些内容后续可能会移除，本文档不作为重点说明。
+本手册面向引擎调用者，重点说明 `core/handler/` 中的场景管线，以及 `core/builder/` 下的通用模型解析与绘制方法，例如 `core/builder/modelBuilder.js`。`builder / handler / runtime` 的理想职责划分见 [设计原则](./design-principles.md#core-源码目录builder--handler--runtime-理想参考非强制)。仓库中当前仍包含一些机房和机柜相关的业务实现，这些内容后续可能会继续收敛，不是本文重点。
 
 ## 文档目录
 
-- [快速开始](./quick-start.md)：如何用 `createSceneRuntime()` 从配置创建场景运行时。
-- [JSON 配置手册](./json-format.md)：场景运行时、盒子、球体、组合、线条、信息面板、场景文字（`objType: text`）、热力图、动态平面和外部模型的 JSON 写法。
-- [信息面板专题](./info-panels.md)：infoPanel / css3dPanel 选型、分类型示例与 Demo 索引。
-- [事件机制与 EventScript](./event-mechanism.md)：JSON `events` 绑定、运行时 ELM、`bindSceneEventRuntime` 与 EventScript DSL 语法。
+- [快速开始](./quick-start.md)：用 `createSceneRuntime()` 从配置创建一个最小可运行场景。
+- [JSON 格式手册](./json-format.md)：运行时配置，以及盒体、球体、组合、线段、信息面板、场景文字（`objType: text`）、热力图、动画平面和外部模型的 JSON 写法。
+- [信息面板专题](./info-panels.md)：infoPanel / css3dPanel 选型、分类型示例和 Demo 索引。
 - [业务域与 `domains/`](./domains.md)：`domainModelList`、`businessDomains`、业务域注册方式，以及如何创建自定义 domain。
-- [可选扩展与 `extensions/`](./extensions.md)：PluginHost、JSON `extensions` 容器、内置参考实现与自定义 extension 接入。
-- [核心 API](./api.md)：调用者最常用的引擎方法（含 [`createJsonScene`](./api.md#createjsonscenepayload-options) 与[静态资源基址](./api.md#静态资源coreutilassetsbasejs)）。
-- [Tools 与宿主应用](./tools.md)：`sysConfig` / `sceneConfig` 边界（编辑器、播放器等）。
-- [运行时对象变更速查](./runtime-object-mutation-quickref.md)：`applyObjectChange` / `applyObjectPartial` / snapshot / redeploy 的实战用法。
-- [能力范围](./scope.md)：core 与扩展边界、规范真源与运行时叠加层概要。
-- [设计原则](./design-principles.md)：规范真源与运行叠加、`objectRegistry` 边界、可选能力与安全占位。
-- [开发与工具链](./development.md)：Node 版本、测试、AI 凭据与 **AI 生成代码贡献规范**。
-- [术语对照表](./glossary.md)：关键概念中英名与简要定义（与 [语言与文档策略](./development.md#语言与文档策略) 互补）。
-- [开发方案归档](./dev/plans/README.md)：`doc/dev/plans/` 目录约定与示例。
-- [Lab 实验索引](../lab/README.md)：未来能力草案（非发布承诺）；状态标记见 [`lab/CONVENTIONS.md`](../lab/CONVENTIONS.md)。
-- [演示页面说明](./demos.md)：`examples/html-demo/` 与项目根目录各示例页对应的功能点。
-- [场景加载生命周期](./scene-load-lifecycle.md)：`createJsonScene` 阶段钩子与 SDF 文字字体预热时序（中英双语）。
+- [可选扩展与 `extensions/`](./extensions.md)：PluginHost、JSON `extensions` 容器、内置参考实现和自定义扩展接入。
+- [核心 API](./api.md)：调用者最常用的运行时 API，包括 [`createJsonScene`](./api.md#createjsonscenepayload-options) 和 [静态资源基址](./api.md#static-assets-coreutilassetsbasejs)。
+- [工具与宿主应用](./tools.md)：`sysConfig` / `sceneConfig` 的边界说明（编辑器、播放器等）。
+- [运行时对象变更速查](./runtime-object-mutation-quickref.md)：`applyObjectChange` / 局部更新 / 快照 / 重新部署。
+- [能力边界](./scope.md)：core 与扩展的边界，以及规范真源与运行时叠加层。
+- [设计原则](./design-principles.md)：可选功能、非侵入式设计与安全占位。
+- [Demo 页面](./demos.md)：`examples/html-demo/` 与仓库根页面各自演示什么。
+- [场景加载生命周期](../scene-load-lifecycle.md)：`createJsonScene` 的阶段钩子与 SDF 文字字体预热（中英双语）。
 
-## 仓库目录结构（速查）
-
-下列为从仓库根 [`..`](../) 出发的常见路径，便于在克隆后快速定位；与根 [`README.md`](../README.md) 互补。
-
-```
-ThreeJSON/
-├── core/                 # 引擎主体：handler（场景/帧循环/注册表）、builder（几何与材质）、plugin、cache、ai、util
-├── doc/                  # 调用者手册与 JSON 契约（含 doc/en/ 英文镜像）
-├── lab/                  # 未来能力草案与历史计划摘录，非发布承诺
-├── extensions/           # 可选扩展（如 physics-rapier、simple-gravity），按需 import
-├── domains/              # 业务域实现（port、cabinet、wall、nativeThree 等）与域级 JSON 拼装
-├── examples/
-│   ├── html-demo/        # 无打包器、import map 驱动的最小示例（学习 core 的首选）
-│   ├── vue-app/ / react-app/  # 框架集成样例
-│   └── script/           # 维护用小脚本（如 AI 批处理）
-├── resources/
-│   ├── json/             # 示例与演示用场景 JSON
-│   ├── textures/ / model/  # 演示资源（贴图；model/obj、model/gltf 等外部模型）
-├── tests/                # Node 侧单测（如 patch、descriptor、插件）
-├── tools/                # 外置工具链（agent、MCP、desktop、dev 维护脚本）
-│   ├── threejson-agent/  # bridge/, components/, shell/py/ (Python CLI+GUI)
-│   ├── mcp-threejson/
-│   ├── threejson-agent-desktop/
-│   └── dev/              # importmap / migrate / build；plans/ 为 AI/变更方案归档
-├── index.html / demo.html
-└── *.html                # 根目录业务演示页（机房、港口、编辑器等），逐步向 runtime 配置收敛
-```
-
-**调用者最常打开**：[`core/index.js`](../core/index.js)（或 npm 包 `threejson`）、[`doc/json-format.md`](./json-format.md)、[`examples/html-demo/`](../examples/html-demo/)、[`assets/json/`](../assets/json/)。
-
-仓库根目录默认入口为 [`../index.html`](../index.html)，会跳转到 [`../demo.html`](../demo.html)。`demo.html` 可集中切换 `examples/html-demo/` 子目录示例，以及 `room-show.html`、`scene-editor.html`、`scene-player.html`、`port-show.html` 等根目录页面。
+仓库根目录默认入口是 [`../index.html`](../index.html)，会跳转到 [`../demo.html`](../demo.html)。`demo.html` 可以在 `examples/html-demo/` 的示例和根目录集成页之间切换，例如 `room-show.html`、`scene-editor.html`、`scene-player.html` 和 `port-show.html`。
 
 ## npm 安装（可选）
 
-仓库已提供根目录 `package.json`，包名为 **`threejson`**。在业务工程内安装时，请同时安装 peer 依赖（由打包器从 `node_modules` 解析 `import 'three'` 等）：
+仓库已经提供了根目录 [`../package.json`](../package.json)，包名为 **`threejson`**。如果要在自己的应用中安装它，请同时安装 peer 依赖，以便打包器能从 `node_modules` 正确解析诸如 `three` 之类的导入：
 
 ```bash
 npm install threejson three @tweenjs/tween.js html2canvas-pro
 ```
 
-入口与克隆源码一致，建议从包根导入：
+推荐从包根导入：
 
 ```js
 import { createSceneRuntime, deployMesh } from "threejson";
 ```
 
-发布到 npm 前你可继续只用克隆路径 `../core/index.js`；具体版本与 peer 范围见根目录 [`package.json`](../package.json)。Three.js **正式支持 r179–r184**，详见 [`three-compat.md`](./three-compat.md)。
+如果你只是想直接使用克隆仓库里的源码，也可以从 `../core/index.js` 导入。当前版本和 peer 依赖范围请以根目录 [`../package.json`](../package.json) 为准。
 
-## 推荐使用方式
+## 推荐用法
 
-1. 使用 `createSceneRuntime()` 根据配置创建 `scene`、`camera`、`renderer`、`controls`、光源和统一渲染循环。
-2. 准备对象 JSON 配置。
-3. 调用 `deployMesh()`、`createGroup()`、`createLine2()`、`createHeatmap()` 等方法把对象 JSON 转成 ThreeJS 对象。
+1. 使用 `createSceneRuntime()` 创建 `scene`、`camera`、`renderer`、`controls`、光源和统一渲染循环。
+2. 准备对象 JSON 描述。
+3. 使用 `deployMesh()`、`createGroup()`、`createLine2()`、`createHeatmap()` 等方法把 JSON 转成 Three.js 对象。
 4. 调用 `sceneRuntime.start()` 启动统一渲染循环。
 
 最小示例：
@@ -110,37 +75,33 @@ const boxJson = {
   position: { x: 0, y: 40, z: 0 },
   rotation: { rotationX: 0, rotationY: 0, rotationZ: 0 },
   scale: { scaleX: 1, scaleY: 1, scaleZ: 1 },
-  material: {
-    type: "standard",
-    color: "#409eff"
-  }
+  material: { type: "standard", color: "#409eff" }
 };
 
 deployMesh(boxJson, sceneRuntime.scene);
 sceneRuntime.start();
 ```
 
-## 运行注意
+## 运行说明
 
 ### 在 VS Code / Cursor 中运行 HTML
 
-1. 使用 **VS Code** 或 **Cursor** 打开本项目根目录。
-2. 在扩展市场安装 **Live Server** 插件（VS Code 与 Cursor 均支持同名扩展）。
-3. 在资源管理器中，对需要预览的 `.html` 文件**右键**，选择 **Open with Live Server**（中文界面可能显示为「使用 Live Server 打开」）。
-4. 浏览器将自动打开对应页面（通常通过本地 HTTP 端口访问）。
+1. 用 **VS Code** 或 **Cursor** 打开仓库根目录。
+2. 安装 **Live Server** 扩展。
+3. 在文件树中对需要预览的 `.html` 文件右键，选择 **Open with Live Server**。
+4. 浏览器会通过本地 HTTP 服务自动打开页面。
 
 ### 在 WebStorm 中运行 HTML
 
-1. 使用 **WebStorm** 打开本项目。
-2. 在工程视图中，对需要运行的 `.html` 文件**右键**，选择 **运行「xxx.html」**（菜单项中的 `xxx` 为当前文件名）。
+1. 用 **WebStorm** 打开项目。
+2. 在项目视图中对需要运行的 `.html` 文件右键，选择 **Run**。
 
-### 其他注意事项
+### 其他说明
 
-- 请通过本地静态服务器访问页面，不建议直接用 `file://` 打开。ES Module、纹理、OBJ/GLTF 文件加载通常需要 HTTP 环境。
-
-- 引擎模块使用裸模块名（`three`、`@tweenjs/tween.js`、`html2canvas-pro` 等）。无打包器时，页面需配置 `importmap` 将这些说明符映射到 CDN；使用 Vite/Webpack 时由 `node_modules` 解析。
-- 纹理路径可以使用项目根路径，例如 `/assets/textures/...`。页面若在 `examples/html-demo/` 子目录中，引擎模块导入通常写成 `../../core/...`。
-- **npm 安装 `threejson` 时**：内置 domain 与 JSON 内 `/assets/...` 默认解析到 jsDelivr [`@threejson/assets`](https://www.npmjs.com/package/@threejson/assets)（见 [`api.md` 静态资源](./api.md#静态资源coreutilassetsbasejs)）。克隆仓库跑 demo 需 `assetsBase: "/assets"` 或 `setAssetsBaseUrl("/assets")`。
-- `rotationX/rotationY/rotationZ` 使用弧度值，不是角度。
-- 引擎会把原始 JSON 放入对象的 `userData.objJson`，后续可通过该字段做类型判断、隐藏、删除或业务扩展。
-- 推荐优先参考 [`examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html`](../examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html) 与 `assets/json/sceneRuntimeBasic.json`。
+- 请通过本地静态服务器访问页面，不建议直接用 `file://` 打开。ES Module、纹理以及 OBJ / GLTF 加载通常都需要 HTTP 环境。
+- 引擎使用 `three`、`@tweenjs/tween.js`、`html2canvas-pro` 等裸模块名；如果不使用打包器，需要手动配置 import map 指向 CDN。使用 Vite 或 Webpack 时，这些依赖会从 `node_modules` 解析。
+- 纹理路径可以直接使用项目根路径，比如 `/assets/textures/...`。`examples/html-demo/` 下的页面通常从 `../../core/...` 导入引擎模块。
+- 安装 `threejson` 后，JSON 中的 `/assets/...` 路径默认先尝试当前 base，失败后回退到 jsDelivr [`@threejson/assets`](https://www.npmjs.com/package/@threejson/assets)；克隆仓库的演示页面仍可使用 `assetsBase: "/assets"` 或 `setAssetsBaseUrl("/assets")` 指向本地资源。
+- `rotationX`、`rotationY` 和 `rotationZ` 的单位是弧度，不是角度。
+- 引擎会把原始 JSON 保存在 `userData.objJson` 上，便于后续做类型判断、隐藏、删除或业务扩展。
+- 想看一个现代示例，可以从 [`examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html`](../examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html) 和 `assets/json/sceneRuntimeBasic.json` 开始。

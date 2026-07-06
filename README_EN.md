@@ -107,7 +107,7 @@ For pure core without built-in domains: `import { createSceneRuntime } from "thr
 
 ### Static assets (textures / models / scene JSON)
 
-After `npm install`, built-in domains and `/assets/...` paths in scene JSON **default** to jsDelivr [`@threejson/assets`](https://www.npmjs.com/package/@threejson/assets) (version pinned in runtime `ASSETS_PACKAGE_VERSION`). You do not need to install the assets package for CDN loading.
+After `npm install`, built-in domains and `/assets/...` paths in scene JSON **default** to the active base first, then fall back to jsDelivr [`@threejson/assets`](https://www.npmjs.com/package/@threejson/assets) (version pinned in runtime `ASSETS_PACKAGE_VERSION`). You do not need to install the assets package for CDN fallback.
 
 **Use a local static mount** (clone, self-hosted):
 
@@ -122,7 +122,7 @@ await createJsonScene(payload, {
 });
 ```
 
-Priority (high → low): `createJsonScene({ assetsBase })` → `sceneConfig.assetsBase` → `setAssetsBaseUrl()` → built-in CDN default. Keep `/assets/textures/...` in JSON; the loader rewrites against the active base. Full `https://` URLs are unchanged.
+Priority (high → low): `createJsonScene({ assetsBase })` → `sceneConfig.assetsBase` → `setAssetsBaseUrl()` → active-base-first CDN fallback. Keep `/assets/textures/...` in JSON; the loader rewrites against the active base first and falls back to CDN. Full `https://` URLs are unchanged.
 
 Bundlers (Vite, Webpack, etc.) resolve `three` and addons from `node_modules`.
 

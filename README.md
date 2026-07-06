@@ -5,19 +5,19 @@
 [![CI](https://github.com/nnrj/threejson/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/nnrj/threejson/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/github/license/nnrj/threejson)](./LICENSE)
 
-这是一个由 JSON 驱动的 [Three.js](https://threejs.org/) 场景运行时：你可以通过配置来构建 3D 场景，而不必手写大量 Three.js 模板代码。
+ThreeJSON 是一个由 JSON 驱动的 [Three.js](https://threejs.org/) 场景运行时：你可以通过配置来构建 3D 场景，而不必手写大量 Three.js 模板代码。
 
 **仓库**：[github.com/nnrj/threejson](https://github.com/nnrj/threejson) · **问题反馈**：[Issues](https://github.com/nnrj/threejson/issues)
 
-**npm**：[threejson - npm](https://www.npmjs.com/package/threejson) 、[@threejson/assets - npm](https://www.npmjs.com/package/@threejson/assets?activeTab=versions) 
+**npm**：[threejson - npm](https://www.npmjs.com/package/threejson) · [@threejson/assets - npm](https://www.npmjs.com/package/@threejson/assets?activeTab=versions)
 
-**Demo 及教程**（GitHub Pages）：[最小场景（异步） - ThreeJSON Demo 索引](https://nnrj.github.io/threejson/demo.html#demo=t00-01)
+**Demo 及教程（GitHub Pages）**：[最小场景（异步） - ThreeJSON Demo 索引](https://nnrj.github.io/threejson/demo.html#demo=t00-01)
 
-> Demo 中某些复杂页面（如编辑器、播放器）可能无法在 GitHub Pages 中正确运行，可将本项目 clone 到本地后，使用 VSCode + Live Server 运行以便体验。
+> 部分复杂 Demo 页（例如编辑器、播放器）在 GitHub Pages 上可能无法完整运行。若要体验完整功能，建议把仓库克隆到本地，用 VSCode + Live Server 运行。
 
-**精确描述：**
+**一句话概括：**
 
-ThreeJSON 是一个 JSON 驱动的 Three.js 声明式场景运行时。它将 3D 场景表示为可持久化、可修改、可扩展的数据，通过统一运行时完成场景装配、对象管理、动画、事件和动态变更，并为业务域、第三方扩展、编辑器以及 AI / Agent 场景生成与操作提供稳定接口。
+ThreeJSON 是一个面向 3D 世界的 JSON 驱动运行时。它把场景表示为可持久化、可修改、可扩展的数据，通过统一运行时完成场景装配、对象管理、动画更新与业务域扩展，也能为编辑器和 AI/Agent 场景生成提供稳定接口。
 
 ## 在你的项目中使用
 
@@ -25,11 +25,11 @@ ThreeJSON 是一个 JSON 驱动的 Three.js 声明式场景运行时。它将 3D
 npm install threejson
 ```
 
-此外，某些内置模型依赖 assets 资源包（包含纹理、示例场景JSON等），默认情况下，您无需处理，ThreeJSON 会自动访问 CDN 获取。
+此外，部分内置模型和场景 JSON 依赖 `assets` 资源包（包含纹理、示例场景 JSON 等）。默认情况下无需手动安装资源包，ThreeJSON 会先按当前 base 解析，失败后自动回退到 CDN。
 
-如您想要在本地引入，可单独安装 assets 资源包：
+如果你希望在本地接入资源包，可单独安装 `assets` 资源包：
 
-```bas
+```bash
 npm install @threejson/assets
 ```
 
@@ -45,31 +45,6 @@ npm ci && npm test
 ```
 
 详见 **[`doc/development.md`](doc/development.md)**。
-
-## 在你的项目中使用
-
-```bash
-npm install threejson
-```
-
-此外，某些内置模型依赖 assets 资源包（包含纹理、示例场景JSON等），默认情况下，您无需处理，ThreeJSON 会自动访问 CDN 获取。
-
-如您想要在本地引入，可单独安装 assets 资源包：
-
-```bas
-npm install @threejson/assets
-```
-
-### ThreeJSON 的哲学，浓缩成四句话：
-
-> **Scene as Data —— 场景即数据**
->  **Runtime as Engine —— 运行时即引擎**
->  **Domain as Extension —— 业务域即扩展**
->  **Agent as Operator —— Agent 即操作者**
-
-**说人话就是：**
-
-> **你定义世界，AI 创造与改变世界，ThreeJSON 让世界运行起来。**
 
 ## 贡献与 AI 生成代码
 
@@ -107,7 +82,7 @@ import { applyJsonPatchToJsonDocument } from "threejson/patch-core";
 
 ### 静态资源（纹理 / 模型 / 场景 JSON）
 
-npm 安装后，内置 domain 与场景 JSON 中的 `/assets/...` 路径**默认**解析到 jsDelivr 上的 [`@threejson/assets`](https://www.npmjs.com/package/@threejson/assets)（版本见运行时 `ASSETS_PACKAGE_VERSION`）。无需单独安装资源包即可通过 CDN 加载。
+npm 安装后，内置 domain 与场景 JSON 中的 `/assets/...` 路径默认先按当前 base 解析，失败后自动回退到 jsDelivr 上的 [`@threejson/assets`](https://www.npmjs.com/package/@threejson/assets)（版本见运行时 `ASSETS_PACKAGE_VERSION`）。无需单独安装资源包即可通过 CDN 加载。
 
 **切换为本地静态目录**（克隆仓库、自托管时）：
 
@@ -122,7 +97,7 @@ await createJsonScene(payload, {
 });
 ```
 
-优先级（高覆盖低）：`createJsonScene({ assetsBase })` → `sceneConfig.assetsBase` → `setAssetsBaseUrl()` → 内置 CDN 默认。场景 JSON 内可继续写 `/assets/textures/...`，加载时按当前 base 重写；完整 `https://` URL 不受影响。
+优先级（高覆盖低）：`createJsonScene({ assetsBase })` → `sceneConfig.assetsBase` → `setAssetsBaseUrl()` → 当前 base 优先、失败后回退 CDN。场景 JSON 内可继续写 `/assets/textures/...`，加载时按当前 base 重写；完整 `https://` URL 不受影响。
 
 第二、三行为可选：**L3 Patch**（写回 `objJson` 并标记 binding 脏）与 **纯 JSON Patch**（无 Three 依赖，便于测试/自定义脏策略）。
 

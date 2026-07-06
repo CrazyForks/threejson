@@ -572,13 +572,13 @@ Friendly and standard JSON may set `sceneConfig.threeRevision`; also `worldInfo.
 
 Controls the HTTP root used when built-in domain defaults and scene JSON paths with the **`/assets/...` prefix** (e.g. `textureUrl`, `modelPath`) are resolved at load time. Full `https://` / `data:` URLs are unchanged.
 
-**After `npm install threejson`**, when nothing overrides it, the engine defaults to jsDelivr [`@threejson/assets`](https://www.npmjs.com/package/@threejson/assets) (version pinned in runtime `ASSETS_PACKAGE_VERSION`, currently aligned with `@1.0.0`). Example:
+**After `npm install threejson`**, when nothing overrides it, the engine tries the active base first and then falls back to jsDelivr [`@threejson/assets`](https://www.npmjs.com/package/@threejson/assets) (version pinned in runtime `ASSETS_PACKAGE_VERSION`, currently aligned with `@1.0.0`). Example:
 
 `https://cdn.jsdelivr.net/npm/@threejson/assets@1.0.0/textures/device/cabinet/cabinet_left_door.png`
 
-**Merge priority (low → high):** built-in CDN default → global `setAssetsBaseUrl()` → `sceneConfig.assetsBase` → `createJsonScene(..., { assetsBase })`.
+**Merge priority (low → high):** `createJsonScene(..., { assetsBase })` → `sceneConfig.assetsBase` → global `setAssetsBaseUrl()` → active-base-first CDN fallback.
 
-When cloning the repo and serving from the root, demos usually pass `assetsBase: "/assets"` or call `setAssetsBaseUrl("/assets")`, matching the [`assets/`](../../assets/) directory. JSON may keep `/assets/textures/...` without rewriting to full CDN URLs.
+When cloning the repo and serving from the root, demos usually pass `assetsBase: "/assets"` or call `setAssetsBaseUrl("/assets")`, matching the [`assets/`](../../assets/) directory. JSON may keep `/assets/textures/...`; the loader now tries the local base first and falls back to CDN if needed.
 
 ```json
 {

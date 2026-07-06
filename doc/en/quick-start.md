@@ -118,7 +118,7 @@ Notes:
 
 ### Static assets and CDN (npm)
 
-When you use **`npm install threejson`**, built-in domains and `/assets/textures/...` paths in scene JSON **default** to jsDelivr [`@threejson/assets`](https://www.npmjs.com/package/@threejson/assets) (version pinned in `ASSETS_PACKAGE_VERSION`). You usually **do not** need a separate assets install.
+When you use **`npm install threejson`**, built-in domains and `/assets/textures/...` paths in scene JSON **default** to the active base first, then fall back to jsDelivr [`@threejson/assets`](https://www.npmjs.com/package/@threejson/assets) (version pinned in `ASSETS_PACKAGE_VERSION`). You usually **do not** need a separate assets install.
 
 Override the base for local dev or self-hosting:
 
@@ -136,7 +136,7 @@ await createJsonScene(sceneData, {
 
 You can also set `sceneConfig.assetsBase` in JSON. See [Static assets in `api.md`](./api.md#static-assets-coreutilassetsbasejs) and [`sceneConfig.assetsBase` in json-format](./json-format.md#sceneconfigassetsbase-optional-static-asset-base-url).
 
-When running HTML demos from a cloned repo, pages pass `assetsBase: "/assets"`; serve from the **repo root**.
+When running HTML demos from a cloned repo, pages pass `assetsBase: "/assets"`; the loader tries repo-root assets first and falls back to CDN if needed. Serve from the **repo root**.
 
 ## 3. Minimal friendly JSON
 
