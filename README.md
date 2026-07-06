@@ -26,6 +26,12 @@ npm ci && npm test
 
 详见 **[`doc/development.md`](doc/development.md)**。
 
+## npm 安装
+
+```bash
+npm install threejson
+```
+
 ## 贡献与 AI 生成代码
 
 本开源项目**允许**提交 AI 辅助生成的代码，但须遵守 [`doc/development.md`](doc/development.md) 中的 **AI 生成代码贡献规范**（代码与文档同步、方案须人类评审、提交时附带 `doc/dev/plans/` 方案目录等）。详见该文档与 [`doc/dev/plans/README.md`](doc/dev/plans/README.md)。

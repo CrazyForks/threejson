@@ -26,6 +26,12 @@ npm ci && npm test
 
 See **[`doc/development.md`](doc/development.md)** (Chinese; English: [`doc/en/development.md`](doc/en/development.md)).
 
+## npm installation
+
+```bash
+npm install threejson
+```
+
 ## Contributing and AI-generated code
 
 This project **allows** AI-assisted contributions, subject to the **AI-generated code guidelines** in [`doc/development.md`](doc/development.md) (keep docs in sync, human-reviewed plans, attach `doc/dev/plans/` with each submission). See also [`doc/dev/plans/README.md`](doc/dev/plans/README.md).
