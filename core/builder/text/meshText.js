@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { log } from "../../util/logger.js";
 import { FontLoader } from "three/examples/jsm/loaders/FontLoader.js";
 import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
+import { resolvePublicAssetUrl } from "../../util/assetsBase.js";
 
 import { loadingManager } from "../../cache/loading.js";
 import { trackDisposableResource } from "../../handler/trackedResourceRegistry.js";
@@ -23,7 +24,7 @@ trackDisposableResource(fontLoader);
 function loadFont(url) {
   return new Promise((resolve, reject) => {
     fontLoader.load(
-      url,
+      resolvePublicAssetUrl(url),
       (font) => resolve(font),
       undefined,
       (err) => reject(err)

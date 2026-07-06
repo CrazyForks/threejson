@@ -3,6 +3,7 @@
  */
 import * as THREE from "three";
 import { log } from "../util/logger.js";
+import { resolvePublicAssetUrl } from "../util/assetsBase.js";
 import { loadingManager } from "../cache/loading.js";
 import { trackDisposableResource } from "../handler/trackedResourceRegistry.js";
 import { registerObject } from "../handler/objectRegistry.js";
@@ -71,7 +72,7 @@ function resolveTextureUrl(record) {
 
 function applySpriteTextureWhenLoaded(sprite, url) {
   textureLoader.load(
-    url,
+    resolvePublicAssetUrl(url),
     (texture) => {
       trackDisposableResource(texture);
       texture.colorSpace = THREE.SRGBColorSpace;

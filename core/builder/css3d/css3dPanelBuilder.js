@@ -5,6 +5,7 @@ import { trackDisposableResource } from "../../handler/trackedResourceRegistry.j
 import { registerObject } from "../../handler/objectRegistry.js";
 import { setUserDataObjJson } from "../../handler/objectDescriptorAttach.js";
 import { applyVisibilityFromDescriptor } from "../../util/util.js";
+import { resolvePublicAssetUrl } from "../../util/assetsBase.js";
 import {
   DEFAULT_IFRAME_SANDBOX,
   DEFAULT_PANEL_HEIGHT_PX,
@@ -75,7 +76,7 @@ function createPanelElement(record, content, widthPx, heightPx) {
       return shell;
     }
     const iframe = document.createElement("iframe");
-    iframe.src = content.src;
+    iframe.src = resolvePublicAssetUrl(content.src);
     iframe.title = String(record.name || record.refName || "css3dPanel");
     iframe.style.width = "100%";
     iframe.style.height = "100%";

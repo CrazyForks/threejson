@@ -4,6 +4,7 @@
 
 import { resolveLibTokenToEventScript } from "../../cache/assetRegistry.js";
 import { log } from "../../util/logger.js";
+import { resolvePublicAssetUrl } from "../../util/assetsBase.js";
 import { LIB_PREFIX } from "../../util/resolveTextureSource.js";
 import { isEventScriptReference } from "./scriptReference.js";
 
@@ -28,7 +29,7 @@ async function fetchScriptTextFromUrl(url) {
     return null;
   }
   try {
-    const response = await fetch(target);
+    const response = await fetch(resolvePublicAssetUrl(target));
     if (!response.ok) {
       log.warn("[eventMechanism] resolveEventScriptSource fetch failed", {
         url: target,

@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import html2canvas from 'html2canvas-pro';
 
 import { applyOpacityToColor, applyOpacityToImageTexture, createStrTextureMultiline } from '../util/textureUtils.js';
+import { resolvePublicAssetUrl } from '../util/assetsBase.js';
 import {
 	injectOpacityIntoHtmlBackgrounds,
 	resolveHtmlOpacity,
@@ -519,7 +520,7 @@ function renderHtmlTexture(infoPanel) {
 function loadImageTexture(url) {
 	return new Promise((resolve, reject) => {
 		textureLoader.load(
-			url,
+			resolvePublicAssetUrl(url),
 			(texture) => resolve(texture),
 			undefined,
 			(err) => reject(err instanceof Error ? err : new Error(String(err)))

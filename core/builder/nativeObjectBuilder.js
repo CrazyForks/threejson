@@ -3,6 +3,7 @@
  */
 import { Color, ObjectLoader, TextureLoader } from "three";
 import { log } from "../util/logger.js";
+import { resolvePublicAssetUrl } from "../util/assetsBase.js";
 import { Line2 } from "three/examples/jsm/lines/Line2.js";
 import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
@@ -403,10 +404,10 @@ function applyTextureUrlToMeshMaterial(mesh, materialJson) {
   }
   const loader = new TextureLoader();
   const texture = loader.load(
-    url,
+    resolvePublicAssetUrl(url),
     undefined,
     undefined,
-    (err) => log.error("[nativeObjectBuilder] texture load failed:", url, err)
+    (err) => log.error("[nativeObjectBuilder] texture load failed:", resolvePublicAssetUrl(url), err)
   );
   const assign = (mat) => {
     if (mat) {
@@ -596,14 +597,15 @@ export function deployNativeObjectRecord(targetRoot, record, ctx = {}) {
 
   let object;
   try {
-    const loader = new ObjectLoader();
-    if (typeof resolved.path === "string" && resolved.path) {
-      loader.setPath(resolved.path);
-    }
-    const rp = typeof resolved.resourcePath === "string" ? resolved.resourcePath.trim() : "";
-    if (rp) {
-      loader.setResourcePath(rp.endsWith("/") ? rp : `${rp}/`);
-    }
+  const loader = new ObjectLoader();
+  if (typeof resolved.path === "string" && resolved.path) {
+      loader.setPath(resolvePublicAssetUrl(resolved.path));
+  }
+  const rp = typeof resolved.resourcePath === "string" ? resolved.resourcePath.trim() : "";
+  if (rp) {
+      const resolvedRp = resolvePublicAssetUrl(rp);
+      loader.setResourcePath(resolvedRp.endsWith("/") ? resolvedRp : `${resolvedRp}/`);
+  }
     if (typeof resolved.crossOrigin === "string") {
       loader.setCrossOrigin(resolved.crossOrigin);
     }

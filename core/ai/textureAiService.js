@@ -6,6 +6,7 @@ import {
   extractJsonText,
   parseSceneJsonString
 } from "./sceneAiService.js";
+import { resolvePublicAssetUrl } from "../util/assetsBase.js";
 import {
   buildTexturePlanSystemPrompt,
   buildTexturePlanUserContent
@@ -84,7 +85,7 @@ async function normalizeImageRawToBlob(raw) {
     if (!raw.url || typeof raw.url !== "string") {
       throw new Error("url payload missing.");
     }
-    const response = await fetch(raw.url);
+    const response = await fetch(resolvePublicAssetUrl(raw.url));
     if (!response.ok) {
       throw new Error(`Failed to download image URL (${response.status}).`);
     }

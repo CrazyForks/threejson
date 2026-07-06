@@ -509,8 +509,8 @@
           <textarea id="updatePromptInput">把主楼颜色改成蓝灰色，在场景右侧增加两排设备机柜，并添加一个温度告警信息面板。</textarea>
           <label class="label" for="aiUpdateOutputModeSelect">调整输出模式</label>
           <select id="aiUpdateOutputModeSelect">
-            <option value="json-full" selected>JSON 全量（重建场景）</option>
-            <option value="json-incremental">JSON 增量补丁（RFC 6902）</option>
+            <option value="json-full">JSON 全量（重建场景）</option>
+            <option value="json-incremental" selected>JSON 增量补丁（RFC 6902）</option>
             <option value="auto">自动（Agent 优先；无 Agent 时回退 JSON 全量）</option>
           </select>
           <label class="checkboxLabel multiline">
@@ -533,9 +533,9 @@
           <div class="hint" id="aiUpdateHintSource">始终将「场景 JSON」标签页中的完整 JSON 作为当前场景基线。</div>
           <div class="hint" id="aiUpdateHintMode">JSON 全量模式会重建场景，与整包导入效果相同。</div>
           <div class="hint">命令脚本模式（可撤销）请在 Scene Editor 体验；本 Demo 仅 JSON 向调整。</div>
+          <pre id="aiStreamPreviewAdjust" class="aiStreamPreview" hidden spellcheck="false"></pre>
           <label id="aiLastAdjustResultLabel" class="aiLastResultLabel" for="aiLastAdjustResult" hidden>上次 AI 产出</label>
           <pre id="aiLastAdjustResult" class="aiStreamPreview aiLastResult" hidden spellcheck="false"></pre>
-          <pre id="aiStreamPreviewAdjust" class="aiStreamPreview" hidden spellcheck="false"></pre>
         </div>
       </div>
 

@@ -2,6 +2,8 @@
  * Archive helpers shared by tjz parser/packer.
  */
 
+import { resolvePublicAssetUrl } from "./assetsBase.js";
+
 const ZIP_MAGIC_0 = 0x50; // P
 const ZIP_MAGIC_1 = 0x4b; // K
 const ZIP_MAGIC_2A = 0x03;
@@ -112,7 +114,7 @@ async function readInputAsUint8Array(input) {
     if (isLikelyJsonString(text)) {
       throw new Error("[archive] input string looks like JSON text, not archive bytes/url");
     }
-    const res = await fetch(text);
+    const res = await fetch(resolvePublicAssetUrl(text));
     if (!res.ok) {
       throw new Error(`[archive] fetch failed: ${res.status} ${res.statusText}`);
     }

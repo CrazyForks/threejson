@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { resolvePublicAssetUrl } from "../util/assetsBase.js";
 
 /** Import formats symmetric to mesh export and routed through `externalModel` JSON pipeline. */
 const SUPPORTED_MESH_IMPORT_FORMATS = new Set([
@@ -93,7 +94,7 @@ function readMeshArrayBufferFromUrl(url, loadingManager) {
     const loader = new THREE.FileLoader(loadingManager);
     loader.setResponseType("arraybuffer");
     loader.load(
-      url,
+      resolvePublicAssetUrl(url),
       (data) => {
         if (data instanceof ArrayBuffer) {
           resolve(data);

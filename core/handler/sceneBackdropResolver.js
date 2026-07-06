@@ -5,6 +5,7 @@
 
 import * as THREE from "three";
 import { log } from "../util/logger.js";
+import { resolvePublicAssetUrl } from "../util/assetsBase.js";
 import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 import { PMREMGenerator } from "three";
 
@@ -211,7 +212,7 @@ export async function resolveSceneBackgroundValue(value, deps = {}) {
     }
     const loader = new THREE.TextureLoader(deps.loadingManager);
     applyLoaderPaths(loader, deps);
-    const tex = await loadTextureAsync(loader, url);
+    const tex = await loadTextureAsync(loader, resolvePublicAssetUrl(url));
     tex.mapping = THREE.EquirectangularReflectionMapping;
     applyLdrColorSpace(tex, value.colorSpace);
     markOwnedTexture(tex);
@@ -239,7 +240,7 @@ export async function resolveSceneBackgroundValue(value, deps = {}) {
       log.warn("sceneBackdropResolver: cube single-image layout requires url");
       return null;
     }
-    const absUrl = buildAbsoluteUrl(singleUrl, deps);
+    const absUrl = buildAbsoluteUrl(resolvePublicAssetUrl(singleUrl), deps);
     const img = await loadImageAsync(absUrl, deps.crossOrigin);
     let faces;
     if (layout === "cross-h" || layout === "cross-horizontal") {
@@ -301,7 +302,7 @@ export async function resolveSceneEnvironmentValue(value, renderer, deps = {}) {
     }
     const loader = new THREE.TextureLoader(deps.loadingManager);
     applyLoaderPaths(loader, deps);
-    const equirectTex = await loadTextureAsync(loader, url);
+    const equirectTex = await loadTextureAsync(loader, resolvePublicAssetUrl(url));
     equirectTex.mapping = THREE.EquirectangularReflectionMapping;
     applyLdrColorSpace(equirectTex, value.colorSpace);
     return pmremEnvironmentFromEquirectTexture(equirectTex, renderer, { disposeSource: true });
@@ -319,7 +320,7 @@ export async function resolveSceneEnvironmentValue(value, renderer, deps = {}) {
   const rgbLoader = new RGBELoader(deps.loadingManager);
   applyLoaderPaths(rgbLoader, deps);
   const hdrTexture = await new Promise((resolve, reject) => {
-    rgbLoader.load(url, resolve, undefined, reject);
+    rgbLoader.load(resolvePublicAssetUrl(url), resolve, undefined, reject);
   });
 
   return pmremEnvironmentFromEquirectTexture(hdrTexture, renderer, { disposeSource: true });

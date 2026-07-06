@@ -4,6 +4,7 @@
  */
 import * as THREE from "three";
 import { log } from "./logger.js";
+import { resolvePublicAssetUrl } from "./assetsBase.js";
 import { trackDisposableResource } from "../handler/trackedResourceRegistry.js";
 import { applyUiTextureSampling } from "./textureSampling.js";
 
@@ -111,7 +112,7 @@ export function createGifCanvasTextureFromMaterialJson(materialJson, url, opts =
     (async () => {
         try {
             const { parseGIF, decompressFrames } = await import("gifuct-js");
-            const res = await fetch(url, { mode: "cors", credentials: "omit" });
+            const res = await fetch(resolvePublicAssetUrl(url), { mode: "cors", credentials: "omit" });
             if (!res.ok) {
                 throw new Error(`HTTP ${res.status}`);
             }
@@ -159,7 +160,7 @@ export function createGifCanvasTextureFromMaterialJson(materialJson, url, opts =
             };
             rafId = requestAnimationFrame(tick);
         } catch (err) {
-            log.error("[textureKind:gif] decode/load failed:", url, err);
+            log.error("[textureKind:gif] decode/load failed:", resolvePublicAssetUrl(url), err);
         }
     })();
     return texture;

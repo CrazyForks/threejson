@@ -5,6 +5,7 @@
 
 import { ImageUtils, ObjectLoader } from "three";
 import { log } from "../util/logger.js";
+import { resolvePublicAssetUrl } from "../util/assetsBase.js";
 import { trackDisposableResource } from "../handler/trackedResourceRegistry.js";
 import { registerObject } from "../handler/objectRegistry.js";
 import { applyObjectTransform } from "./heatmap/heatmapTexture.js";
@@ -285,11 +286,12 @@ export function loadThreeNativeObjectJsonFromUrl(objInfo, scene, deps = {}) {
   const loader = manager ? new ObjectLoader(manager) : new ObjectLoader();
 
   if (typeof objInfo.path === "string" && objInfo.path !== "") {
-    loader.setPath(objInfo.path);
+    loader.setPath(resolvePublicAssetUrl(objInfo.path));
   }
   const rp = typeof objInfo.resourcePath === "string" ? objInfo.resourcePath.trim() : "";
   if (rp !== "") {
-    loader.setResourcePath(rp.endsWith("/") ? rp : `${rp}/`);
+    const resolvedRp = resolvePublicAssetUrl(rp);
+    loader.setResourcePath(resolvedRp.endsWith("/") ? resolvedRp : `${resolvedRp}/`);
   }
 
   if (typeof objInfo.crossOrigin === "string") {
@@ -305,7 +307,7 @@ export function loadThreeNativeObjectJsonFromUrl(objInfo, scene, deps = {}) {
   }
 
   loader.load(
-    objInfo.modelPath,
+    resolvePublicAssetUrl(objInfo.modelPath),
     (object) => {
       finish(object);
     },
@@ -339,12 +341,13 @@ export async function parseThreeNativeObjectJsonAndAdd(json, scene, transformOpt
   const loader = manager ? new ObjectLoader(manager) : new ObjectLoader();
 
   if (typeof transformOpts.path === "string" && transformOpts.path !== "") {
-    loader.setPath(transformOpts.path);
+    loader.setPath(resolvePublicAssetUrl(transformOpts.path));
   }
   const rp =
     typeof transformOpts.resourcePath === "string" ? transformOpts.resourcePath.trim() : "";
   if (rp !== "") {
-    loader.setResourcePath(rp.endsWith("/") ? rp : `${rp}/`);
+    const resolvedRp = resolvePublicAssetUrl(rp);
+    loader.setResourcePath(resolvedRp.endsWith("/") ? resolvedRp : `${resolvedRp}/`);
   }
   if (typeof transformOpts.crossOrigin === "string") {
     loader.setCrossOrigin(transformOpts.crossOrigin);
