@@ -75,6 +75,8 @@ setting.json
 
 
 # Temporary files
+/assets/dist/
+/dist/
 /target/
 /tmp/
 /temp/
