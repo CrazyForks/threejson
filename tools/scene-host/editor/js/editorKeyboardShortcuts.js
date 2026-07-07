@@ -4,7 +4,7 @@ export function bindEditorKeyboardShortcuts(host) {
   }
 
   function onKeyDown(event) {
-    if (event.key === "F5") {
+    if (event.key === "F5" && event.altKey) {
       event.preventDefault();
       void host.getRunScenePreview?.()?.runScene?.();
       return;
