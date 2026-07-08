@@ -76,7 +76,7 @@ tools/scene-host/
 
 - [`examples/electron-apps/`](../../examples/electron-apps/) — 集成教程，拆分期不修改
 - [`tools/threejson-agent-desktop/`](../../tools/threejson-agent-desktop/) — Agent 壳，拆分期不修改
-- [`examples/html-demo/`](../../examples/html-demo/)、[`demo.html`](../../demo.html) — 教程索引
+- [`examples/html-demo/`](../../examples/html-demo/)、[`demo.html`](../../examples/html-demo/demo.html) — 教程索引
 
 ## 对照测试
 

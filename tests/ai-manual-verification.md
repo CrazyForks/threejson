@@ -23,7 +23,7 @@
 
 - [ ] **Node.js 24+**：`nvm use` → `node -v`（见 [`.nvmrc`](../.nvmrc)）
 - [ ] **Python 3.10+**：`pip install -r tools/threejson-agent/shell/py/requirements.txt`（live 验证与 `verify:ai-static` 内 Python 单测需要）
-- [ ] **静态服务**（浏览器项）：仓库根 `python -m http.server 8080` → `http://localhost:8080/demo.html`
+- [ ] **静态服务**（浏览器项）：仓库根 `python -m http.server 8080` → `http://localhost:8080/examples/html-demo/demo.html`
 - [ ] **Agent 凭据**：[`tools/threejson-agent/setting.json`](../tools/threejson-agent/setting.json)（从 `setting.example.json` 复制，`llm.apiKey` 已填）
 - [ ] **MCP 凭据**（可选）：[`tools/mcp-threejson/setting.json`](../tools/mcp-threejson/setting.json)（与 agent **独立**）
 - [ ] 跑通自动化：`npm test && npm run verify:ai-static`

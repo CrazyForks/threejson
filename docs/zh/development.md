@@ -98,7 +98,7 @@ objectMutation 的贴图路径属于第 2 类：同步 API 不阻塞贴图下载
 |------|------|
 | **文档 `docs/`** | 对外契约以 `docs/` + [`docs/en/`](en/) 双轨为准；新文档尽量同步英文 |
 | **代码注释** | 新代码与公开 API **英文**；`core/`、`domains/` 存量中文注释 **分批英文化**（允许删除无效注释、补缺失说明；触达文件时继续迁移） |
-| **[`demo.html`](../../demo.html)** | 单页运行时 i18n；`navigator.language` → `zh-CN` / `en-US`，无法识别时回退 `en-US`；中文 UI「相关文档」指向 `docs/*.md`；英文 UI 指向 `docs/en/*.md`（无英文镜像的文档仍链中文，如 `event-mechanism.md`） |
+| **[`demo.html`](../../examples/html-demo/demo.html)** | 单页运行时 i18n；`navigator.language` → `zh-CN` / `en-US`，无法识别时回退 `en-US`；中文 UI「相关文档」指向 `docs/*.md`；英文 UI 指向 `docs/en/*.md`（无英文镜像的文档仍链中文，如 `event-mechanism.md`） |
 | **`html-demo` 教程页** | 正文 UI 保持中文 |
 | **`tools/scene-host` 编辑器 / 播放器** | 应用层 i18n（补遗漏）；设置可覆盖语言；默认跟随浏览器，回退 `en-US` |
 | **正本 `scene-editor.html` / `scene-player.html`** | **暂不做 UI i18n**（绿场未与正本对齐前避免双轨漂移） |

@@ -178,6 +178,20 @@ a { color: inherit; text-decoration: none; }
   margin-top: 28px;
 }
 
+.heroQuickLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 14px;
+  font-size: 14px;
+}
+
+.heroQuickLinks a {
+  color: var(--brand);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
 .primaryBtn,
 .secondaryBtn {
   display: inline-flex;

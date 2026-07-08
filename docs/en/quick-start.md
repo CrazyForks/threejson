@@ -12,7 +12,7 @@ Full examples (Tutorial Track 0):
 - Friendly JSON: [examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html](../../examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html)
 - Standard JSON: [examples/html-demo/track-00-runtime/00-04-standard-objectlist.html](../../examples/html-demo/track-00-runtime/00-04-standard-objectlist.html)
 
-Index: [demo.html](../../demo.html) · Catalog: [tutorial.md](./tutorial.md)
+Index: [demo.html](../../examples/html-demo/demo.html) · Catalog: [tutorial.md](./tutorial.md)
 
 ## 0. Run the page
 

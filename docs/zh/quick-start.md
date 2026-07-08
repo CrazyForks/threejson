@@ -14,7 +14,7 @@ ThreeJSON 现在明确支持两种并列输入：
 - 友好 JSON：[examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html](../../examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html)
 - 标准 JSON：[examples/html-demo/track-00-runtime/00-04-standard-objectlist.html](../../examples/html-demo/track-00-runtime/00-04-standard-objectlist.html)
 
-教程总索引：[demo.html](../../demo.html) · 课表：[tutorial.md](./tutorial.md)
+教程总索引：[demo.html](../../examples/html-demo/demo.html) · 课表：[tutorial.md](./tutorial.md)
 
 ## 0. 运行
 

@@ -1639,7 +1639,10 @@ Powered by ThreeJSON and Three.js</div>
 
   function resolvePlayerPageUrl(url) {
     const value = String(url || "").trim();
-    if (value.startsWith("/assets/") || value === "/demo.html") {
+    if (value === "/demo.html") {
+      return "./examples/html-demo/demo.html";
+    }
+    if (value.startsWith("/assets/") || value === "/examples/html-demo/demo.html") {
       return "." + value;
     }
     return value;

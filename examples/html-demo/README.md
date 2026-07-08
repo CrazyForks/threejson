@@ -58,7 +58,7 @@ import "../../../builtins/register.js";
 
 ## 目录与 catalog
 
-教程索引由根目录 [`demo.html`](../../demo.html) 按语言加载一份完整 catalog（经 [`demo-i18n.js`](./demo-i18n.js)）：
+教程索引由根目录 [`demo.html`](../../examples/html-demo/demo.html) 按语言加载一份完整 catalog（经 [`demo-i18n.js`](./demo-i18n.js)）：
 
 - [`demo-catalog.zh.json`](./demo-catalog.zh.json) — 中文（含 path、docLinks、标题说明等全部字段）
 - [`demo-catalog.en.json`](./demo-catalog.en.json) — 英文（结构须与中文版一致，文案为英文）

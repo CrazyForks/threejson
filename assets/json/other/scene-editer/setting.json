@@ -5,7 +5,7 @@
     "baseTitle": "场景编辑器",
     "defaultSceneUrl": "./assets/json/portShow.json",
     "openLastSceneOnStartup": false,
-    "exitNavigateUrl": "./demo.html",
+    "exitNavigateUrl": "./examples/html-demo/demo.html",
     "loadingMaskText": "3D 场景加载中...",
     "loadingActivityIntervalMs": 120,
       "messageToastDurationMs": 2600,

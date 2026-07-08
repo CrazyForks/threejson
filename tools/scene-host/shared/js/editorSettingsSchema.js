@@ -26,7 +26,7 @@ export const EDITOR_SETTINGS_DEFAULTS = {
       baseTitle: "Scene Editor",
       defaultSceneUrl: "../../../../assets/json/portShow.json",
       openLastSceneOnStartup: false,
-      exitNavigateUrl: "../../../../demo.html",
+      exitNavigateUrl: "../../../../examples/html-demo/demo.html",
       loadingMaskText: "Loading 3D scene…",
       loadingActivityIntervalMs: 120,
       messageToastDurationMs: 2600,

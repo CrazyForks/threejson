@@ -11,7 +11,7 @@ ThreeJSON 是一个由 JSON 驱动的 [Three.js](https://threejs.org/) 场景运
 
 **npm**：[threejson - npm](https://www.npmjs.com/package/threejson) · [@threejson/assets - npm](https://www.npmjs.com/package/@threejson/assets?activeTab=versions)
 
-**Demo 及教程（GitHub Pages）**：[最小场景（异步） - ThreeJSON Demo 索引](https://nnrj.github.io/threejson/demo.html#demo=t00-01)
+**Demo 及教程（GitHub Pages）**：[最小场景（异步） - ThreeJSON Demo 索引](https://nnrj.github.io/threejson/examples/html-demo/demo.html#demo=t00-01)
 
 > 部分复杂 Demo 页（例如编辑器、播放器）在 GitHub Pages 上可能无法完整运行。若要体验完整功能，建议把仓库克隆到本地，用 VSCode + Live Server 运行。
 
@@ -111,7 +111,7 @@ await createJsonScene(payload, {
 
 ## 本地快速预览
 
-启动静态服务器后，打开仓库根目录下的 [`index.html`](index.html)。它会重定向到 [`demo.html`](demo.html)。该页面将 `examples/html-demo/*.html` 示例以及根目录下集成的页面汇总在一起，例如 [`room-show.html`](room-show.html)、[`scene-editor.html`](scene-editor.html)、[`scene-player.html`](scene-player.html) 和 [`port-show.html`](port-show.html)。
+启动静态服务器后，打开仓库根目录下的 [`index.html`](index.html)。它会重定向到 [`website/index.html`](website/index.html)。教程索引位于 [`examples/html-demo/demo.html`](examples/html-demo/demo.html)，该页面将 `examples/html-demo/*.html` 示例以及根目录下集成的页面汇总在一起，例如 [`room-show.html`](room-show.html)、[`scene-editor.html`](scene-editor.html)、[`scene-player.html`](scene-player.html) 和 [`port-show.html`](port-show.html)。
 
 ## 许可证
 

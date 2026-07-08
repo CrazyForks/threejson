@@ -4,9 +4,9 @@
 
 [中文](../zh/tutorial.md) | [English](./tutorial.md)
 
-This catalog matches [demo.html](../../demo.html): **Tracks 0 → 7** from core runtime contracts through tooling, host apps, the stat domain, and scene text.
+This catalog matches [demo.html](../../examples/html-demo/demo.html): **Tracks 0 → 7** from core runtime contracts through tooling, host apps, the stat domain, and scene text.
 
-**How to run**: start a static server at the repo root (`python -m http.server 8080`), then open `http://localhost:8080/demo.html`.
+**How to run**: start a static server at the repo root (`python -m http.server 8080`), then open `http://localhost:8080/examples/html-demo/demo.html`.
 
 ## Track 0 · Runtime and JSON contracts
 

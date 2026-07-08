@@ -13,11 +13,11 @@ This directory contains:
 - **`electron-apps/`**: Electron desktop demos — `electron-app` (vanilla), `electron-vue`, `electron-react-app` (`npm install` and `npm run dev` in each subfolder).
 - **`script/`**: Node helper scripts (e.g. AI scene updates).
 
-The root [`../demo.html`](../demo.html) switches between pages under **`html-demo/`** and integrated root pages such as `room-show.html`, `scene-editor.html`, `scene-player.html`, and `port-show.html`. [`../index.html`](../index.html) redirects to `demo.html`.
+The root [`html-demo/demo.html`](html-demo/demo.html) switches between pages under **`html-demo/`** and integrated root pages such as `room-show.html`, `scene-editor.html`, `scene-player.html`, and `port-show.html`. [`../index.html`](../index.html) redirects to the website at [`../website/index.html`](../website/index.html).
 
 ## `html-demo/` pages (selected)
 
-See [`demo.html`](../demo.html) and [`docs/en/tutorial.md`](../docs/en/tutorial.md) for the full catalog.
+See [`demo.html`](html-demo/demo.html) and [`docs/en/tutorial.md`](../docs/en/tutorial.md) for the full catalog.
 
 - [`track-00-runtime/00-01-minimal-mesh.html`](./html-demo/track-00-runtime/00-01-minimal-mesh.html): Track 0 entry, `createJsonScene` + minimal friendly JSON
 - [`track-00-runtime/00-07-manual-deploy-mesh.html`](./html-demo/track-00-runtime/00-07-manual-deploy-mesh.html) (optional): `createSceneRuntime` + `deployMesh` for a single box

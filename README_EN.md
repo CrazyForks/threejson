@@ -11,7 +11,7 @@ JSON-driven [Three.js](https://threejs.org/) scene runtime: build 3D scenes from
 
 **npm**：[threejson - npm](https://www.npmjs.com/package/threejson) 、[@threejson/assets - npm](https://www.npmjs.com/package/@threejson/assets?activeTab=versions) 
 
-Demos & Tutorials (GitHub Pages): [Minimal scene (async) - ThreeJSON Demo Index](https://nnrj.github.io/threejson/demo.html#demo=t00-01)
+Demos & Tutorials (GitHub Pages): [Minimal scene (async) - ThreeJSON Demo Index](https://nnrj.github.io/threejson/examples/html-demo/demo.html#demo=t00-01)
 
 > Some complex pages in the demos (such as the editor or player) may not function properly on GitHub Pages. To experience them fully, you can clone this repository locally and run it using VSCode + Live Server.
 
@@ -134,7 +134,7 @@ Clone the repo and serve it over HTTP (e.g. Live Server). Map **`threejson`** �
 
 ## Quick Local Preview
 
-After starting a static server, open [`index.html`](index.html) at the repo root. It redirects to [`demo.html`](demo.html), which aggregates the `examples/html-demo/*.html` samples together with the root-level integrated pages such as [`room-show.html`](room-show.html), [`scene-editor.html`](scene-editor.html), [`scene-player.html`](scene-player.html), and [`port-show.html`](port-show.html).
+After starting a static server, open [`index.html`](index.html) at the repo root. It redirects to [`website/index.html`](website/index.html). The tutorial index is [`examples/html-demo/demo.html`](examples/html-demo/demo.html), which aggregates the `examples/html-demo/*.html` samples together with the root-level integrated pages such as [`room-show.html`](room-show.html), [`scene-editor.html`](scene-editor.html), [`scene-player.html`](scene-player.html), and [`port-show.html`](port-show.html).
 
 ## License
 

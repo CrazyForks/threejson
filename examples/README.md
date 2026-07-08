@@ -13,11 +13,11 @@
 - **`electron-apps/`**：Electron 桌面壳示例，含 `electron-app`（原生）、`electron-vue`、`electron-react-app` 三个子项目（各目录内 `npm install` 与 `npm run dev`）。
 - **`script/`**：Node 辅助脚本（如 AI 更新场景）。
 
-项目根目录的 [`../demo.html`](../demo.html) 可集中切换 **`html-demo/`** 下各页，以及 `room-show.html`、`scene-editor.html`、`scene-player.html`、`port-show.html` 等根目录整合页。[`../index.html`](../index.html) 会跳转到 `demo.html`。
+项目根目录的 [`html-demo/demo.html`](html-demo/demo.html) 可集中切换 **`html-demo/`** 下各页，以及 `room-show.html`、`scene-editor.html`、`scene-player.html`、`port-show.html` 等根目录整合页。[`../index.html`](../index.html) 会跳转到官网 [`../website/index.html`](../website/index.html)。
 
 ## `html-demo/` 页面（节选）
 
-完整列表见 [`demo.html`](../demo.html) 与 [`docs/zh/tutorial.md`](../docs/zh/tutorial.md)。
+完整列表见 [`demo.html`](html-demo/demo.html) 与 [`docs/zh/tutorial.md`](../docs/zh/tutorial.md)。
 
 - [`track-00-runtime/00-01-minimal-mesh.html`](./html-demo/track-00-runtime/00-01-minimal-mesh.html)：Track 0 入口，`createJsonScene` + 最小友好 JSON。
 - [`track-00-runtime/00-07-manual-deploy-mesh.html`](./html-demo/track-00-runtime/00-07-manual-deploy-mesh.html)（选修）：`createSceneRuntime` + `deployMesh` 单 box 手写部署。

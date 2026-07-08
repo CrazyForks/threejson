@@ -45,6 +45,8 @@ const I18N = {
     "lang.en": "English",
     "home.desc": "ThreeJSON 将 Three.js 场景表达为可读、可编辑、可生成的 JSON。它适合文档示例、低代码编辑器、AI 生成、运行时更新和业务域对象建模。",
     "home.quick": "快速入门",
+    "home.quickEditor": "场景编辑器",
+    "home.quickPlayer": "场景播放器",
     "home.examples": "查看示例",
     "home.features": "核心能力",
     "examples.title": "示例",
@@ -90,6 +92,8 @@ const I18N = {
     "lang.en": "English",
     "home.desc": "ThreeJSON represents Three.js scenes as readable, editable, and generatable JSON. It fits documentation examples, low-code editors, AI generation, runtime updates, and domain object modeling.",
     "home.quick": "Quick Start",
+    "home.quickEditor": "Scene Editor",
+    "home.quickPlayer": "Scene Player",
     "home.examples": "View Examples",
     "home.features": "Core Features",
     "examples.title": "Examples",
@@ -257,6 +261,10 @@ function renderHome() {
           <a class="primaryBtn" href="#/reader/${localizedDocPath("quick-start.md")}">${t("home.quick")}</a>
           <a class="secondaryBtn" href="#/examples">${t("home.examples")}</a>
         </div>
+        <div class="heroQuickLinks">
+          <a href="#" id="homeOpenEditor">${t("home.quickEditor")}</a>
+          <a href="#" id="homeOpenPlayer">${t("home.quickPlayer")}</a>
+        </div>
       </div>
       <div class="heroVisual">
         <pre class="codeCard">{
@@ -283,6 +291,8 @@ function renderHome() {
         ${featureCard("Runtime Mutation", "支持运行时命令和局部更新。", "Supports runtime commands and partial updates.")}
       </div>
     </section>`;
+  document.getElementById("homeOpenEditor")?.addEventListener("click", openEditorTool);
+  document.getElementById("homeOpenPlayer")?.addEventListener("click", openPlayerTool);
 }
 
 function featureCard(title, zh, en) {

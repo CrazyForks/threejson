@@ -71,7 +71,7 @@
   }
 
   async function loadDemoIndexBundle(locale, baseUrl) {
-    const root = baseUrl || "./examples/html-demo/";
+    const root = baseUrl || "./";
     const loc = SUPPORTED.has(locale) ? locale : normalizeLocale(locale);
     const [catalogRes, uiRes] = await Promise.all([
       fetch(root + catalogLocaleFile(loc)),

@@ -6,7 +6,7 @@
 
 演示分为两类：
 
-1. **教程示例**（推荐）：`examples/html-demo/track-*`，按学习轨组织，数据在 `assets/json/tutorial/`。索引入口：[demo.html](../../demo.html)，课表：[tutorial.md](./tutorial.md)。
+1. **教程示例**（推荐）：`examples/html-demo/track-*`，按学习轨组织，数据在 `assets/json/tutorial/`。索引入口：[demo.html](../../examples/html-demo/demo.html)，课表：[tutorial.md](./tutorial.md)。
 2. **根目录整合页**：机房、编辑器、播放器、港口等业务大屏（非教程必修）。
 
 ## 运行
@@ -18,7 +18,7 @@ python -m http.server 8080
 推荐入口：
 
 ```text
-http://localhost:8080/demo.html
+http://localhost:8080/examples/html-demo/demo.html
 http://localhost:8080/index.html
 ```
 

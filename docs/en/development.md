@@ -83,7 +83,7 @@ Details and an example folder: **[`docs/dev/plans/README.md`](../../dev/plans/RE
 |-------|--------|
 | **Docs `docs/`** | Public contracts live in `docs/` + [`docs/en/`](./); add English mirrors for new docs when practical |
 | **Code comments** | New code and public APIs in **English**; legacy Chinese comments in `core/` and `domains/` are migrated **in batches** (remove stale comments, add missing notes; continue when touching files) |
-| **[`demo.html`](../../demo.html)** | Single-page runtime i18n; `navigator.language` → `zh-CN` / `en-US`, fallback `en-US`; Chinese UI links to `docs/*.md`; English UI links to `docs/en/*.md` where mirrors exist (e.g. `event-mechanism.md` stays Chinese-only) |
+| **[`demo.html`](../../examples/html-demo/demo.html)** | Single-page runtime i18n; `navigator.language` → `zh-CN` / `en-US`, fallback `en-US`; Chinese UI links to `docs/*.md`; English UI links to `docs/en/*.md` where mirrors exist (e.g. `event-mechanism.md` stays Chinese-only) |
 | **`html-demo` tutorial pages** | Body UI stays Chinese |
 | **`tools/scene-host` editor / player** | Application i18n (gap-fill only); settings can override locale; default follows browser, fallback `en-US` |
 | **Canonical `scene-editor.html` / `scene-player.html`** | **No UI i18n for now** (avoid drift before greenfield aligns with canonical pages) |

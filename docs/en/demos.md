@@ -4,7 +4,7 @@
 
 [中文](../zh/demos.md) | [English](./demos.md)
 
-- **Tutorial demos**: `examples/html-demo/track-*` with JSON under `assets/json/tutorial/`. Index: [demo.html](../../demo.html), catalog: [tutorial.md](./tutorial.md).
+- **Tutorial demos**: `examples/html-demo/track-*` with JSON under `assets/json/tutorial/`. Index: [demo.html](../../examples/html-demo/demo.html), catalog: [tutorial.md](./tutorial.md).
 - **Root integration pages**: `room-show.html`, `scene-editor.html`, `scene-player.html`, `port-show.html`.
 
 ```bash
@@ -12,7 +12,7 @@ python -m http.server 8080
 ```
 
 ```text
-http://localhost:8080/demo.html
+http://localhost:8080/examples/html-demo/demo.html
 ```
 
 See [quick-start.md](./quick-start.md) for minimal `createJsonScene` setup. Full lesson list: [tutorial.md](./tutorial.md).

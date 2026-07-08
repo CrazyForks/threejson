@@ -4,9 +4,9 @@
 
 [中文](./tutorial.md) | [English](../en/tutorial.md)
 
-本课表与 [demo.html](../../demo.html) 索引一一对应：按 **Track 0 → 7** 从核心运行时契约到工具链、宿主应用、stat 域与场景文字。
+本课表与 [demo.html](../../examples/html-demo/demo.html) 索引一一对应：按 **Track 0 → 7** 从核心运行时契约到工具链、宿主应用、stat 域与场景文字。
 
-**运行方式**：在仓库根目录启动静态服务（如 `python -m http.server 8080`），打开 `http://localhost:8080/demo.html`。
+**运行方式**：在仓库根目录启动静态服务（如 `python -m http.server 8080`），打开 `http://localhost:8080/examples/html-demo/demo.html`。
 
 ## Track 0 · 运行时与 JSON 契约
 

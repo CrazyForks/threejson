@@ -3,7 +3,7 @@
     "id": "t00-01-simple",
     "track": "00",
     "order": "00",
-    "path": "./examples/html-demo/track-00-runtime/00-00-simple-mesh.html",
+    "path": "./track-00-runtime/00-00-simple-mesh.html",
     "jsonFiles": [],
     "prerequisites": [],
     "status": "stable",
@@ -18,11 +18,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/quick-start.md",
+        "href": "../../docs/zh/quick-start.md",
         "label": "快速开始"
       },
       {
-        "href": "./docs/zh/json-format.md#盒子-box",
+        "href": "../../docs/zh/json-format.md#盒子-box",
         "label": "JSON：盒子 box"
       }
     ]
@@ -31,10 +31,10 @@
     "id": "t00-01",
     "track": "00",
     "order": "01",
-    "path": "./examples/html-demo/track-00-runtime/00-01-minimal-mesh.html",
+    "path": "./track-00-runtime/00-01-minimal-mesh.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-00/00-01-minimal-mesh.json"
+        "json": "../../assets/json/tutorial/track-00/00-01-minimal-mesh.json"
       }
     ],
     "prerequisites": [],
@@ -50,15 +50,15 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/quick-start.md",
+        "href": "../../docs/zh/quick-start.md",
         "label": "快速开始"
       },
       {
-        "href": "./docs/zh/json-format.md#盒子-box",
+        "href": "../../docs/zh/json-format.md#盒子-box",
         "label": "JSON：盒子 box"
       },
       {
-        "href": "./docs/zh/json-format.md#声明式动画-animations",
+        "href": "../../docs/zh/json-format.md#声明式动画-animations",
         "label": "声明式动画"
       }
     ]
@@ -67,10 +67,10 @@
     "id": "t00-02",
     "track": "00",
     "order": "02",
-    "path": "./examples/html-demo/track-00-runtime/00-02-primitives-materials.html",
+    "path": "./track-00-runtime/00-02-primitives-materials.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-00/00-02-primitives.json"
+        "json": "../../assets/json/tutorial/track-00/00-02-primitives.json"
       }
     ],
     "prerequisites": [
@@ -88,11 +88,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#其他基础几何体-primitive",
+        "href": "../../docs/zh/json-format.md#其他基础几何体-primitive",
         "label": "JSON：其他基础几何"
       },
       {
-        "href": "./docs/zh/json-format.md#球体-sphere",
+        "href": "../../docs/zh/json-format.md#球体-sphere",
         "label": "JSON：球体"
       }
     ]
@@ -101,10 +101,10 @@
     "id": "t00-03",
     "track": "00",
     "order": "03",
-    "path": "./examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html",
+    "path": "./track-00-runtime/00-03-friendly-full-scene.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-00/00-03-friendly-full-scene.json"
+        "json": "../../assets/json/tutorial/track-00/00-03-friendly-full-scene.json"
       }
     ],
     "prerequisites": [
@@ -122,11 +122,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#人类友好-json",
+        "href": "../../docs/zh/json-format.md#人类友好-json",
         "label": "人类友好 JSON"
       },
       {
-        "href": "./docs/zh/json-format.md#friendlymap",
+        "href": "../../docs/zh/json-format.md#friendlymap",
         "label": "friendlyMap"
       }
     ]
@@ -135,10 +135,10 @@
     "id": "t00-04",
     "track": "00",
     "order": "04",
-    "path": "./examples/html-demo/track-00-runtime/00-04-standard-objectlist.html",
+    "path": "./track-00-runtime/00-04-standard-objectlist.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-00/00-04-standard-objectlist.json"
+        "json": "../../assets/json/tutorial/track-00/00-04-standard-objectlist.json"
       }
     ],
     "prerequisites": [
@@ -156,11 +156,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#标准-json",
+        "href": "../../docs/zh/json-format.md#标准-json",
         "label": "标准 JSON"
       },
       {
-        "href": "./docs/zh/json-format.md#objectlist-分发规则",
+        "href": "../../docs/zh/json-format.md#objectlist-分发规则",
         "label": "objectList 分发"
       }
     ]
@@ -169,10 +169,10 @@
     "id": "t00-05",
     "track": "00",
     "order": "05",
-    "path": "./examples/html-demo/track-00-runtime/00-05-import-paths.html",
+    "path": "./track-00-runtime/00-05-import-paths.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-00/00-03-friendly-full-scene.json"
+        "json": "../../assets/json/tutorial/track-00/00-03-friendly-full-scene.json"
       }
     ],
     "prerequisites": [
@@ -190,11 +190,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/domains.md",
+        "href": "../../docs/zh/domains.md",
         "label": "业务域"
       },
       {
-        "href": "./examples/html-demo/README.md",
+        "href": "./README.md",
         "label": "html-demo README"
       }
     ]
@@ -203,7 +203,7 @@
     "id": "t00-06",
     "track": "00",
     "order": "06",
-    "path": "./examples/html-demo/track-00-runtime/00-06-resource-reclaimer.html",
+    "path": "./track-00-runtime/00-06-resource-reclaimer.html",
     "jsonFiles": [],
     "prerequisites": [
       "t00-01"
@@ -220,11 +220,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/api.md#disposebythreejsonidscene-threejsonid-options--detachbythreejsonid",
+        "href": "../../docs/zh/api.md#disposebythreejsonidscene-threejsonid-options--detachbythreejsonid",
         "label": "disposeByThreeJsonId"
       },
       {
-        "href": "./examples/html-demo/README.md",
+        "href": "./README.md",
         "label": "html-demo README"
       }
     ]
@@ -233,7 +233,7 @@
     "id": "t00-07",
     "track": "00",
     "order": "07",
-    "path": "./examples/html-demo/track-00-runtime/00-07-manual-deploy-mesh.html",
+    "path": "./track-00-runtime/00-07-manual-deploy-mesh.html",
     "jsonFiles": [],
     "prerequisites": [
       "t00-01"
@@ -250,11 +250,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/README.md",
+        "href": "../../docs/zh/README.md",
         "label": "调用者手册"
       },
       {
-        "href": "./docs/zh/json-format.md#盒子-box",
+        "href": "../../docs/zh/json-format.md#盒子-box",
         "label": "JSON：盒子 box"
       }
     ]
@@ -263,10 +263,10 @@
     "id": "t00-08",
     "track": "00",
     "order": "08",
-    "path": "./examples/html-demo/track-00-runtime/00-08-scene-intro.html",
+    "path": "./track-00-runtime/00-08-scene-intro.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-00/00-08-scene-intro.json"
+        "json": "../../assets/json/tutorial/track-00/00-08-scene-intro.json"
       }
     ],
     "prerequisites": [
@@ -285,11 +285,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#sceneconfigintro-可选加载完成后片头",
+        "href": "../../docs/zh/json-format.md#sceneconfigintro-可选加载完成后片头",
         "label": "JSON：sceneConfig.intro"
       },
       {
-        "href": "./docs/zh/scene-load-lifecycle.md",
+        "href": "../../docs/zh/scene-load-lifecycle.md",
         "label": "场景加载生命周期"
       }
     ]
@@ -298,10 +298,10 @@
     "id": "t01-01",
     "track": "01",
     "order": "01",
-    "path": "./examples/html-demo/track-01-geometry/01-01-group-line-panel.html",
+    "path": "./track-01-geometry/01-01-group-line-panel.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-01/01-01-group-line-panel.json"
+        "json": "../../assets/json/tutorial/track-01/01-01-group-line-panel.json"
       }
     ],
     "prerequisites": [
@@ -319,19 +319,19 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#组合-group",
+        "href": "../../docs/zh/json-format.md#组合-group",
         "label": "组合 group"
       },
       {
-        "href": "./docs/zh/json-format.md#线条-line",
+        "href": "../../docs/zh/json-format.md#线条-line",
         "label": "线条 line"
       },
       {
-        "href": "./docs/zh/json-format.md#信息面板-infopanel",
+        "href": "../../docs/zh/json-format.md#信息面板-infopanel",
         "label": "信息面板"
       },
       {
-        "href": "./docs/zh/info-panels.md",
+        "href": "../../docs/zh/info-panels.md",
         "label": "信息面板专题"
       }
     ]
@@ -340,10 +340,10 @@
     "id": "t01-02",
     "track": "01",
     "order": "02",
-    "path": "./examples/html-demo/track-01-geometry/01-02-plane-line-topology.html",
+    "path": "./track-01-geometry/01-02-plane-line-topology.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-01/01-02-plane-line-topology.json"
+        "json": "../../assets/json/tutorial/track-01/01-02-plane-line-topology.json"
       }
     ],
     "prerequisites": [
@@ -361,11 +361,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#plane贴图纯色平面",
+        "href": "../../docs/zh/json-format.md#plane贴图纯色平面",
         "label": "plane"
       },
       {
-        "href": "./docs/zh/json-format.md#line-拓扑-topology",
+        "href": "../../docs/zh/json-format.md#line-拓扑-topology",
         "label": "line 拓扑"
       }
     ]
@@ -374,10 +374,10 @@
     "id": "t01-03",
     "track": "01",
     "order": "03",
-    "path": "./examples/html-demo/track-01-geometry/01-03-preset-objtypes.html",
+    "path": "./track-01-geometry/01-03-preset-objtypes.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-01/01-03-preset-objtypes.json"
+        "json": "../../assets/json/tutorial/track-01/01-03-preset-objtypes.json"
       }
     ],
     "prerequisites": [
@@ -395,7 +395,7 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#预设-objtypewallglass-等",
+        "href": "../../docs/zh/json-format.md#预设-objtypewallglass-等",
         "label": "预设 objType"
       }
     ]
@@ -404,10 +404,10 @@
     "id": "t01-04",
     "track": "01",
     "order": "04",
-    "path": "./examples/html-demo/track-01-geometry/01-04-csg-joins.html",
+    "path": "./track-01-geometry/01-04-csg-joins.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-01/01-04-csg-joins.json"
+        "json": "../../assets/json/tutorial/track-01/01-04-csg-joins.json"
       }
     ],
     "prerequisites": [
@@ -425,7 +425,7 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#csg合并相交挖洞",
+        "href": "../../docs/zh/json-format.md#csg合并相交挖洞",
         "label": "CSG"
       }
     ]
@@ -434,10 +434,10 @@
     "id": "t01-05",
     "track": "01",
     "order": "05",
-    "path": "./examples/html-demo/track-01-geometry/01-05-helpers-irregular-geometry.html",
+    "path": "./track-01-geometry/01-05-helpers-irregular-geometry.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-01/01-05-helpers-irregular.json"
+        "json": "../../assets/json/tutorial/track-01/01-05-helpers-irregular.json"
       }
     ],
     "prerequisites": [
@@ -455,15 +455,15 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#sceneconfighelpersgrid--axes-辅助线",
+        "href": "../../docs/zh/json-format.md#sceneconfighelpersgrid--axes-辅助线",
         "label": "sceneConfig.helpers"
       },
       {
-        "href": "./docs/zh/json-format.md#shapeplane--irregularplane不规则平面",
+        "href": "../../docs/zh/json-format.md#shapeplane--irregularplane不规则平面",
         "label": "irregularPlane"
       },
       {
-        "href": "./docs/zh/json-format.md#shapeextrude--irregulargeometry不规则几何体",
+        "href": "../../docs/zh/json-format.md#shapeextrude--irregulargeometry不规则几何体",
         "label": "shapeExtrude"
       }
     ]
@@ -472,10 +472,10 @@
     "id": "t01-06",
     "track": "01",
     "order": "06",
-    "path": "./examples/html-demo/track-01-geometry/01-06-native-object-dispatch.html",
+    "path": "./track-01-geometry/01-06-native-object-dispatch.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-01/01-06-native-objects.json"
+        "json": "../../assets/json/tutorial/track-01/01-06-native-objects.json"
       }
     ],
     "prerequisites": [
@@ -494,11 +494,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#objtype-native通用-threejs-对象",
+        "href": "../../docs/zh/json-format.md#objtype-native通用-threejs-对象",
         "label": "objType: native"
       },
       {
-        "href": "./lab/native-object-dispatch-memo.md",
+        "href": "../../lab/native-object-dispatch-memo.md",
         "label": "lab 备忘"
       }
     ]
@@ -507,10 +507,10 @@
     "id": "t01-07",
     "track": "01",
     "order": "07",
-    "path": "./examples/html-demo/track-01-geometry/01-07-jsm-geometries.html",
+    "path": "./track-01-geometry/01-07-jsm-geometries.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-01/01-07-jsm-geometries.json"
+        "json": "../../assets/json/tutorial/track-01/01-07-jsm-geometries.json"
       }
     ],
     "prerequisites": [
@@ -528,11 +528,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#objtype-native通用-threejs-对象",
+        "href": "../../docs/zh/json-format.md#objtype-native通用-threejs-对象",
         "label": "objType: native"
       },
       {
-        "href": "./docs/zh/json-format.md",
+        "href": "../../docs/zh/json-format.md",
         "label": "assetLibrary"
       }
     ]
@@ -541,10 +541,10 @@
     "id": "t01-08",
     "track": "01",
     "order": "08",
-    "path": "./examples/html-demo/track-01-geometry/01-08-ortho-fly.html",
+    "path": "./track-01-geometry/01-08-ortho-fly.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-01/01-08-ortho-fly.json"
+        "json": "../../assets/json/tutorial/track-01/01-08-ortho-fly.json"
       }
     ],
     "prerequisites": [
@@ -562,11 +562,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md",
+        "href": "../../docs/zh/json-format.md",
         "label": "相机 type"
       },
       {
-        "href": "./docs/zh/json-format.md",
+        "href": "../../docs/zh/json-format.md",
         "label": "controls fly"
       }
     ]
@@ -575,10 +575,10 @@
     "id": "t02-01",
     "track": "02",
     "order": "01",
-    "path": "./examples/html-demo/track-02-visual-fx/02-01-heatmap-wind.html",
+    "path": "./track-02-visual-fx/02-01-heatmap-wind.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-02/02-01-heatmap-wind.json"
+        "json": "../../assets/json/tutorial/track-02/02-01-heatmap-wind.json"
       }
     ],
     "prerequisites": [
@@ -596,11 +596,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#热力图-heatmap",
+        "href": "../../docs/zh/json-format.md#热力图-heatmap",
         "label": "热力图"
       },
       {
-        "href": "./docs/zh/json-format.md#动态平面-wind",
+        "href": "../../docs/zh/json-format.md#动态平面-wind",
         "label": "动态平面 wind"
       }
     ]
@@ -609,10 +609,10 @@
     "id": "t02-02",
     "track": "02",
     "order": "02",
-    "path": "./examples/html-demo/track-02-visual-fx/02-02-points-motion.html",
+    "path": "./track-02-visual-fx/02-02-points-motion.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-02/02-02-points-motion.json"
+        "json": "../../assets/json/tutorial/track-02/02-02-points-motion.json"
       }
     ],
     "prerequisites": [
@@ -630,7 +630,7 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#point点云-粒子",
+        "href": "../../docs/zh/json-format.md#point点云-粒子",
         "label": "points"
       }
     ]
@@ -639,10 +639,10 @@
     "id": "t02-03",
     "track": "02",
     "order": "03",
-    "path": "./examples/html-demo/track-02-visual-fx/02-03-weather-domain.html",
+    "path": "./track-02-visual-fx/02-03-weather-domain.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-02/02-03-weather-domain.json"
+        "json": "../../assets/json/tutorial/track-02/02-03-weather-domain.json"
       }
     ],
     "prerequisites": [
@@ -660,11 +660,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#domain-weather天气粒子预设",
+        "href": "../../docs/zh/json-format.md#domain-weather天气粒子预设",
         "label": "weather 域"
       },
       {
-        "href": "./docs/zh/domains.md",
+        "href": "../../docs/zh/domains.md",
         "label": "domains.md"
       }
     ]
@@ -673,10 +673,10 @@
     "id": "t02-04",
     "track": "02",
     "order": "04",
-    "path": "./examples/html-demo/track-02-visual-fx/02-04-sprite-tube-instanced.html",
+    "path": "./track-02-visual-fx/02-04-sprite-tube-instanced.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-02/02-04-sprite-tube-instanced.json"
+        "json": "../../assets/json/tutorial/track-02/02-04-sprite-tube-instanced.json"
       }
     ],
     "prerequisites": [
@@ -694,15 +694,15 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#sprite图标-标记",
+        "href": "../../docs/zh/json-format.md#sprite图标-标记",
         "label": "sprite"
       },
       {
-        "href": "./docs/zh/json-format.md#tube管道路径",
+        "href": "../../docs/zh/json-format.md#tube管道路径",
         "label": "tube"
       },
       {
-        "href": "./docs/zh/json-format.md#instanced显式-instancedmesh",
+        "href": "../../docs/zh/json-format.md#instanced显式-instancedmesh",
         "label": "instanced"
       }
     ]
@@ -711,10 +711,10 @@
     "id": "t02-05",
     "track": "02",
     "order": "05",
-    "path": "./examples/html-demo/track-02-visual-fx/02-05-scene-background.html",
+    "path": "./track-02-visual-fx/02-05-scene-background.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-02/02-05-scene-background.json"
+        "json": "../../assets/json/tutorial/track-02/02-05-scene-background.json"
       }
     ],
     "prerequisites": [
@@ -732,7 +732,7 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#sceneconfigscenebackground-与-environment",
+        "href": "../../docs/zh/json-format.md#sceneconfigscenebackground-与-environment",
         "label": "background / environment"
       }
     ]
@@ -741,10 +741,10 @@
     "id": "t02-06",
     "track": "02",
     "order": "06",
-    "path": "./examples/html-demo/track-02-visual-fx/02-06-audio-spatial.html",
+    "path": "./track-02-visual-fx/02-06-audio-spatial.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-02/02-06-audio-spatial.json"
+        "json": "../../assets/json/tutorial/track-02/02-06-audio-spatial.json"
       }
     ],
     "prerequisites": [
@@ -762,7 +762,7 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#audio",
+        "href": "../../docs/zh/json-format.md#audio",
         "label": "audio"
       }
     ]
@@ -771,10 +771,10 @@
     "id": "t02-09",
     "track": "02",
     "order": "09",
-    "path": "./examples/html-demo/track-02-visual-fx/02-09-particle-emitter-gpu.html",
+    "path": "./track-02-visual-fx/02-09-particle-emitter-gpu.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-02/02-09-particle-emitter-gpu.json"
+        "json": "../../assets/json/tutorial/track-02/02-09-particle-emitter-gpu.json"
       }
     ],
     "prerequisites": [
@@ -792,7 +792,7 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#particleemitter统一粒子发射器",
+        "href": "../../docs/zh/json-format.md#particleemitter统一粒子发射器",
         "label": "particleEmitter"
       }
     ]
@@ -801,10 +801,10 @@
     "id": "t02-10",
     "track": "02",
     "order": "10",
-    "path": "./examples/html-demo/track-02-visual-fx/02-10-particle-nebula-provider.html",
+    "path": "./track-02-visual-fx/02-10-particle-nebula-provider.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-02/02-10-particle-nebula-provider.json"
+        "json": "../../assets/json/tutorial/track-02/02-10-particle-nebula-provider.json"
       }
     ],
     "prerequisites": [
@@ -822,11 +822,11 @@
     ],
     "docLinks": [
       {
-        "href": "./extensions/particle-nebula/README.md",
+        "href": "../../extensions/particle-nebula/README.md",
         "label": "particle-nebula README"
       },
       {
-        "href": "./docs/zh/json-format.md#particleemitter统一粒子发射器",
+        "href": "../../docs/zh/json-format.md#particleemitter统一粒子发射器",
         "label": "particleEmitter"
       }
     ]
@@ -835,10 +835,10 @@
     "id": "t02-11",
     "track": "02",
     "order": "11",
-    "path": "./examples/html-demo/track-02-visual-fx/02-11-texture-sampling-toggle.html",
+    "path": "./track-02-visual-fx/02-11-texture-sampling-toggle.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-02/02-11-texture-sampling-toggle.json"
+        "json": "../../assets/json/tutorial/track-02/02-11-texture-sampling-toggle.json"
       }
     ],
     "prerequisites": [
@@ -856,11 +856,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#纹理采样-texturequality",
+        "href": "../../docs/zh/json-format.md#纹理采样-texturequality",
         "label": "纹理采样 textureQuality"
       },
       {
-        "href": "./docs/zh/api.md#coreutiltexturesamplingjs",
+        "href": "../../docs/zh/api.md#coreutiltexturesamplingjs",
         "label": "textureSampling API"
       }
     ]
@@ -869,10 +869,10 @@
     "id": "t02-sky",
     "track": "02",
     "order": "07",
-    "path": "./examples/html-demo/track-02-visual-fx/02-08-shader-sky-cycle.html",
+    "path": "./track-02-visual-fx/02-08-shader-sky-cycle.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-02/02-08-shader-sky-cycle.json"
+        "json": "../../assets/json/tutorial/track-02/02-08-shader-sky-cycle.json"
       }
     ],
     "prerequisites": [
@@ -890,11 +890,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#shadersurfacecore-通用-shader-面",
+        "href": "../../docs/zh/json-format.md#shadersurfacecore-通用-shader-面",
         "label": "shaderSurface / nature.sky"
       },
       {
-        "href": "./lab/shader-preset-architecture.md",
+        "href": "../../lab/shader-preset-architecture.md",
         "label": "Shader 架构契约"
       }
     ],
@@ -902,10 +902,10 @@
       {
         "id": "t02-07",
         "order": "A",
-        "path": "./examples/html-demo/track-02-visual-fx/02-07-shader-sky-water.html",
+        "path": "./track-02-visual-fx/02-07-shader-sky-water.html",
         "jsonFiles": [
           {
-            "json": "./assets/json/tutorial/track-02/02-07-shader-sky-water.json"
+            "json": "../../assets/json/tutorial/track-02/02-07-shader-sky-water.json"
           }
         ],
         "prerequisites": [
@@ -926,10 +926,10 @@
       {
         "id": "t02-08",
         "order": "B",
-        "path": "./examples/html-demo/track-02-visual-fx/02-08-shader-sky-cycle.html",
+        "path": "./track-02-visual-fx/02-08-shader-sky-cycle.html",
         "jsonFiles": [
           {
-            "json": "./assets/json/tutorial/track-02/02-08-shader-sky-cycle.json"
+            "json": "../../assets/json/tutorial/track-02/02-08-shader-sky-cycle.json"
           }
         ],
         "prerequisites": [
@@ -953,10 +953,10 @@
     "id": "t03-01",
     "track": "03",
     "order": "01",
-    "path": "./examples/html-demo/track-03-assets/03-01-external-gltf.html",
+    "path": "./track-03-assets/03-01-external-gltf.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-03/03-01-external-gltf.json"
+        "json": "../../assets/json/tutorial/track-03/03-01-external-gltf.json"
       }
     ],
     "prerequisites": [
@@ -974,7 +974,7 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#externalmodel",
+        "href": "../../docs/zh/json-format.md#externalmodel",
         "label": "externalModel"
       }
     ]
@@ -983,10 +983,10 @@
     "id": "t03-02",
     "track": "03",
     "order": "02",
-    "path": "./examples/html-demo/track-03-assets/03-02-gltf-animation-mixer.html",
+    "path": "./track-03-assets/03-02-gltf-animation-mixer.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-03/03-02-gltf-animation-mixer.json"
+        "json": "../../assets/json/tutorial/track-03/03-02-gltf-animation-mixer.json"
       }
     ],
     "prerequisites": [
@@ -1004,7 +1004,7 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#animationmode-可选",
+        "href": "../../docs/zh/json-format.md#animationmode-可选",
         "label": "animationMode"
       }
     ]
@@ -1013,10 +1013,10 @@
     "id": "t03-03",
     "track": "03",
     "order": "03",
-    "path": "./examples/html-demo/track-03-assets/03-03-native-three-domain.html",
+    "path": "./track-03-assets/03-03-native-three-domain.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-03/03-03-native-three-domain.json"
+        "json": "../../assets/json/tutorial/track-03/03-03-native-three-domain.json"
       }
     ],
     "prerequisites": [
@@ -1034,7 +1034,7 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#外部模型-objgltfglbthreejson",
+        "href": "../../docs/zh/json-format.md#外部模型-objgltfglbthreejson",
         "label": "外部模型与原生 JSON"
       }
     ]
@@ -1043,10 +1043,10 @@
     "id": "t03-04",
     "track": "03",
     "order": "04",
-    "path": "./examples/html-demo/track-03-assets/03-04-obj-maps-fallback.html",
+    "path": "./track-03-assets/03-04-obj-maps-fallback.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-03/03-04-obj-maps-fallback.json"
+        "json": "../../assets/json/tutorial/track-03/03-04-obj-maps-fallback.json"
       }
     ],
     "prerequisites": [
@@ -1064,7 +1064,7 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#obj-同目录-maps-回退",
+        "href": "../../docs/zh/json-format.md#obj-同目录-maps-回退",
         "label": "OBJ maps 回退"
       }
     ]
@@ -1073,10 +1073,10 @@
     "id": "t03-06",
     "track": "03",
     "order": "06",
-    "path": "./examples/html-demo/track-03-assets/03-06-animation-graph.html",
+    "path": "./track-03-assets/03-06-animation-graph.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-03/03-06-animation-graph.json"
+        "json": "../../assets/json/tutorial/track-03/03-06-animation-graph.json"
       }
     ],
     "prerequisites": [
@@ -1094,7 +1094,7 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#animationgraph可选gltf-动画状态机",
+        "href": "../../docs/zh/json-format.md#animationgraph可选gltf-动画状态机",
         "label": "animationGraph"
       }
     ]
@@ -1103,10 +1103,10 @@
     "id": "t04-01",
     "track": "04",
     "order": "01",
-    "path": "./examples/html-demo/track-04-interaction/04-01-object-registry.html",
+    "path": "./track-04-interaction/04-01-object-registry.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-04/04-01-object-registry.json"
+        "json": "../../assets/json/tutorial/track-04/04-01-object-registry.json"
       }
     ],
     "prerequisites": [
@@ -1124,7 +1124,7 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#运行时对象查询",
+        "href": "../../docs/zh/json-format.md#运行时对象查询",
         "label": "运行时对象查询"
       }
     ]
@@ -1133,10 +1133,10 @@
     "id": "t04-02",
     "track": "04",
     "order": "02",
-    "path": "./examples/html-demo/track-04-interaction/04-02-plugin-physics.html",
+    "path": "./track-04-interaction/04-02-plugin-physics.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-04/04-02-plugin-physics.json"
+        "json": "../../assets/json/tutorial/track-04/04-02-plugin-physics.json"
       }
     ],
     "prerequisites": [
@@ -1154,11 +1154,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/scope.md",
+        "href": "../../docs/zh/scope.md",
         "label": "scope.md"
       },
       {
-        "href": "./extensions/physics-rapier/README.md",
+        "href": "../../extensions/physics-rapier/README.md",
         "label": "physics-rapier README"
       }
     ]
@@ -1167,10 +1167,10 @@
     "id": "t04-fps",
     "track": "04",
     "order": "03",
-    "path": "./examples/html-demo/track-04-interaction/04-05-fps-rapier-collision.html",
+    "path": "./track-04-interaction/04-05-fps-rapier-collision.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-04/04-05-fps-rapier-collision.json"
+        "json": "../../assets/json/tutorial/track-04/04-05-fps-rapier-collision.json"
       }
     ],
     "prerequisites": [
@@ -1188,15 +1188,15 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#objtype-controls视口控制器",
+        "href": "../../docs/zh/json-format.md#objtype-controls视口控制器",
         "label": "controls"
       },
       {
-        "href": "./extensions/fps-walk/README.md",
+        "href": "../../extensions/fps-walk/README.md",
         "label": "fps-walk"
       },
       {
-        "href": "./lab/first-person-integration.md",
+        "href": "../../lab/first-person-integration.md",
         "label": "first-person-integration"
       }
     ],
@@ -1204,10 +1204,10 @@
       {
         "id": "t04-03",
         "order": "A",
-        "path": "./examples/html-demo/track-04-interaction/04-03-fps-walk.html",
+        "path": "./track-04-interaction/04-03-fps-walk.html",
         "jsonFiles": [
           {
-            "json": "./assets/json/tutorial/track-04/04-03-fps-walk.json"
+            "json": "../../assets/json/tutorial/track-04/04-03-fps-walk.json"
           }
         ],
         "prerequisites": [
@@ -1228,10 +1228,10 @@
       {
         "id": "t04-04",
         "order": "B",
-        "path": "./examples/html-demo/track-04-interaction/04-04-fps-player-rig.html",
+        "path": "./track-04-interaction/04-04-fps-player-rig.html",
         "jsonFiles": [
           {
-            "json": "./assets/json/tutorial/track-04/04-04-fps-player-rig.json"
+            "json": "../../assets/json/tutorial/track-04/04-04-fps-player-rig.json"
           }
         ],
         "prerequisites": [
@@ -1252,10 +1252,10 @@
       {
         "id": "t04-05",
         "order": "C",
-        "path": "./examples/html-demo/track-04-interaction/04-05-fps-rapier-collision.html",
+        "path": "./track-04-interaction/04-05-fps-rapier-collision.html",
         "jsonFiles": [
           {
-            "json": "./assets/json/tutorial/track-04/04-05-fps-rapier-collision.json"
+            "json": "../../assets/json/tutorial/track-04/04-05-fps-rapier-collision.json"
           }
         ],
         "prerequisites": [
@@ -1280,10 +1280,10 @@
     "id": "t04-09",
     "track": "04",
     "order": "09",
-    "path": "./examples/html-demo/track-04-interaction/04-09-event-mechanism.html",
+    "path": "./track-04-interaction/04-09-event-mechanism.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-04/04-09-event-mechanism.json"
+        "json": "../../assets/json/tutorial/track-04/04-09-event-mechanism.json"
       }
     ],
     "prerequisites": [
@@ -1303,15 +1303,15 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/event-mechanism.md#一事件机制使用方法",
+        "href": "../../docs/zh/event-mechanism.md#一事件机制使用方法",
         "label": "事件机制"
       },
       {
-        "href": "./docs/zh/event-mechanism.md#二eventscript-语法",
+        "href": "../../docs/zh/event-mechanism.md#二eventscript-语法",
         "label": "EventScript 语法"
       },
       {
-        "href": "./docs/zh/json-format.md",
+        "href": "../../docs/zh/json-format.md",
         "label": "JSON events"
       }
     ]
@@ -1320,10 +1320,10 @@
     "id": "t04-10",
     "track": "04",
     "order": "10",
-    "path": "./examples/html-demo/track-04-interaction/04-10-object-lifecycle.html",
+    "path": "./track-04-interaction/04-10-object-lifecycle.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-04/04-10-object-lifecycle.json"
+        "json": "../../assets/json/tutorial/track-04/04-10-object-lifecycle.json"
       }
     ],
     "prerequisites": [
@@ -1341,7 +1341,7 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/event-mechanism.md#131-单对象-lifecycle-与场景-load-的区别",
+        "href": "../../docs/zh/event-mechanism.md#131-单对象-lifecycle-与场景-load-的区别",
         "label": "object lifecycle"
       }
     ]
@@ -1350,10 +1350,10 @@
     "id": "t04-11",
     "track": "04",
     "order": "11",
-    "path": "./examples/html-demo/track-04-interaction/04-11-declarative-actions.html",
+    "path": "./track-04-interaction/04-11-declarative-actions.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-04/04-11-declarative-actions.json"
+        "json": "../../assets/json/tutorial/track-04/04-11-declarative-actions.json"
       }
     ],
     "prerequisites": [
@@ -1371,7 +1371,7 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/event-mechanism.md#12-jsonevents-块",
+        "href": "../../docs/zh/event-mechanism.md#12-jsonevents-块",
         "label": "JSON actions"
       }
     ]
@@ -1380,10 +1380,10 @@
     "id": "t04-08",
     "track": "04",
     "order": "03",
-    "path": "./examples/html-demo/track-04-interaction/04-08-info-panel-gallery.html",
+    "path": "./track-04-interaction/04-08-info-panel-gallery.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-04/04-08-info-panel-gallery.json"
+        "json": "../../assets/json/tutorial/track-04/04-08-info-panel-gallery.json"
       }
     ],
     "prerequisites": [
@@ -1402,11 +1402,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/info-panels.md",
+        "href": "../../docs/zh/info-panels.md",
         "label": "信息面板专题"
       },
       {
-        "href": "./docs/zh/json-format.md#信息面板-infopanel",
+        "href": "../../docs/zh/json-format.md#信息面板-infopanel",
         "label": "infoPanel JSON"
       }
     ]
@@ -1415,10 +1415,10 @@
     "id": "t04-06",
     "track": "04",
     "order": "04",
-    "path": "./examples/html-demo/track-04-interaction/04-06-css3d-panel.html",
+    "path": "./track-04-interaction/04-06-css3d-panel.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-04/04-06-css3d-panel.json"
+        "json": "../../assets/json/tutorial/track-04/04-06-css3d-panel.json"
       }
     ],
     "prerequisites": [
@@ -1436,7 +1436,7 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#可交互-css3d-面板-css3dpanelcore",
+        "href": "../../docs/zh/json-format.md#可交互-css3d-面板-css3dpanelcore",
         "label": "css3dPanel"
       }
     ],
@@ -1444,10 +1444,10 @@
       {
         "id": "t04-07",
         "order": "B",
-        "path": "./examples/html-demo/track-04-interaction/04-07-css3d-curved-browser.html",
+        "path": "./track-04-interaction/04-07-css3d-curved-browser.html",
         "jsonFiles": [
           {
-            "json": "./assets/json/tutorial/track-04/04-07-css3d-curved-google.json"
+            "json": "../../assets/json/tutorial/track-04/04-07-css3d-curved-google.json"
           }
         ],
         "prerequisites": [],
@@ -1469,10 +1469,10 @@
     "id": "t05-01",
     "track": "05",
     "order": "01",
-    "path": "./examples/html-demo/track-05-tooling/05-01-ai-scene.html",
+    "path": "./track-05-tooling/05-01-ai-scene.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-05/05-01-ai-scene.json"
+        "json": "../../assets/json/tutorial/track-05/05-01-ai-scene.json"
       }
     ],
     "prerequisites": [
@@ -1491,11 +1491,11 @@
     ],
     "docLinks": [
       {
-        "href": "./core/ai/README.md",
+        "href": "../../core/ai/README.md",
         "label": "AI README"
       },
       {
-        "href": "./docs/zh/mcp-cursor.md",
+        "href": "../../docs/zh/mcp-cursor.md",
         "label": "mcp-cursor"
       }
     ]
@@ -1504,10 +1504,10 @@
     "id": "t05-02a",
     "track": "05",
     "order": "02",
-    "path": "./examples/html-demo/track-05-tooling/05-02-nested-domain.html",
+    "path": "./track-05-tooling/05-02-nested-domain.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-05/05-02-nested-domain.json"
+        "json": "../../assets/json/tutorial/track-05/05-02-nested-domain.json"
       }
     ],
     "prerequisites": [
@@ -1525,11 +1525,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/domains.md",
+        "href": "../../docs/zh/domains.md",
         "label": "domains.md"
       },
       {
-        "href": "./docs/zh/json-format.md#domain-weather天气粒子预设",
+        "href": "../../docs/zh/json-format.md#domain-weather天气粒子预设",
         "label": "weather 域"
       }
     ]
@@ -1538,10 +1538,10 @@
     "id": "t05-02",
     "track": "05",
     "order": "01",
-    "path": "./room-show.html",
+    "path": "../../room-show.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/roomShow.json"
+        "json": "../../assets/json/roomShow.json"
       }
     ],
     "prerequisites": [
@@ -1559,7 +1559,7 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md#world-业务场景-json扩展",
+        "href": "../../docs/zh/json-format.md#world-业务场景-json扩展",
         "label": "World 业务 JSON"
       }
     ]
@@ -1568,10 +1568,10 @@
     "id": "t05-05",
     "track": "05",
     "order": "02",
-    "path": "./port-show.html",
+    "path": "../../port-show.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/portShow.json"
+        "json": "../../assets/json/portShow.json"
       }
     ],
     "prerequisites": [
@@ -1589,7 +1589,7 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/demos.md",
+        "href": "../../docs/zh/demos.md",
         "label": "演示说明"
       }
     ]
@@ -1598,10 +1598,10 @@
     "id": "t05-03",
     "track": "05",
     "order": "03",
-    "path": "./scene-editor.html",
+    "path": "../../scene-editor.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/portShow.json"
+        "json": "../../assets/json/portShow.json"
       }
     ],
     "prerequisites": [
@@ -1619,7 +1619,7 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/demos.md",
+        "href": "../../docs/zh/demos.md",
         "label": "演示说明"
       }
     ]
@@ -1628,10 +1628,10 @@
     "id": "t05-04",
     "track": "05",
     "order": "04",
-    "path": "./scene-player.html",
+    "path": "../../scene-player.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/portShow.json"
+        "json": "../../assets/json/portShow.json"
       }
     ],
     "prerequisites": [
@@ -1649,7 +1649,7 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/demos.md",
+        "href": "../../docs/zh/demos.md",
         "label": "演示说明"
       }
     ]
@@ -1658,10 +1658,10 @@
     "id": "t06-stat",
     "track": "06",
     "order": "01",
-    "path": "./examples/html-demo/track-06-stat/06-02-stat-grid.html",
+    "path": "./track-06-stat/06-02-stat-grid.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-06/06-02-stat-grid.json"
+        "json": "../../assets/json/tutorial/track-06/06-02-stat-grid.json"
       }
     ],
     "prerequisites": [
@@ -1679,11 +1679,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/domains.md",
+        "href": "../../docs/zh/domains.md",
         "label": "业务域"
       },
       {
-        "href": "./extensions/stat-echarts/README.md",
+        "href": "../../extensions/stat-echarts/README.md",
         "label": "stat-echarts README"
       }
     ],
@@ -1691,10 +1691,10 @@
       {
         "id": "t06-01",
         "order": "A",
-        "path": "./examples/html-demo/track-06-stat/06-01-stat-bar.html",
+        "path": "./track-06-stat/06-01-stat-bar.html",
         "jsonFiles": [
           {
-            "json": "./assets/json/tutorial/track-06/06-01-stat-bar.json"
+            "json": "../../assets/json/tutorial/track-06/06-01-stat-bar.json"
           }
         ],
         "prerequisites": [
@@ -1715,10 +1715,10 @@
       {
         "id": "t06-02",
         "order": "B",
-        "path": "./examples/html-demo/track-06-stat/06-02-stat-grid.html",
+        "path": "./track-06-stat/06-02-stat-grid.html",
         "jsonFiles": [
           {
-            "json": "./assets/json/tutorial/track-06/06-02-stat-grid.json"
+            "json": "../../assets/json/tutorial/track-06/06-02-stat-grid.json"
           }
         ],
         "prerequisites": [
@@ -1739,10 +1739,10 @@
       {
         "id": "t06-03",
         "order": "C",
-        "path": "./examples/html-demo/track-06-stat/06-03-stat-panel.html",
+        "path": "./track-06-stat/06-03-stat-panel.html",
         "jsonFiles": [
           {
-            "json": "./assets/json/tutorial/track-06/06-03-stat-panel.json"
+            "json": "../../assets/json/tutorial/track-06/06-03-stat-panel.json"
           }
         ],
         "prerequisites": [
@@ -1763,10 +1763,10 @@
       {
         "id": "t06-04",
         "order": "D",
-        "path": "./examples/html-demo/track-06-stat/06-04-stat-chart-echarts.html",
+        "path": "./track-06-stat/06-04-stat-chart-echarts.html",
         "jsonFiles": [
           {
-            "json": "./assets/json/tutorial/track-06/06-04-stat-chart-echarts.json"
+            "json": "../../assets/json/tutorial/track-06/06-04-stat-chart-echarts.json"
           }
         ],
         "prerequisites": [
@@ -1785,11 +1785,11 @@
         ],
         "docLinks": [
           {
-            "href": "./extensions/stat-echarts/README.md",
+            "href": "../../extensions/stat-echarts/README.md",
             "label": "stat-echarts README"
           },
           {
-            "href": "./docs/zh/json-format.md#可交互-css3d-面板-css3dpanelcore",
+            "href": "../../docs/zh/json-format.md#可交互-css3d-面板-css3dpanelcore",
             "label": "CSS3D 面板"
           }
         ]
@@ -1797,10 +1797,10 @@
       {
         "id": "t06-05",
         "order": "E",
-        "path": "./examples/html-demo/track-06-stat/06-05-stat-line.html",
+        "path": "./track-06-stat/06-05-stat-line.html",
         "jsonFiles": [
           {
-            "json": "./assets/json/tutorial/track-06/06-05-stat-line.json"
+            "json": "../../assets/json/tutorial/track-06/06-05-stat-line.json"
           }
         ],
         "prerequisites": [
@@ -1821,10 +1821,10 @@
       {
         "id": "t06-06",
         "order": "F",
-        "path": "./examples/html-demo/track-06-stat/06-06-stat-pie.html",
+        "path": "./track-06-stat/06-06-stat-pie.html",
         "jsonFiles": [
           {
-            "json": "./assets/json/tutorial/track-06/06-06-stat-pie.json"
+            "json": "../../assets/json/tutorial/track-06/06-06-stat-pie.json"
           }
         ],
         "prerequisites": [
@@ -1845,10 +1845,10 @@
       {
         "id": "t06-07",
         "order": "G",
-        "path": "./examples/html-demo/track-06-stat/06-07-stat-pie-ring.html",
+        "path": "./track-06-stat/06-07-stat-pie-ring.html",
         "jsonFiles": [
           {
-            "json": "./assets/json/tutorial/track-06/06-07-stat-pie-ring.json"
+            "json": "../../assets/json/tutorial/track-06/06-07-stat-pie-ring.json"
           }
         ],
         "prerequisites": [
@@ -1872,10 +1872,10 @@
     "id": "t07-text",
     "track": "07",
     "order": "01",
-    "path": "./examples/html-demo/track-07-text/07-02-text-mesh.html",
+    "path": "./track-07-text/07-02-text-mesh.html",
     "jsonFiles": [
       {
-        "json": "./assets/json/tutorial/track-07/07-02-text-mesh.json"
+        "json": "../../assets/json/tutorial/track-07/07-02-text-mesh.json"
       }
     ],
     "prerequisites": [
@@ -1893,11 +1893,11 @@
     ],
     "docLinks": [
       {
-        "href": "./docs/zh/json-format.md",
+        "href": "../../docs/zh/json-format.md",
         "label": "text 对象"
       },
       {
-        "href": "./assets/json/tutorial/track-07/07-01-text-modes.json",
+        "href": "../../assets/json/tutorial/track-07/07-01-text-modes.json",
         "label": "JSON 示例"
       }
     ],
@@ -1905,10 +1905,10 @@
       {
         "id": "t07-01",
         "order": "A",
-        "path": "./examples/html-demo/track-07-text/07-01-text-modes.html",
+        "path": "./track-07-text/07-01-text-modes.html",
         "jsonFiles": [
           {
-            "json": "./assets/json/tutorial/track-07/07-01-text-modes.json"
+            "json": "../../assets/json/tutorial/track-07/07-01-text-modes.json"
           }
         ],
         "prerequisites": [
@@ -1929,10 +1929,10 @@
       {
         "id": "t07-02",
         "order": "B",
-        "path": "./examples/html-demo/track-07-text/07-02-text-mesh.html",
+        "path": "./track-07-text/07-02-text-mesh.html",
         "jsonFiles": [
           {
-            "json": "./assets/json/tutorial/track-07/07-02-text-mesh.json"
+            "json": "../../assets/json/tutorial/track-07/07-02-text-mesh.json"
           }
         ],
         "prerequisites": [

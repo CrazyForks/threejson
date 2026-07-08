@@ -9,7 +9,7 @@ export function resolveSceneHostUrl(value, baseUrl = SCENE_HOST_REPO_ROOT_URL) {
     return raw;
   }
   if (raw === "/demo.html" || raw === "./demo.html" || raw === "demo.html") {
-    return new URL("demo.html", baseUrl).href;
+    return new URL("examples/html-demo/demo.html", baseUrl).href;
   }
   const clean = raw
     .replace(/^(\.\.\/)+/, "")
