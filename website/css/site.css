@@ -76,6 +76,7 @@ a { color: inherit; text-decoration: none; }
   cursor: pointer;
 }
 
+.mainNav > a::after,
 .navMenu > button::after {
   content: "";
   position: absolute;
@@ -92,11 +93,14 @@ a { color: inherit; text-decoration: none; }
 }
 
 .mainNav > a:hover,
+.mainNav > a:focus-visible,
 .navMenu > button:hover,
 .iconLink:hover {
   color: var(--brand);
 }
 
+.mainNav > a:hover,
+.mainNav > a:focus-visible,
 .navMenu > button:hover,
 .navMenu > button:focus-visible,
 .navMenu.hoverOpen > button,
@@ -106,6 +110,8 @@ a { color: inherit; text-decoration: none; }
   color: var(--brand);
 }
 
+.mainNav > a:hover::after,
+.mainNav > a:focus-visible::after,
 .navMenu > button:hover::after,
 .navMenu > button:focus-visible::after,
 .navMenu.hoverOpen > button::after,
