@@ -60,11 +60,13 @@ a { color: inherit; text-decoration: none; }
 
 .mainNav > a,
 .navMenu > button {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   height: 38px;
   padding: 0 13px;
+  border-radius: 8px;
   border: 0;
   background: transparent;
   color: var(--text);
@@ -74,10 +76,43 @@ a { color: inherit; text-decoration: none; }
   cursor: pointer;
 }
 
+.navMenu > button::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 2px;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand), var(--brand2));
+  opacity: 0;
+  transform: scaleX(0.35);
+  transform-origin: center;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
 .mainNav > a:hover,
 .navMenu > button:hover,
 .iconLink:hover {
   color: var(--brand);
+}
+
+.navMenu > button:hover,
+.navMenu > button:focus-visible,
+.navMenu.hoverOpen > button,
+.navMenu.pinnedOpen > button,
+.navMenu:focus-within > button {
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+  color: var(--brand);
+}
+
+.navMenu > button:hover::after,
+.navMenu > button:focus-visible::after,
+.navMenu.hoverOpen > button::after,
+.navMenu.pinnedOpen > button::after,
+.navMenu:focus-within > button::after {
+  opacity: 1;
+  transform: scaleX(1);
 }
 
 .navMenu { position: relative; display: inline-flex; align-items: center; height: 64px; }
