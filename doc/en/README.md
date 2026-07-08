@@ -1,4 +1,4 @@
-[中文](../README.md) | [English](./README.md)
+[中文](../zh/README.md) | [English](./README.md)
 
 # ThreeJSON Caller Guide
 
@@ -21,13 +21,13 @@ This handbook is written for library callers. It focuses on the scene pipeline u
 - [Scope](./scope.md): core vs extensions and canonical vs runtime overlays.
 - [Design principles](./design-principles.md): optional features, non-invasiveness, and security placeholder.
 - [Demo Pages](./demos.md): what each page under `examples/html-demo/` and the repo root demonstrates.
-- [Scene load lifecycle](../scene-load-lifecycle.md): `createJsonScene` phase hooks and SDF text font preload (bilingual).
+- [Scene load lifecycle](./scene-load-lifecycle.md): `createJsonScene` phase hooks and SDF text font preload (bilingual).
 
-The default entry page at the repo root is [`../index.html`](../index.html), which redirects to [`../demo.html`](../demo.html). `demo.html` lets you switch between the `examples/html-demo/` samples and the root-level integrated pages such as `room-show.html`, `scene-editor.html`, `scene-player.html`, and `port-show.html`.
+The default entry page at the repo root is [`../index.html`](../../index.html), which redirects to [`../demo.html`](../../demo.html). `demo.html` lets you switch between the `examples/html-demo/` samples and the root-level integrated pages such as `room-show.html`, `scene-editor.html`, `scene-player.html`, and `port-show.html`.
 
 ## npm Install (Optional)
 
-The repository already provides a root [`../package.json`](../package.json) and the package name is **`threejson`**. When installing it into your own application, also install the peer dependencies so your bundler can resolve imports such as `three` from `node_modules`:
+The repository already provides a root [`../package.json`](../../package.json) and the package name is **`threejson`**. When installing it into your own application, also install the peer dependencies so your bundler can resolve imports such as `three` from `node_modules`:
 
 ```bash
 npm install threejson three @tweenjs/tween.js html2canvas-pro
@@ -39,7 +39,7 @@ Prefer importing from the package root:
 import { createSceneRuntime, deployMesh } from "threejson";
 ```
 
-Before publishing to npm, you can still import directly from the cloned source path `../core/index.js`. See the root [`../package.json`](../package.json) for the current package version and peer dependency range.
+Before publishing to npm, you can still import directly from the cloned source path `../core/index.js`. See the root [`../package.json`](../../package.json) for the current package version and peer dependency range.
 
 ## Recommended Usage
 
@@ -109,4 +109,4 @@ sceneRuntime.start();
 - **With `npm install threejson`**: built-in domains and `/assets/...` paths in JSON try the active base first and fall back to jsDelivr [`@threejson/assets`](https://www.npmjs.com/package/@threejson/assets) (see [Static assets in `api.md`](./api.md#static-assets-coreutilassetsbasejs)). Cloned-repo demos can still use `assetsBase: "/assets"` or `setAssetsBaseUrl("/assets")` for the local mount.
 - `rotationX`, `rotationY`, and `rotationZ` use radians, not degrees.
 - The engine stores the original JSON on `userData.objJson`, which is useful for later type checks, hiding, deletion, or business extensions.
-- Start with [`examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html`](../examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html) and `assets/json/sceneRuntimeBasic.json` for a modern example.
+- Start with [`examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html`](../../examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html) and `assets/json/sceneRuntimeBasic.json` for a modern example.

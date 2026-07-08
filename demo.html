@@ -2027,7 +2027,7 @@
   }
 
   function tutorialDocHref() {
-    return currentLocale === "en-US" ? "./doc/en/tutorial.md" : "./doc/tutorial.md";
+    return currentLocale === "en-US" ? "./doc/en/tutorial.md" : "./doc/zh/tutorial.md";
   }
 
   function buildReaderLink(href) {
@@ -2043,7 +2043,7 @@
       return false;
     }
     const path = href.split("#")[0].replace(/^\.\//, "").replace(/^\//, "");
-    return path === "doc/tutorial.md" || path === "doc/en/tutorial.md";
+    return path === "doc/zh/tutorial.md" || path === "doc/en/tutorial.md";
   }
 
   function appendDocLinkItem(container, href, label) {

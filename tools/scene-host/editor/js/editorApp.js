@@ -34,6 +34,7 @@ import {
 import { isLoadableScenePayload } from "../../../../core/handler/sceneFriendlyNormalizer.js";
 import { buildEditorScenePayload } from "../../shared/js/buildEditorRuntimeConfig.js";
 import { createEditorSysConfig } from "../../shared/js/createEditorSysConfig.js";
+import { resolveSceneHostUrl, sceneHostAssetUrl } from "../../shared/js/sceneHostPaths.js";
 import {
   applyEditorSettingsToSysConfig,
   clearEditorSettingsCache,
@@ -670,7 +671,7 @@ export async function bootstrapSceneHostEditor() {
     };
     const opts = {
       canvas: canvasContainer,
-      assetsBase: new URL("../../../../assets/", import.meta.url).href,
+      assetsBase: sceneHostAssetUrl("assets/"),
       cameraFallbackPosition: editorSettings?.render?.cameraFallbackPosition,
       defaultFov: editorSettings?.render?.defaultFov,
       orbitDampingFactor: editorSettings?.render?.orbitDampingFactor,
@@ -888,33 +889,6 @@ export async function bootstrapSceneHostEditor() {
       console.error(error);
       return false;
     }
-  }
-
-  function resolveSceneHostUrl(value) {
-    const raw = String(value || "").trim();
-    if (!raw) {
-      return raw;
-    }
-    if (/^(?:[a-z]+:)?\/\//i.test(raw) || raw.startsWith("data:") || raw.startsWith("blob:")) {
-      return raw;
-    }
-    const sceneHostRoot = new URL("../../../../", import.meta.url).href;
-    if (raw === "/demo.html" || raw === "./demo.html" || raw === "demo.html") {
-      return new URL("demo.html", sceneHostRoot).href;
-    }
-    if (raw.startsWith("/assets/")) {
-      return new URL(raw.slice(1), sceneHostRoot).href;
-    }
-    if (raw.startsWith("./")) {
-      return new URL(raw.slice(2), sceneHostRoot).href;
-    }
-    if (raw.startsWith("../")) {
-      return new URL(raw, sceneHostRoot).href;
-    }
-    if (raw.startsWith("assets/")) {
-      return new URL(raw, sceneHostRoot).href;
-    }
-    return raw;
   }
 
   function ensureDefaultSceneLights(rootScene, autoFillLights = true) {

@@ -1,8 +1,10 @@
+[中文](../zh/extensions.md) | [English](./extensions.md)
+
 # Optional Extensions and `extensions/`
 
-[中文](../extensions.md) | [English](./extensions.md)
+[中文](../zh/extensions.md) | [English](./extensions.md)
 
-This page is for **host application developers** building on ThreeJSON: how to wire bundled [`extensions/`](../extensions/) reference implementations and how to author **custom extensions** (physics, charts, ground snap, particle providers, and other cross-cutting runtime capabilities).
+This page is for **host application developers** building on ThreeJSON: how to wire bundled [`extensions/`](../../extensions/) reference implementations and how to author **custom extensions** (physics, charts, ground snap, particle providers, and other cross-cutting runtime capabilities).
 
 - **Declarative business objects** (cabinets, doors, port models) belong in [Business domains and `domains/`](./domains.md)—do not mix with extensions.
 - JSON field details: [JSON Format Guide · Optional extension config](./json-format.md#optional-extension-config-extensions). APIs: [Core API · PluginHost / onSceneReady](./api.md#corepluginpluginhostjs).
@@ -22,8 +24,8 @@ Terminology: [Glossary · Architecture and layers](./glossary.md#architecture-an
 
 1. **Not auto-loaded**: `core/index.js` and `import { createJsonScene } from "threejson"` do **not** import `extensions/`. Without import/register, behavior matches core-only ([Design principles · Predictable behavior](./design-principles.md)).
 2. **npm subpaths**: after `npm install threejson`, import on demand, e.g. `threejson/extensions/physics-rapier/bootstrapFromScene.js`. Bundled reference code ≠ enabled by default.
-3. **Heavy deps as optional peers**: e.g. `@dimforge/rapier3d-compat`, `echarts`—install in **your app**; see root [`package.json`](../package.json) `peerDependenciesMeta`.
-4. **Core defines JSON containers only**: merges `extensions` maps, provides `PluginHost` and registries; does **not** parse plugin-specific field semantics ([`core/util/extensionsUtil.js`](../core/util/extensionsUtil.js)).
+3. **Heavy deps as optional peers**: e.g. `@dimforge/rapier3d-compat`, `echarts`—install in **your app**; see root [`package.json`](../../package.json) `peerDependenciesMeta`.
+4. **Core defines JSON containers only**: merges `extensions` maps, provides `PluginHost` and registries; does **not** parse plugin-specific field semantics ([`core/util/extensionsUtil.js`](../../core/util/extensionsUtil.js)).
 
 ## JSON container conventions
 
@@ -52,8 +54,8 @@ Config on a record implicitly binds that object (interpreted by the extension bo
 
 ### Sample JSON
 
-- Physics / Rapier: [`assets/json/tutorial/track-04/04-02-plugin-physics.json`](../assets/json/tutorial/track-04/04-02-plugin-physics.json)
-- FPS walk: [`04-03-fps-walk.json`](../assets/json/tutorial/track-04/04-03-fps-walk.json)
+- Physics / Rapier: [`assets/json/tutorial/track-04/04-02-plugin-physics.json`](../../assets/json/tutorial/track-04/04-02-plugin-physics.json)
+- FPS walk: [`04-03-fps-walk.json`](../../assets/json/tutorial/track-04/04-03-fps-walk.json)
 
 ## Host integration (three steps)
 
@@ -98,7 +100,7 @@ const objJson = mesh.userData.objJson;
 const perObject = readExtensionConfig(objJson, "my-extension-id");
 ```
 
-Lifecycle bus: [Scene load lifecycle](../scene-load-lifecycle.md).
+Lifecycle bus: [Scene load lifecycle](./scene-load-lifecycle.md).
 
 ### Rapier physics (bundled reference)
 
@@ -122,7 +124,7 @@ await createJsonScene(payload, {
 });
 ```
 
-API and field semantics: [`extensions/physics-rapier/README.md`](../extensions/physics-rapier/README.md).
+API and field semantics: [`extensions/physics-rapier/README.md`](../../extensions/physics-rapier/README.md).
 
 ### Particle provider (registry path)
 
@@ -132,18 +134,18 @@ When `PluginHost` is not needed, register at page entry:
 import "threejson/extensions/particle-nebula"; // registers provider: "nebula"
 ```
 
-Particle emitter JSON may set `provider: "nebula"`. Custom providers use `registerParticleEmitterProvider(id, deployer)` (see [`extensions/particle-nebula/`](../extensions/particle-nebula/index.js) stub).
+Particle emitter JSON may set `provider: "nebula"`. Custom providers use `registerParticleEmitterProvider(id, deployer)` (see [`extensions/particle-nebula/`](../../extensions/particle-nebula/index.js) stub).
 
 ## Bundled reference implementations
 
-Directory overview: [`extensions/README.md`](../extensions/README.md).
+Directory overview: [`extensions/README.md`](../../extensions/README.md).
 
 | extension id | directory | bootstrap / entry | demo |
 |--------------|-----------|-------------------|------|
-| `physics-rapier` | `extensions/physics-rapier/` | `bootstrapPhysicsRapierFromScene` | [04-02-plugin-physics.html](../examples/html-demo/track-04-interaction/04-02-plugin-physics.html) |
+| `physics-rapier` | `extensions/physics-rapier/` | `bootstrapPhysicsRapierFromScene` | [04-02-plugin-physics.html](../../examples/html-demo/track-04-interaction/04-02-plugin-physics.html) |
 | (demo) simple-gravity | `extensions/simple-gravity/` | `createSimpleGravityPlugin` + `pluginHost.register` | same page, “simple gravity” tab |
-| `fps-walk` | `extensions/fps-walk/` | `bootstrapFirstPersonExtensionsFromScene` | [04-03-fps-walk.html](../examples/html-demo/track-04-interaction/04-03-fps-walk.html) |
-| Rapier first-person | `physics-rapier/firstPersonBridge.js` | `bootstrapRapierFirstPersonFromScene` | [04-05-fps-rapier-collision.html](../examples/html-demo/track-04-interaction/04-05-fps-rapier-collision.html) |
+| `fps-walk` | `extensions/fps-walk/` | `bootstrapFirstPersonExtensionsFromScene` | [04-03-fps-walk.html](../../examples/html-demo/track-04-interaction/04-03-fps-walk.html) |
+| Rapier first-person | `physics-rapier/firstPersonBridge.js` | `bootstrapRapierFirstPersonFromScene` | [04-05-fps-rapier-collision.html](../../examples/html-demo/track-04-interaction/04-05-fps-rapier-collision.html) |
 | `stat-echarts` | `extensions/stat-echarts/` | `bootstrapFromScene` (with stat domain) | Track 6 `06-04-stat-chart-echarts.html` |
 | `nebula` (provider) | `extensions/particle-nebula/` | `registerParticleEmitterProvider` | see api / json-format particle section |
 
@@ -160,7 +162,7 @@ Create modules in **your application repo** (do not edit `node_modules/threejson
 3. Author JSON under `sceneConfig.extensions["your-id"]` and/or per-object `extensions["your-id"]`.
 4. Import in the app entry and call bootstrap from `onSceneReady`.
 
-You may copy examples from [`extensions/`](../extensions/) into e.g. `src/threejson-extensions/` and change `../../core/` imports to `threejson/core`.
+You may copy examples from [`extensions/`](../../extensions/) into e.g. `src/threejson-extensions/` and change `../../core/` imports to `threejson/core`.
 
 ### Other core registration hooks
 
@@ -173,7 +175,7 @@ You may copy examples from [`extensions/`](../extensions/) into e.g. `src/threej
 
 ### Standalone npm package
 
-Publish `@acme/threejson-extension-foo` and bootstrap from the host app. There is **no** domain-style `add-extension` CLI or `threejson.extensions.mjs` convention yet; see [lab/third-party-extension-adoption-memo.md](../lab/third-party-extension-adoption-memo.md).
+Publish `@acme/threejson-extension-foo` and bootstrap from the host app. There is **no** domain-style `add-extension` CLI or `threejson.extensions.mjs` convention yet; see [lab/third-party-extension-adoption-memo.md](../../lab/third-party-extension-adoption-memo.md).
 
 ## Related docs
 
@@ -182,4 +184,4 @@ Publish `@acme/threejson-extension-foo` and bootstrap from the host app. There i
 - [Scope · PluginHost and extensions/](./scope.md)
 - [Design principles · Core vs extensions](./design-principles.md)
 - [Business domains (contrast)](./domains.md)
-- Lab draft (complementary): [extension-json.md](../lab/extension-json.md)
+- Lab draft (complementary): [extension-json.md](../../lab/extension-json.md)

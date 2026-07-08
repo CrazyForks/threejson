@@ -2,6 +2,7 @@ import {
   HIGHLIGHT_ALARM_RED,
   HIGHLIGHT_LOCATE_AMBER
 } from "../../../../domains/sceneHighlight/channels.js";
+import { resolveSceneHostUrl } from "./sceneHostPaths.js";
 
 const PLAYER_SETTINGS_STORAGE_KEY = "scenePlayer_settings_v1";
 const PLAYER_SETTINGS_JSON_URL = new URL(
@@ -71,33 +72,6 @@ export function setPlayerSettingsByPath(obj, path, value) {
     cur = cur[parts[i]];
   }
   cur[parts[parts.length - 1]] = value;
-}
-
-function resolveSceneHostUrl(value) {
-  const raw = String(value || "").trim();
-  if (!raw) {
-    return raw;
-  }
-  if (/^(?:[a-z]+:)?\/\//i.test(raw) || raw.startsWith("data:") || raw.startsWith("blob:")) {
-    return raw;
-  }
-  const sceneHostRoot = new URL("../../../../", import.meta.url).href;
-  if (raw === "/demo.html" || raw === "./demo.html" || raw === "demo.html") {
-    return new URL("demo.html", sceneHostRoot).href;
-  }
-  if (raw.startsWith("/assets/")) {
-    return new URL(raw.slice(1), sceneHostRoot).href;
-  }
-  if (raw.startsWith("./")) {
-    return new URL(raw.slice(2), sceneHostRoot).href;
-  }
-  if (raw.startsWith("../")) {
-    return new URL(raw, sceneHostRoot).href;
-  }
-  if (raw.startsWith("assets/")) {
-    return new URL(raw, sceneHostRoot).href;
-  }
-  return raw;
 }
 
 export function clearPlayerSettingsCache() {

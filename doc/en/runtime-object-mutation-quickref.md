@@ -1,6 +1,8 @@
+[中文](../zh/runtime-object-mutation-quickref.md) | [English](./runtime-object-mutation-quickref.md)
+
 # Runtime Object Mutation Quick Reference
 
-[中文](../runtime-object-mutation-quickref.md) | [Core API](./api.md)
+[中文](../zh/runtime-object-mutation-quickref.md) | [Core API](./api.md)
 
 For callers who want to mutate a single runtime object by `threeJsonId` without using full-scene `ingest`.
 

@@ -1303,11 +1303,11 @@
     ],
     "docLinks": [
       {
-        "href": "./doc/event-mechanism.md#一事件机制使用方法",
+        "href": "./doc/en/event-mechanism.md#一事件机制使用方法",
         "label": "Event mechanism"
       },
       {
-        "href": "./doc/event-mechanism.md#二eventscript-语法",
+        "href": "./doc/en/event-mechanism.md#二eventscript-语法",
         "label": "EventScript syntax"
       },
       {
@@ -1341,7 +1341,7 @@
     ],
     "docLinks": [
       {
-        "href": "./doc/event-mechanism.md#131-单对象-lifecycle-与场景-load-的区别",
+        "href": "./doc/en/event-mechanism.md#131-单对象-lifecycle-与场景-load-的区别",
         "label": "Object lifecycle"
       }
     ]
@@ -1371,7 +1371,7 @@
     ],
     "docLinks": [
       {
-        "href": "./doc/event-mechanism.md#12-jsonevents-块",
+        "href": "./doc/en/event-mechanism.md#12-jsonevents-块",
         "label": "JSON actions"
       }
     ]
@@ -1495,7 +1495,7 @@
         "label": "AI README"
       },
       {
-        "href": "./doc/mcp-cursor.md",
+        "href": "./doc/en/mcp-cursor.md",
         "label": "mcp-cursor"
       }
     ]

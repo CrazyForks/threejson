@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ThreeJSON Shower</title>
+  <link rel="icon" href="../../../assets/img/threejson_desc.ico" type="image/x-icon">
+  <script type="importmap">
+    {
+      "imports": {
+        "threejson": "../../../builtins/full.js",
+        "threejson/core": "../../../core/index.js",
+        "three": "https://esm.sh/three@0.184.0",
+        "three/examples/jsm/": "https://esm.sh/three@0.184.0/examples/jsm/",
+        "@tweenjs/tween.js": "https://esm.sh/@tweenjs/tween.js@25.0.0",
+        "html2canvas-pro": "https://esm.sh/html2canvas-pro@2.0.4",
+        "gifuct-js": "https://esm.sh/gifuct-js@2.1.2",
+        "three-mesh-bvh": "https://esm.sh/three-mesh-bvh@0.9.10?deps=three@0.184.0",
+        "three-bvh-csg": "https://esm.sh/three-bvh-csg@0.0.18?deps=three@0.184.0,three-mesh-bvh@0.9.10",
+        "troika-three-text": "https://esm.sh/troika-three-text@0.52.4?deps=three@0.184.0"
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="https://esm.sh/codemirror@5.65.16/lib/codemirror.css">
+  <link rel="stylesheet" href="https://esm.sh/codemirror@5.65.16/theme/material-darker.css">
+  <link rel="stylesheet" href="./css/shower.css">
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/javascript/javascript.min.js"></script>
+</head>
+<body>
+  <div id="appShell">
+    <header class="showerHeader">
+      <a class="brand" href="../../../examples/threejson-site/index.html#/examples">
+        <img src="../../../assets/img/ThreeJSON_desc.png" alt="ThreeJSON">
+      </a>
+      <div class="titleBlock">
+        <div id="exampleTitle">ThreeJSON Shower</div>
+        <span id="statusText">Ready</span>
+      </div>
+      <label class="autoRunLabel">
+        <input id="autoRunCheckbox" type="checkbox">
+        <span data-i18n="autoRun">实时</span>
+      </label>
+    </header>
+    <main class="workspace">
+      <section class="leftPane">
+        <nav class="tabs">
+          <button class="tab active" data-tab="core" type="button" data-i18n="coreJson">核心JSON</button>
+          <button class="tab" data-tab="full" type="button" data-i18n="fullJson">完整JSON</button>
+          <button class="tab" data-tab="tree" type="button" data-i18n="sceneTree">场景树</button>
+        </nav>
+        <div class="editorToolbar" id="jsonToolbar">
+          <div class="segmented">
+            <button id="friendlyBtn" type="button" data-i18n="friendlyJson">友好JSON</button>
+            <button id="standardBtn" type="button" data-i18n="standardJson">标准JSON</button>
+          </div>
+          <div class="toolbarSpacer"></div>
+          <button id="formatBtn" type="button" data-i18n="format">格式化</button>
+          <button id="runBtn" class="primary" type="button" data-i18n="run">运行</button>
+        </div>
+        <div id="editorPanel" class="editorPanel"></div>
+        <div id="treePanel" class="treePanel" hidden></div>
+      </section>
+      <section class="rightPane">
+        <div class="canvasToolbar">
+          <button id="downloadHtmlBtn" type="button" data-i18n="downloadHtml">下载</button>
+          <div class="menu">
+            <button type="button" data-i18n="export">导出</button>
+            <div class="menuPanel">
+              <button id="exportThreeJsonBtn" type="button">ThreeJSON</button>
+              <button id="exportNativeBtn" type="button" data-i18n="nativeJson">原生JSON</button>
+              <button id="exportModelBtn" type="button" data-i18n="modelExport">三方模型</button>
+            </div>
+          </div>
+          <div class="toolbarSpacer"></div>
+          <button id="threeViewBtn" type="button" data-i18n="threeView">三视图</button>
+          <button id="fitBtn" type="button" data-i18n="fit">自适应</button>
+          <button id="fullscreenBtn" type="button" data-i18n="fullscreen">全屏</button>
+        </div>
+        <div id="canvasWrap">
+          <canvas id="canvasContainer">WebGL required</canvas>
+          <div id="loadingMask">Loading...</div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

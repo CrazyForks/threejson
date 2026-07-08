@@ -1,0 +1,30 @@
+[
+  {
+    "section": "basic",
+    "sectionTitle": "基础几何",
+    "sectionTitleEn": "Basic Geometry",
+    "items": [
+      { "id": "box", "title": "Box 盒子", "titleEn": "Box", "desc": "一个最小盒子对象。", "descEn": "A minimal box object.", "json": "../../../assets/json/demo-show/01-box.json" },
+      { "id": "sphere", "title": "Sphere 球体", "titleEn": "Sphere", "desc": "一个基础球体对象。", "descEn": "A minimal sphere object.", "json": "../../../assets/json/demo-show/02-sphere.json" }
+    ]
+  },
+  {
+    "section": "style",
+    "sectionTitle": "材质与光照",
+    "sectionTitleEn": "Materials And Lighting",
+    "items": [
+      { "id": "materials", "title": "材质参数", "titleEn": "Materials", "desc": "颜色、粗糙度、金属度和发光。", "descEn": "Color, roughness, metalness, and emissive material fields.", "json": "../../../assets/json/demo-show/03-materials.json" },
+      { "id": "lighting", "title": "灯光配置", "titleEn": "Lighting", "desc": "用 sceneConfig.lights 控制光照。", "descEn": "Control lighting through sceneConfig.lights.", "json": "../../../assets/json/demo-show/04-lighting.json" }
+    ]
+  },
+  {
+    "section": "runtime",
+    "sectionTitle": "运行时",
+    "sectionTitleEn": "Runtime",
+    "items": [
+      { "id": "animation", "title": "声明式动画", "titleEn": "Declarative Animation", "desc": "通过 JSON 配置旋转动画。", "descEn": "Configure rotation animation in JSON.", "json": "../../../assets/json/demo-show/05-animation.json" },
+      { "id": "composed", "title": "组合场景", "titleEn": "Composed Scene", "desc": "把多个对象组合成一个小场景。", "descEn": "Compose several objects into a small scene.", "json": "../../../assets/json/demo-show/06-composed-scene.json" }
+    ]
+  }
+]
+

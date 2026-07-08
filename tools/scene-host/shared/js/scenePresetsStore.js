@@ -4,6 +4,7 @@ import {
   editorSessionIdbPut,
   editorSessionIdbDelete
 } from "./editorSessionIdb.js";
+import { resolveSceneHostUrl } from "./sceneHostPaths.js";
 
 export const PRESET_SCENE_BASE_URL = new URL(
   "../../../../assets/json/other/demo-json/",
@@ -22,30 +23,6 @@ export const PRESET_SCENES_FALLBACK = [
   { id: "bot", file: "bot.json", label: "Robot bot", order: 70 },
   { id: "rotor", file: "rotor.json", label: "Rotor scene", order: 80 }
 ];
-
-function resolveSceneHostUrl(value) {
-  const raw = String(value || "").trim();
-  if (!raw) {
-    return raw;
-  }
-  if (/^(?:[a-z]+:)?\/\//i.test(raw) || raw.startsWith("data:") || raw.startsWith("blob:")) {
-    return raw;
-  }
-  const sceneHostRoot = new URL("../../../../", import.meta.url).href;
-  if (raw.startsWith("/assets/")) {
-    return new URL(raw.slice(1), sceneHostRoot).href;
-  }
-  if (raw.startsWith("./")) {
-    return new URL(raw.slice(2), sceneHostRoot).href;
-  }
-  if (raw.startsWith("../")) {
-    return new URL(raw, sceneHostRoot).href;
-  }
-  if (raw.startsWith("assets/")) {
-    return new URL(raw, sceneHostRoot).href;
-  }
-  return raw;
-}
 
 export function normalizePresetSceneEntries(manifest) {
   const normalizedBase = resolveSceneHostUrl(String(manifest?.baseUrl || PRESET_SCENE_BASE_URL));

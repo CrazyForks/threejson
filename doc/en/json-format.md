@@ -1,6 +1,8 @@
+[中文](../zh/json-format.md) | [English](./json-format.md)
+
 # JSON Format Guide
 
-[中文](../json-format.md) | [English](./json-format.md)
+[中文](../zh/json-format.md) | [English](./json-format.md)
 
 ThreeJSON now explicitly supports two parallel input shapes:
 
@@ -203,7 +205,7 @@ const handle = startDescriptorBinding(scene, worldInfo);
 
 **Tier 3 (full object rebuild)**: only for objects that can be recreated from the **same** descriptor via `deployMesh` or `createGroup`; disposes old geometry/material, **expensive**, and not all `objType` values are covered. Triggered by `scheduleDescriptorBindingRebuild(scene, descriptorOrId, { debounceMs })`; or call `redeployObject`.
 
-**Other API**: `markDescriptorBindingJsonDirty(id)` forces JSON → object transform on the next frame. See [Core API](../api.md#sceneDescriptorBinding).
+**Other API**: `markDescriptorBindingJsonDirty(id)` forces JSON → object transform on the next frame. See [Core API](./api.md#sceneDescriptorBinding).
 
 ## Object identity and naming
 
@@ -225,7 +227,7 @@ Kebab-case like `room-wall`, `air-conditioning` is a migration/docs convention o
 
 **Scene root**: use `label` for title display; `roomName` is deprecated—use `label`.
 
-Page batch visibility: `setObjectsVisibleByName` / `setObjectsVisibleByNames` (see [api.md](../api.md)).
+Page batch visibility: `setObjectsVisibleByName` / `setObjectsVisibleByNames` (see [api.md](./api.md)).
 
 ## friendlyMap
 
@@ -564,7 +566,7 @@ Viewport `camera` optional **`attachTo`** (`refName` string): attach camera to p
 
 ### `sceneConfig.threeRevision` (optional)
 
-Declares target Three.js **revision** (integer, or `"184"` / `"r184"`). Used for compat routing; when unset, uses runtime `THREE.REVISION`, then ThreeJSON major version (currently **184**). **Officially supported r179–r184**; lower revisions warn with no behavior guarantee. See [`three-compat.md`](../three-compat.md).
+Declares target Three.js **revision** (integer, or `"184"` / `"r184"`). Used for compat routing; when unset, uses runtime `THREE.REVISION`, then ThreeJSON major version (currently **184**). **Officially supported r179–r184**; lower revisions warn with no behavior guarantee. See [`three-compat.md`](./three-compat.md).
 
 Friendly and standard JSON may set `sceneConfig.threeRevision`; also `worldInfo.threeRevision` (lower priority than `sceneConfig`).
 
@@ -907,7 +909,7 @@ Animated example (`motion` as array may combine drift + twinkle):
 
 **Nested subdomains (dotted id)**: also **`domain: "weather.rain"`** or **`"weather.wind"`** (full path required; `domain: "rain"` invalid). Wind strips on subdomains still use handlers like `coldWind`. Example JSON: [`assets/json/tutorial/track-05/05-02-nested-domain.json`](../../assets/json/tutorial/track-05/05-02-nested-domain.json).
 
-See [domains.md](../domains.md).
+See [domains.md](./domains.md).
 
 ### `shaderSurface` (core generic shader surface)
 
@@ -1170,7 +1172,7 @@ Notes:
 - `handler` remains the domain internal entry function or subtype name
 - `items`, `payload`, `options` remain available; meaning defined by each domain
 
-For domain details, descriptor structure, registration, and extension steps, see [Business domains and `domains/`](../domains.md).
+For domain details, descriptor structure, registration, and extension steps, see [Business domains and `domains/`](./domains.md).
 
 ## Common fields
 
@@ -1807,7 +1809,7 @@ Handler presets: `wind` | `coldWind` | `hotWind` (also `domainModelList` with `d
 
 **Textures and UV scroll**
 
-- [`assets/textures/environment/nature/weather/`](../assets/textures/environment/nature/weather/) provides `wind_{cold,hot}_{left,right}.png`; chevrons align with texture **U** (horizontal). Default **U-axis scroll** (omit `scrollAxis` or use `u`). Avoid `scrollAxis: "v"` on horizontal chevron textures — motion will look weak or wrong.
+- [`assets/textures/environment/nature/weather/`](../../assets/textures/environment/nature/weather/) provides `wind_{cold,hot}_{left,right}.png`; chevrons align with texture **U** (horizontal). Default **U-axis scroll** (omit `scrollAxis` or use `u`). Avoid `scrollAxis: "v"` on horizontal chevron textures — motion will look weak or wrong.
 - Use `scrollAxis: "v"` only when the texture pattern itself is vertical.
 - **Reverse flow** priority: negative `speed` > swap to `_right` texture > adjust `rotationZ`. `speed` may be any non-zero finite value; negative reverses UV offset.
 - Vertical up/down flow uses **plane rotation** + U scroll, not left/right texture choice.
@@ -1830,7 +1832,7 @@ OBJ texture priority:
 2. Explicit `maps` on OBJ record.
 3. When no `maps`, fallback from sibling `maps/` folder next to OBJ or MTL by naming convention (scope via `mapsFolderFallback`, below).
 4. Legacy `material.textureUrl` / `material.map` ( `map` slot fallback only).
-5. On `maps` slot objects: **`textureKind: "video"`** (and `videoMuted` / `videoLoop`, etc.) or **`textureKind: "gif"`** (and `gifAutoplay` / `gifPlaybackRate` / `gifMaxFps`)—same as box/sphere/plane primitives; see [domains.md](../domains.md) and [BUSINESS_DOMAINS.md](../../core/BUSINESS_DOMAINS.md). When `textureKind` omitted or `image`, `.gif` URLs load as static (first frame only); animation requires explicit `gif`.
+5. On `maps` slot objects: **`textureKind: "video"`** (and `videoMuted` / `videoLoop`, etc.) or **`textureKind: "gif"`** (and `gifAutoplay` / `gifPlaybackRate` / `gifMaxFps`)—same as box/sphere/plane primitives; see [domains.md](./domains.md) and [BUSINESS_DOMAINS.md](../../core/BUSINESS_DOMAINS.md). When `textureKind` omitted or `image`, `.gif` URLs load as static (first frame only); animation requires explicit `gif`.
 
 ```js
 {
@@ -1961,7 +1963,7 @@ Examples use site-root paths so project-root pages and `examples/html-demo/` pag
 
 Unlike [`objType: "native"`](#objtype-native-general-threejs-object) (**single** ObjectLoader record), this domain loads **whole** Three.js Object/Scene JSON (URL or inline).
 
-Works with `applyDomainModelsFromWorldInfo(scene, worldInfo)`. Domain overview, registration, custom extension examples: [Business domains and `domains/`](../domains.md); implementation constraints: [BUSINESS_DOMAINS.md](../../core/BUSINESS_DOMAINS.md). Below: **`loadFromUrl`**; editor “Load native JSON” also uses **`handler: "parseInline"`** with inline object graph in same-domain `record.json` (no `modelPath`).
+Works with `applyDomainModelsFromWorldInfo(scene, worldInfo)`. Domain overview, registration, custom extension examples: [Business domains and `domains/`](./domains.md); implementation constraints: [BUSINESS_DOMAINS.md](../../core/BUSINESS_DOMAINS.md). Below: **`loadFromUrl`**; editor “Load native JSON” also uses **`handler: "parseInline"`** with inline object graph in same-domain `record.json` (no `modelPath`).
 
 ```json
 {

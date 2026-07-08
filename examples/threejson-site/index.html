@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ThreeJSON</title>
+  <link rel="icon" href="../../assets/img/threejson_desc.ico" type="image/x-icon">
+  <link rel="stylesheet" href="./css/site.css">
+</head>
+<body>
+  <header class="siteHeader">
+    <a class="brand" href="#/" aria-label="ThreeJSON">
+      <img src="../../assets/img/ThreeJSON_desc.png" alt="ThreeJSON">
+    </a>
+    <nav class="mainNav" aria-label="Main">
+      <a href="#/" data-i18n="nav.home">首页</a>
+      <div class="navMenu">
+        <button type="button" data-i18n="nav.docs">文档</button>
+        <div class="dropdown">
+          <a href="#/docs-index" data-i18n="docs.index">索引</a>
+          <a href="#" data-doc="features.md" data-i18n="docs.features">特性</a>
+          <a href="#" data-doc="README.md" data-i18n="docs.manual">使用手册</a>
+          <a href="#" data-doc="api.md" data-i18n="docs.api">API</a>
+          <a href="#" data-doc="json-format.md" data-i18n="docs.jsonConfig">JSON 配置</a>
+          <a href="#" data-doc="changelog.md" data-i18n="docs.changelog">版本记录</a>
+          <a href="#" data-doc="faq.md" data-i18n="docs.faq">常见问题</a>
+        </div>
+      </div>
+      <div class="navMenu">
+        <button type="button" data-i18n="nav.download">下载</button>
+        <div class="dropdown">
+          <a href="#/download" data-i18n="download.download">下载</a>
+          <a href="#" id="downloadSceneJsons" data-i18n="download.scenes">示例场景</a>
+        </div>
+      </div>
+      <a href="#/examples" data-i18n="nav.examples">示例</a>
+      <div class="navMenu">
+        <button type="button" data-i18n="nav.tools">工具</button>
+        <div class="dropdown">
+          <a href="#" id="openEditorTool" data-i18n="tools.editor">场景编辑器</a>
+          <a href="#" id="openPlayerTool" data-i18n="tools.player">场景播放器</a>
+          <a href="#" data-doc="glossary.md" data-i18n="tools.glossary">术语手册</a>
+          <a href="../../demo.html" target="_blank" rel="noreferrer" data-i18n="tools.more">更多资源</a>
+        </div>
+      </div>
+      <div class="navMenu">
+        <button type="button" data-i18n="nav.community">社区</button>
+        <div class="dropdown">
+          <a href="#/contributors" data-i18n="community.contributors">贡献者列表</a>
+          <a href="#" data-doc="mailing-list.md" data-i18n="community.mail">邮件列表</a>
+          <a href="#" data-doc="contributing-guide.md" data-i18n="community.contribute">如何贡献</a>
+          <a href="#/dependencies" data-i18n="community.dependencies">依赖项</a>
+          <a href="#" data-doc="design-principles.md" data-i18n="community.codeStyle">代码规范</a>
+          <a href="https://github.com/nnrj/threejson" target="_blank" rel="noreferrer" data-i18n="community.source">源码（GitHub）</a>
+          <a href="https://github.com/nnrj/threejson/issues" target="_blank" rel="noreferrer" data-i18n="community.issues">Issues（GitHub）</a>
+        </div>
+      </div>
+    </nav>
+    <div class="headerTools">
+      <label class="selectTool">
+        <span data-i18n="theme.label">主题</span>
+        <select id="themeSelect">
+          <option value="auto" data-i18n="theme.auto">自动</option>
+          <option value="light" data-i18n="theme.light">浅色</option>
+          <option value="dark" data-i18n="theme.dark">深色</option>
+        </select>
+      </label>
+      <label class="selectTool">
+        <span data-i18n="lang.label">语言</span>
+        <select id="langSelect">
+          <option value="auto" data-i18n="lang.auto">自动</option>
+          <option value="zh-CN" data-i18n="lang.zh">简体中文</option>
+          <option value="en-US" data-i18n="lang.en">English</option>
+        </select>
+      </label>
+      <a class="iconLink" href="https://www.npmjs.com/package/threejson" target="_blank" rel="noreferrer" aria-label="npm">npm</a>
+      <a class="iconLink" href="https://github.com/nnrj/threejson" target="_blank" rel="noreferrer" aria-label="GitHub">GH</a>
+    </div>
+  </header>
+  <main id="app" class="siteMain"></main>
+  <script type="module" src="./js/site.js"></script>
+</body>
+</html>

@@ -1,6 +1,8 @@
+[中文](../zh/info-panels.md) | [English](./info-panels.md)
+
 # Info panels guide
 
-[中文](../info-panels.md) | [English](./info-panels.md)
+[中文](../zh/info-panels.md) | [English](./info-panels.md)
 
 ThreeJSON offers several ways to show labels and information in 3D. This guide covers selection, JSON authoring, imperative APIs, and host interaction patterns. Field contracts: [json-format § infoPanel](./json-format.md#infopanel) and [§ css3dPanel](./json-format.md#interactive-css3d-panel-css3dpanel-core); APIs: [api.md § infoPanelBuilder](./api.md#corebuilderinfopanelbuilderjs).
 
@@ -38,7 +40,7 @@ Static non-CSS3D panels use a **single pipeline** in [`core/builder/infoPanelBui
 
 ## Static infoPanel: carrier × content
 
-> **Scale**: html-demo tutorials typically use infoPanel world widths around **12–20** (demo convention ~1 unit ≈ 1 meter). See [html-demo README § tutorial scale](../examples/html-demo/README.md#tutorial-尺度约定).
+> **Scale**: html-demo tutorials typically use infoPanel world widths around **12–20** (demo convention ~1 unit ≈ 1 meter). See [html-demo README § tutorial scale](../../examples/html-demo/README.md#tutorial-尺度约定).
 
 ### Box carrier (`panelBoxType: "box"`)
 

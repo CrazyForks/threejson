@@ -3,6 +3,7 @@ import {
   EDITOR_SETTINGS_JSON_URL,
   EDITOR_SETTINGS_STORAGE_KEY
 } from "./editorSettingsSchema.js";
+import { resolveSceneHostUrl } from "./sceneHostPaths.js";
 
 export function cloneEditorSettings(value) {
   return JSON.parse(JSON.stringify(value));
@@ -61,33 +62,6 @@ export function setSettingsByPath(obj, path, value) {
     cur = cur[part];
   }
   cur[parts[parts.length - 1]] = value;
-}
-
-function resolveSceneHostUrl(value) {
-  const raw = String(value || "").trim();
-  if (!raw) {
-    return raw;
-  }
-  if (/^(?:[a-z]+:)?\/\//i.test(raw) || raw.startsWith("data:") || raw.startsWith("blob:")) {
-    return raw;
-  }
-  const sceneHostRoot = new URL("../../../../", import.meta.url).href;
-  if (raw === "/demo.html" || raw === "./demo.html" || raw === "demo.html") {
-    return new URL("demo.html", sceneHostRoot).href;
-  }
-  if (raw.startsWith("/assets/")) {
-    return new URL(raw.slice(1), sceneHostRoot).href;
-  }
-  if (raw.startsWith("./")) {
-    return new URL(raw.slice(2), sceneHostRoot).href;
-  }
-  if (raw.startsWith("../")) {
-    return new URL(raw, sceneHostRoot).href;
-  }
-  if (raw.startsWith("assets/")) {
-    return new URL(raw, sceneHostRoot).href;
-  }
-  return raw;
 }
 
 export async function fetchEditorSettingsFileDefaults() {

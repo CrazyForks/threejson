@@ -1,6 +1,8 @@
+[中文](../zh/api.md) | [English](./api.md)
+
 # Core API
 
-[中文](../api.md) | [English](./api.md)
+[中文](../zh/api.md) | [English](./api.md)
 
 This page lists only APIs that callers commonly use and that are relatively general-purpose. Business-specific methods for data centers, racks, device status, and similar domains are not the focus of this manual, but business-domain dispatch entry points are still documented here.
 
@@ -151,7 +153,7 @@ After `door.toggle`, a document event **`threejson:door-toggled`** (`door.DOOR_T
 |-------|--------|---------|
 | `doorToggleTrigger` | `dblclick` \| `click` \| `none` | `dblclick` |
 
-Implementation: [`domains/door/doorEventActions.js`](../domains/door/doorEventActions.js), [`doorTriggerResolver.js`](../domains/door/doorTriggerResolver.js). objType capabilities are registered by the door domain via `registerObjTypeEventCapabilities("door", …)` — **not** in the core `objTypeEventCapabilities` seed table.
+Implementation: [`domains/door/doorEventActions.js`](../../domains/door/doorEventActions.js), [`doorTriggerResolver.js`](../../domains/door/doorTriggerResolver.js). objType capabilities are registered by the door domain via `registerObjTypeEventCapabilities("door", …)` — **not** in the core `objTypeEventCapabilities` seed table.
 
 ### `door.impactHole(model, scene)` / `door.resetWall(door, scene)`
 
@@ -325,7 +327,7 @@ After all objects are deployed, a **DOM overlay** can show image/text slides aro
 - Coexists with page `#loadingMask`; use `excludeFromLoadWait` for brief credit flashes alongside persistent `#hint` (see `portShow.json`, `04-05-fps-rapier-collision.json`).
 - Phase 2 (not yet): `preLoad`, `showDeployProgress`, `skipOnKey`, editor/player skip setting.
 
-See also [json-format.md](./json-format.md) and [scene-load-lifecycle.md](../scene-load-lifecycle.md).
+See also [json-format.md](./json-format.md) and [scene-load-lifecycle.md](./scene-load-lifecycle.md).
 
 ### `sceneConfig.infoPanel` (optional)
 
@@ -388,7 +390,7 @@ import {
 
 - `objectLoadHandler` series supports `record` (pure `objType` records) only.
 - Passing `options.mode !== "record"` throws `E_OBJECT_MODE_MISMATCH`.
-- Hierarchical subtrees in the payload use **`subScene[]`** (see [JSON configuration guide](../json-format.md#subscene-嵌套层级对象)).
+- Hierarchical subtrees in the payload use **`subScene[]`** (see [JSON configuration guide](./json-format.md#subscene-嵌套层级对象)).
 
 ### Minimal examples
 
@@ -441,7 +443,7 @@ console.log(info.entryKind); // "scene" | "object" | "unknown"
 Notes:
 
 - Current `.tjz` entry support: `full scene payload`, `object record`.
-- Nested hierarchy in the payload uses **`subScene[]`** (see [JSON configuration guide](../json-format.md#subscene-嵌套层级对象)).
+- Nested hierarchy in the payload uses **`subScene[]`** (see [JSON configuration guide](./json-format.md#subscene-嵌套层级对象)).
 
 ## Export API (scene / object / archive)
 
@@ -578,7 +580,7 @@ Builds a standard `externalModel` descriptor from `fileName` / `modelPath` / `mo
 
 ## Business domain dispatch API
 
-All of these can be imported from `../../core/index.js`; they route `worldInfo.domainModelList` from human-friendly JSON, or `objType: "domain"` records from standard JSON, to registered business domains. For full domain concepts, descriptor structure, and creation steps, see [Business domains and `domains/`](../domains.md).
+All of these can be imported from `../../core/index.js`; they route `worldInfo.domainModelList` from human-friendly JSON, or `objType: "domain"` records from standard JSON, to registered business domains. For full domain concepts, descriptor structure, and creation steps, see [Business domains and `domains/`](./domains.md).
 
 Import path:
 
@@ -800,7 +802,7 @@ Import path: `../../core/builder/textBuilder.js` (also exported from `../../core
 
 ### `createText(parent, record, ctx?)` / `createTextAsync(parent, record, ctx?)` / `deployText(parent, record, ctx?)`
 
-Deploys in-scene text with **`objType: "text"`**. `mode` supports `sdf` (default), `texture`, `mesh` (see [JSON configuration guide § text](../json-format.md#text场景内文字)).
+Deploys in-scene text with **`objType: "text"`**. `mode` supports `sdf` (default), `texture`, `mesh` (see [JSON configuration guide § text](./json-format.md#text场景内文字)).
 
 - **`createTextAsync`**: full async path for sdf / mesh / texture with lazy troika load and fallbacks.
 - **`createText`**: sync subset; stable `texture` only; `sdf` / `mesh` **degrade synchronously to texture** (warn).
@@ -1203,7 +1205,7 @@ if (res.needsRedeploy) {
 
 ## Runtime structure commands (`core/runtime/sceneObjectCommands.js`)
 
-**Add/remove** on the scene (not property edits). See [runtime-object-commands.md](../runtime-object-commands.md).
+**Add/remove** on the scene (not property edits). See [runtime-object-commands.md](./runtime-object-commands.md).
 
 ```js
 import {
@@ -1276,7 +1278,7 @@ Optional `three-mesh-bvh` accelerated picking (**off by default**):
 - `applyMeshBvhPickToScene(root, { sceneMeshBvh })`
 - `raycastSceneWithPick({ useMeshBvh, scene, ... })` (async)
 
-Switches: [JSON configuration guide](../json-format.md) `pick.meshBvh` / `pick.precision: "bvh"`.
+Switches: [JSON configuration guide](./json-format.md) `pick.meshBvh` / `pick.precision: "bvh"`.
 
 ## `core/util/extensionsUtil.js`
 
@@ -1290,7 +1292,7 @@ Switches: [JSON configuration guide](../json-format.md) `pick.meshBvh` / `pick.p
 
 Implementation: `core/handler/sceneDescriptorBinding.js`.
 
-Optional: lightweight two-way sync between **descriptor transforms** and **Object3D** (`position` / `rotation` / `scale` only). Off by default; configure in `worldInfo.descriptorBinding` and call `startDescriptorBinding(scene, worldInfo)`. Full fields, priority, and limits: [JSON configuration guide](../json-format.md) **`descriptorBinding`** section.
+Optional: lightweight two-way sync between **descriptor transforms** and **Object3D** (`position` / `rotation` / `scale` only). Off by default; configure in `worldInfo.descriptorBinding` and call `startDescriptorBinding(scene, worldInfo)`. Full fields, priority, and limits: [JSON configuration guide](./json-format.md) **`descriptorBinding`** section.
 
 - `startDescriptorBinding(scene, worldInfo?, options?)`: returns `{ stop, flush }`.
 - `markDescriptorBindingJsonDirty(id | descriptor)`: next frame pushes transform from JSON to object.

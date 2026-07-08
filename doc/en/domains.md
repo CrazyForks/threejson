@@ -1,4 +1,4 @@
-[中文](../domains.md) | [English](./domains.md)
+[中文](../zh/domains.md) | [English](./domains.md)
 
 # Business Domains and `domains/`
 
@@ -6,15 +6,15 @@ This page explains what business domains are in ThreeJSON, when to use them, and
 
 If you only want to render ordinary boxes, spheres, groups, or external models from JSON, start with the [JSON Format Guide](./json-format.md) and the [Core API](./api.md). If you want to package business-specific behavior as reusable runtime capabilities, or drive those capabilities through friendly JSON `worldInfo.domainModelList` or standard `objType: "domain"` records, then `domains/` is the part to look at.
 
-There is also an implementation-oriented note under [`../core/BUSINESS_DOMAINS.md`](../core/BUSINESS_DOMAINS.md). This page is the caller-facing entry point; the file under `core/` is more about internal conventions and design constraints.
+There is also an implementation-oriented note under [`../core/BUSINESS_DOMAINS.md`](../../core/BUSINESS_DOMAINS.md). This page is the caller-facing entry point; the file under `core/` is more about internal conventions and design constraints.
 
 ## Documentation layering (library vs apps)
 
 `core/` and `domains/` are the **library**. Any host app—a minimal page that renders one box, a demo, RoomShow, or a scene editor—is a **consumer on equal footing**.
 
-- This page, [domain-scaffold.md](../domain-scaffold.md), and [BUSINESS_DOMAINS.md](../core/BUSINESS_DOMAINS.md) describe **library contracts** for integrators and generic loaders.
+- This page, [domain-scaffold.md](./domain-scaffold.md), and [BUSINESS_DOMAINS.md](../../core/BUSINESS_DOMAINS.md) describe **library contracts** for integrators and generic loaders.
 - **Dependency direction** (core may change; no reverse imports; host UX stays in hosts) is in [design-principles.md §Dependency direction](./design-principles.md#dependency-direction-core--domains--host).
-- Host-specific UI (model palettes, toolbars, undo stacks) belongs in **application docs** (for example [editor-selection.md](../editor-selection.md)), not in required domain APIs.
+- Host-specific UI (model palettes, toolbars, undo stacks) belongs in **application docs** (for example [editor-selection.md](./editor-selection.md)), not in required domain APIs.
 - Some domains expose convenience methods such as `addToScene` on `api` for `domainModelList` handlers or optional host use; absence does not block registration.
 
 ## What is a domain
@@ -37,9 +37,9 @@ Use `import "threejson/builtins/register"` only with **`threejson/core`** when y
 
 Manifest and merge logic:
 
-- [`../builtins/builtinDomainManifest.generated.js`](../builtins/builtinDomainManifest.generated.js): produced before publish / in dev by **recursively** scanning `domains/**/index.js` (**do not edit by hand**); descriptor `id` should match the folder path (e.g. `domains/weather/rain` → `id: "weather.rain"`).
-- [`../builtins/userDomainDescriptors.js`](../builtins/userDomainDescriptors.js): hand-written overrides; on the **same `id`**, the user entry **wins**; ids only in the user list are **appended** at the end.
-- [`../builtins/register.js`](../builtins/register.js): merges descriptors and calls `initBusinessDomains`.
+- [`../builtins/builtinDomainManifest.generated.js`](../../builtins/builtinDomainManifest.generated.js): produced before publish / in dev by **recursively** scanning `domains/**/index.js` (**do not edit by hand**); descriptor `id` should match the folder path (e.g. `domains/weather/rain` → `id: "weather.rain"`).
+- [`../builtins/userDomainDescriptors.js`](../../builtins/userDomainDescriptors.js): hand-written overrides; on the **same `id`**, the user entry **wins**; ids only in the user list are **appended** at the end.
+- [`../builtins/register.js`](../../builtins/register.js): merges descriptors and calls `initBusinessDomains`.
 
 **Maintainers** run **`npm run generate:business-domain-manifest`** from the repo root after adding `domains/<name>/index.js`. **End users** who install the npm package do not run generate.
 
@@ -178,11 +178,11 @@ Core supports **dot-separated qualified ids** (v1):
 Notes:
 
 - **`getDomain("rain")`** returns `null` when `weather.rain` (or any `*.rain`) is registered; use the full id. Short root ids (`port`, `cabinet`) are unaffected.
-- Root and child domains can coexist (`weather` + `weather.rain` / `weather.wind`). Demo: [`05-02-nested-domain.html`](../examples/html-demo/track-05-tooling/05-02-nested-domain.html). See [`lab/nested-domain-memo.md`](../lab/nested-domain-memo.md).
+- Root and child domains can coexist (`weather` + `weather.rain` / `weather.wind`). Demo: [`05-02-nested-domain.html`](../../examples/html-demo/track-05-tooling/05-02-nested-domain.html). See [`lab/nested-domain-memo.md`](../../lab/nested-domain-memo.md).
 
 ## Domain descriptor structure
 
-The core descriptor contract is defined in [`../core/handler/businessDomainRegistry.js`](../core/handler/businessDomainRegistry.js). `initBusinessDomains` / `registerDomain` run **`validateDomainDescriptor`**:
+The core descriptor contract is defined in [`../core/handler/businessDomainRegistry.js`](../../core/handler/businessDomainRegistry.js). `initBusinessDomains` / `registerDomain` run **`validateDomainDescriptor`**:
 
 | Check | Level |
 |-------|--------|
@@ -192,7 +192,7 @@ The core descriptor contract is defined in [`../core/handler/businessDomainRegis
 | `resolveDomainModel` or `domainHandlers` | **Recommended** for deployable domains — `console.warn` if both missing |
 | Namespace-only descriptor (no create/deploy) | **Allowed** — warns; not dispatchable via `invokeDomainModel` |
 
-`PascalCase(leaf)` matches `toPascalCase` in the registry. Built-in list: [`builtinDomainManifest.generated.js`](../builtins/builtinDomainManifest.generated.js). Contract tests: [`tests/businessDomainManifest.test.mjs`](../tests/businessDomainManifest.test.mjs), [`tests/nestedDomainRegistry.test.mjs`](../tests/nestedDomainRegistry.test.mjs).
+`PascalCase(leaf)` matches `toPascalCase` in the registry. Built-in list: [`builtinDomainManifest.generated.js`](../../builtins/builtinDomainManifest.generated.js). Contract tests: [`tests/businessDomainManifest.test.mjs`](../../tests/businessDomainManifest.test.mjs), [`tests/nestedDomainRegistry.test.mjs`](../../tests/nestedDomainRegistry.test.mjs).
 
 A common shape looks like this:
 
@@ -238,13 +238,13 @@ const demoDomain = {
 
 When a page uses `deployMeshWithDomains()` or `deployMeshListWithDomains()` (for friendly `boxModelList`, `sphereModelList`, or `meshList` after normalization): records matching `legacyBoxObjTypes` route to `resolveDomainModel`; if `sceneConfig.enableComposeBoxModel === true`, registered domains may handle records via `composeBoxModel()`; otherwise the runtime falls back to `deployMesh()`.
 
-**Preset thin domains** ([`domains/wall`](../domains/wall/index.js), [`domains/glass`](../domains/glass/index.js)): use `objType: "wall"` / `"glass"` in `boxModelList` without enabling compose (legacy mapping). Glass records may set `glassKind` (`clear` | `tinted` | `frosted`). Deployed materials use `material.type: "standard"`.
+**Preset thin domains** ([`domains/wall`](../../domains/wall/index.js), [`domains/glass`](../../domains/glass/index.js)): use `objType: "wall"` / `"glass"` in `boxModelList` without enabling compose (legacy mapping). Glass records may set `glassKind` (`clear` | `tinted` | `frosted`). Deployed materials use `material.type: "standard"`.
 
 That is why some domains support both `domainModelList` and `boxModelList` extension.
 
 ## Start with the small example: `nativeThree`
 
-[`../domains/nativeThree/index.js`](../domains/nativeThree/index.js) is the closest thing in this repository to a pure `domainModelList` / `objType: "domain"` example. It does not implement `composeBoxModel`. It only turns domain records into loading actions for Three.js native Object / Scene JSON.
+[`../domains/nativeThree/index.js`](../../domains/nativeThree/index.js) is the closest thing in this repository to a pure `domainModelList` / `objType: "domain"` example. It does not implement `composeBoxModel`. It only turns domain records into loading actions for Three.js native Object / Scene JSON.
 
 Key points:
 
@@ -270,7 +270,7 @@ If you are new to business domains, understand `nativeThree` first. It is a clea
 
 ## Then look at the advanced example: `port`
 
-[`../domains/port/index.js`](../domains/port/index.js) is a mixed domain:
+[`../domains/port/index.js`](../../domains/port/index.js) is a mixed domain:
 
 - It uses `composeBoxModel()` to take over certain `boxModelList` records and turn them into port composites.
 - It also supports `domainModelList`, but currently that path is mostly for the statistics overlay handler `createPortStatistics`.
@@ -279,7 +279,7 @@ That means `port` is **not** the best template for the first custom domain. It i
 
 ### `port` through `domainModelList` (canonical)
 
-In [`../assets/json/portShow.json`](../assets/json/portShow.json), dock cranes and similar equipment are declared in **`domainModelList`** (`name` = slug, `label` = display text):
+In [`../assets/json/portShow.json`](../../assets/json/portShow.json), dock cranes and similar equipment are declared in **`domainModelList`** (`name` = slug, `label` = display text):
 
 ```json
 {
@@ -393,9 +393,9 @@ This example highlights:
 
 ### Step 3: register it in the manifest
 
-Recommended: after `domains/demo/index.js` exists, run **`npm run generate:business-domain-manifest`** from the repo root; the script updates [`../builtins/builtinDomainManifest.generated.js`](../builtins/builtinDomainManifest.generated.js).
+Recommended: after `domains/demo/index.js` exists, run **`npm run generate:business-domain-manifest`** from the repo root; the script updates [`../builtins/builtinDomainManifest.generated.js`](../../builtins/builtinDomainManifest.generated.js).
 
-If you need to override a scanned `id`, add it to `userDomainDescriptors` in [`../builtins/userDomainDescriptors.js`](../builtins/userDomainDescriptors.js), for example:
+If you need to override a scanned `id`, add it to `userDomainDescriptors` in [`../builtins/userDomainDescriptors.js`](../../builtins/userDomainDescriptors.js), for example:
 
 ```js
 import demoDomain from "../domains/demo/index.js";
@@ -404,7 +404,7 @@ import demoDomain from "../domains/demo/index.js";
 export const userDomainDescriptors = [demoDomain];
 ```
 
-See [`../builtins/register.js`](../builtins/register.js) for merge rules. Only after generation or user configuration will the runtime recognize `domain: "demo"`.
+See [`../builtins/register.js`](../../builtins/register.js) for merge rules. Only after generation or user configuration will the runtime recognize `domain: "demo"`.
 
 ### Step 4: prepare JSON records
 
@@ -465,7 +465,7 @@ businessDomains.demo.deployDemo({ name: "demo-03", position: { x: -120, y: 40, z
 
 ## Material maps: video and GIF (primitives / planes / OBJ `maps`)
 
-This matches [`modelBuilder.js`](../core/builder/modelBuilder.js) **`ensureMaterialTextureFromJson`** and OBJ **`maps`** slots:
+This matches [`modelBuilder.js`](../../core/builder/modelBuilder.js) **`ensureMaterialTextureFromJson`** and OBJ **`maps`** slots:
 
 | `textureKind` | Behavior |
 | --------------- | -------- |
@@ -477,19 +477,19 @@ This matches [`modelBuilder.js`](../core/builder/modelBuilder.js) **`ensureMater
 
 ## Practical advice for custom domains
 
-- **`create*Json` / `create*` / `deploy*`**: registration **requires** `create${PascalCase(leaf)}` and `deploy${PascalCase(leaf)}` (last segment of a dotted id); keep the semantic layering described in [BUSINESS_DOMAINS.md](../core/BUSINESS_DOMAINS.md), including documented **semantic exceptions**.
+- **`create*Json` / `create*` / `deploy*`**: registration **requires** `create${PascalCase(leaf)}` and `deploy${PascalCase(leaf)}` (last segment of a dotted id); keep the semantic layering described in [BUSINESS_DOMAINS.md](../../core/BUSINESS_DOMAINS.md), including documented **semantic exceptions**.
 - Keep `index.js` focused on descriptor, `resolveDomainModel`, and `api`; move complex animation/statistics/object-ops logic into `*Handler.js`.
 - Use tiered scaffolds by complexity: simple domain (1 file `index.js`), composite domain (3 files: `index.js` + `*Factory.js` + template module), composite+stats domain (4 files with `*Handler.js`).
 - Keep the first version of a domain small and self-contained before growing it into a hybrid design like `port`.
 - Prefer declarative records interpreted by `resolveDomainModel()` instead of spreading business-specific `if / else` logic across host apps.
 - If a capability depends on root JSON, loading managers, or other runtime context, document the expected `ctx` fields clearly.
 - Even if you mainly expose imperative `api`, keep a `domainModelList` entry point for JSON-driven loading and other hosts.
-- For edit-time add/remove/undo in hosts, see [runtime-object-mutation-quickref.md](../runtime-object-mutation-quickref.md) and [lab/domain-runtime-mutation-contract-memo.md](../../lab/domain-runtime-mutation-contract-memo.md) (separate from domain registration).
+- For edit-time add/remove/undo in hosts, see [runtime-object-mutation-quickref.md](./runtime-object-mutation-quickref.md) and [lab/domain-runtime-mutation-contract-memo.md](../../lab/domain-runtime-mutation-contract-memo.md) (separate from domain registration).
 
 ## Related documents
 
 - [JSON Format Guide](./json-format.md): `worldInfo`, `domainModelList`, and other object JSON formats.
 - [Core API](./api.md): `applyDomainModelsFromWorldInfo()`, `invokeDomainModel()`, `businessDomains`, and related entry points.
-- [Domain Scaffold Template](../domain-scaffold.md): tiered 1/3/4-file templates and the minimum contract.
-- [Demo Pages](./demos.md): see [`examples/html-demo/track-03-assets/03-03-native-three-domain.html`](../examples/html-demo/track-03-assets/03-03-native-three-domain.html) and `port-show.html` for how different domains are integrated.
-- [`../core/BUSINESS_DOMAINS.md`](../core/BUSINESS_DOMAINS.md): additional implementation-facing design notes.
+- [Domain Scaffold Template](./domain-scaffold.md): tiered 1/3/4-file templates and the minimum contract.
+- [Demo Pages](./demos.md): see [`examples/html-demo/track-03-assets/03-03-native-three-domain.html`](../../examples/html-demo/track-03-assets/03-03-native-three-domain.html) and `port-show.html` for how different domains are integrated.
+- [`../core/BUSINESS_DOMAINS.md`](../../core/BUSINESS_DOMAINS.md): additional implementation-facing design notes.

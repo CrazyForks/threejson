@@ -1,0 +1,28 @@
+{
+  "version": "next",
+  "name": "demo-show-box",
+  "sceneConfig": {
+    "scene": { "background": "#11151b" },
+    "camera": { "fov": 55, "near": 0.1, "far": 200, "position": { "x": 18, "y": 14, "z": 22 } },
+    "renderer": { "antialias": true, "ratioRate": 1 },
+    "controls": { "enableDamping": true, "target": { "x": 0, "y": 2, "z": 0 } },
+    "lights": [
+      { "type": "ambient", "color": "#ffffff", "intensity": 0.7 },
+      { "type": "directional", "color": "#ffffff", "intensity": 1, "position": { "x": 20, "y": 30, "z": 20 } }
+    ],
+    "renderLoop": { "autoResize": true, "firstAutoResize": true }
+  },
+  "worldInfo": {
+    "boxModelList": [
+      {
+        "threeJsonId": "box-basic",
+        "name": "box-basic",
+        "objType": "box",
+        "geometry": { "width": 6, "height": 6, "depth": 6 },
+        "position": { "x": 0, "y": 3, "z": 0 },
+        "material": { "type": "standard", "color": "#5470c6" }
+      }
+    ]
+  },
+  "threeJsonId": "demo-show-01-box"
+}

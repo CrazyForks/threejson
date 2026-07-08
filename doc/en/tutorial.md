@@ -1,6 +1,8 @@
+[中文](../zh/tutorial.md) | [English](./tutorial.md)
+
 # ThreeJSON Tutorial Catalog
 
-[中文](../tutorial.md) | [English](./tutorial.md)
+[中文](../zh/tutorial.md) | [English](./tutorial.md)
 
 This catalog matches [demo.html](../../demo.html): **Tracks 0 → 7** from core runtime contracts through tooling, host apps, the stat domain, and scene text.
 
@@ -119,7 +121,7 @@ Track 7 HTML pages include `troika-three-text` + `fflate` in the import map (SDF
 
 ## Roadmap (no standalone demo yet)
 
-Aligned with [json-format.md § Out of scope](../json-format.md#暂不纳入当前-json-主线的能力) (Chinese): skeletal animation state machines, more formats (FBX/STL), advanced descriptorBinding / spatial-query lessons, dedicated mesh import/export tutorials, etc.
+Aligned with [json-format.md § Out of scope](./json-format.md#暂不纳入当前-json-主线的能力) (Chinese): skeletal animation state machines, more formats (FBX/STL), advanced descriptorBinding / spatial-query lessons, dedicated mesh import/export tutorials, etc.
 
 ## Adding a new lesson
 

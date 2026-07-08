@@ -1,4 +1,4 @@
-# ThreeJSON
+﻿# ThreeJSON
 
 [中文](./README.md) | [English](./README_EN.md)
 
@@ -44,7 +44,7 @@ nvm use          # reads .nvmrc
 npm ci && npm test
 ```
 
-See **[`doc/development.md`](doc/development.md)** (Chinese; English: [`doc/en/development.md`](doc/en/development.md)).
+See **[`doc/zh/development.md`](doc/zh/development.md)** (Chinese; English: [`doc/en/development.md`](doc/en/development.md)).
 
 ## Use in your project
 
@@ -73,7 +73,7 @@ npm install @threejson/assets
 
 ## Contributing and AI-generated code
 
-This project **allows** AI-assisted contributions, subject to the **AI-generated code guidelines** in [`doc/development.md`](doc/development.md) (keep docs in sync, human-reviewed plans, attach `doc/dev/plans/` with each submission). See also [`doc/dev/plans/README.md`](doc/dev/plans/README.md).
+This project **allows** AI-assisted contributions, subject to the **AI-generated code guidelines** in [`doc/zh/development.md`](doc/zh/development.md) (keep docs in sync, human-reviewed plans, attach `doc/dev/plans/` with each submission). See also [`doc/dev/plans/README.md`](doc/dev/plans/README.md).
 
 ## Documentation
 
@@ -85,7 +85,7 @@ If you want to understand the design of `domains/`, how `domainModelList` works,
 
 Peer dependencies must be installed in your app (versions should satisfy the `peerDependencies` field in [`package.json`](package.json)):
 
-- **Three.js**: `>= 0.179.0` (recommended **0.184.x**). See [`doc/three-compat.md`](doc/three-compat.md) (Chinese; version matrix and workarounds).
+- **Three.js**: `>= 0.179.0` (recommended **0.184.x**). See [`doc/zh/three-compat.md`](doc/zh/three-compat.md) (Chinese; version matrix and workarounds).
 
 ```bash
 npm install threejson three @tweenjs/tween.js html2canvas-pro

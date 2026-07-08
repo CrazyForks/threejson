@@ -1,4 +1,4 @@
-# ThreeJSON Examples
+﻿# ThreeJSON Examples
 
 [中文](./README.md) | [English](./README_EN.md)
 
@@ -31,7 +31,7 @@ Because `html-demo/` sits one level deeper than the old `demo/` folder, engine i
 
 ### Import maps and `core` (bare ESM)
 
-Without a bundler, the page's **`<script type="importmap">` must cover every bare specifier** pulled in by the full module graph (including transitive imports from `../../core/index.js`), e.g. `three`, `three/examples/jsm/`, `three-mesh-bvh`, `three-bvh-csg`, `@tweenjs/tween.js`, `html2canvas-pro`, `gifuct-js`. Root pages such as `scene-editor.html`, `room-show.html`, `scene-player.html`, `port-show.html`, and `port-show-auto.html` are kept in sync with `examples/html-demo/track-*/*.html`. If you fork a page, copy the import map or switch to a bundled setup. See [`../doc/quick-start.md`](../doc/quick-start.md) for the snippet.
+Without a bundler, the page's **`<script type="importmap">` must cover every bare specifier** pulled in by the full module graph (including transitive imports from `../../core/index.js`), e.g. `three`, `three/examples/jsm/`, `three-mesh-bvh`, `three-bvh-csg`, `@tweenjs/tween.js`, `html2canvas-pro`, `gifuct-js`. Root pages such as `scene-editor.html`, `room-show.html`, `scene-player.html`, `port-show.html`, and `port-show-auto.html` are kept in sync with `examples/html-demo/track-*/*.html`. If you fork a page, copy the import map or switch to a bundled setup. See [`../doc/zh/quick-start.md`](../doc/zh/quick-start.md) for the snippet.
 
 ## Node scripts (`script/`)
 

@@ -1,8 +1,10 @@
+[中文](../zh/tools.md) | [English](./tools.md)
+
 # ThreeJSON tools and host applications
 
-[Caller guide](./README.md) | [JSON format](../json-format.md) (core contract) | [Tools README](../../tools/README.md)
+[Caller guide](./README.md) | [JSON format](./json-format.md) (core contract) | [Tools README](../../tools/README.md)
 
-This document describes **host applications** built on ThreeJSON core (scene editor, player, demo pages) and **`sysConfig`** conventions. Core callers only need [`json-format.md`](../json-format.md) and [`api.md`](../api.md); this does not replace core docs.
+This document describes **host applications** built on ThreeJSON core (scene editor, player, demo pages) and **`sysConfig`** conventions. Core callers only need [`json-format.md`](./json-format.md) and [`api.md`](./api.md); this does not replace core docs.
 
 Planned: root `scene-editor.html` / `scene-player.html` may move under [`tools/`](../../tools/); contracts stay the same.
 
@@ -14,7 +16,7 @@ Planned: root `scene-editor.html` / `scene-player.html` may move under [`tools/`
 | Scene player | [`scene-player.html`](../../scene-player.html) | Playlists, inspection tours |
 | Editor commands | [`tools/common/editor-single/command/`](../../tools/common/editor-single/command/) | `editor.*` commands for HTML hosts |
 | Business demos | [`room-show.html`](../../room-show.html), [`port-show.html`](../../port-show.html), etc. | Machine room / port dashboards |
-| External agent / MCP | [`tools/threejson-agent/`](../../tools/threejson-agent/README.md), [`mcp-cursor.md`](../mcp-cursor.md) | Does not depend on page `sysConfig` |
+| External agent / MCP | [`tools/threejson-agent/`](../../tools/threejson-agent/README.md), [`mcp-cursor.md`](./mcp-cursor.md) | Does not depend on page `sysConfig` |
 
 ## `sceneConfig` vs `sysConfig`
 
@@ -85,7 +87,7 @@ Not required in `sceneConfig`: `jsonData`, `sceneLocked`, `dragLocked`, `meshObj
 
 ### `sysConfig.jsonData` and save
 
-- Editor `sceneToJson` merge base is `sysConfig.jsonData` (see [`api.md`](../api.md)).
+- Editor `sceneToJson` merge base is `sysConfig.jsonData` (see [`api.md`](./api.md)).
 - Persistence details: [`lab/scene-canonical-collect-roadmap.md`](../../lab/scene-canonical-collect-roadmap.md).
 
 ## Editor / player highlights
@@ -98,8 +100,8 @@ Not required in `sceneConfig`: `jsonData`, `sceneLocked`, `dragLocked`, `meshObj
 
 | Document | Notes |
 |----------|-------|
-| [`editor-selection.md`](../editor-selection.md) | Outline vs post-process highlight |
-| [`json-templates/README.md`](../json-templates/README.md) | Hand-authored scene templates |
+| [`editor-selection.md`](./editor-selection.md) | Outline vs post-process highlight |
+| [`json-templates/README.md`](../../json-templates/README.md) | Hand-authored scene templates |
 | [`demos.md`](./demos.md) | Demo index |
 | [`tutorial.md`](./tutorial.md) | Lessons t05-03 / t05-04 |
 | [`tools/common/editor-single/README.md`](../../tools/common/editor-single/README.md) | `editor.*` command wiring |
@@ -107,5 +109,5 @@ Not required in `sceneConfig`: `jsonData`, `sceneLocked`, `dragLocked`, `meshObj
 
 ## Boundary with core docs
 
-- **Scene semantics** (camera, lights, background, helpers, deployScheduler) → write `sceneConfig`; see [`json-format.md`](../json-format.md).
+- **Scene semantics** (camera, lights, background, helpers, deployScheduler) → write `sceneConfig`; see [`json-format.md`](./json-format.md).
 - **Page UI** (alarm lists, sidebar toggles, etc.) → not in scene JSON; see [`lab/standard-json-shape-proposal.md`](../../lab/standard-json-shape-proposal.md) §10b.

@@ -1,0 +1,66 @@
+:root {
+  --bg: #151922;
+  --panel: #1f2630;
+  --panel2: #252d38;
+  --text: #edf2f7;
+  --muted: #9aa9bd;
+  --line: #344052;
+  --brand: #5470c6;
+}
+
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--text); font-family: "Segoe UI", Arial, "Microsoft YaHei", sans-serif; }
+button { font: inherit; }
+
+#appShell { display: grid; grid-template-rows: 56px 1fr; width: 100vw; height: 100vh; }
+.showerHeader { display: flex; align-items: center; gap: 14px; padding: 0 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.brand img { height: 32px; display: block; }
+.titleBlock { display: grid; gap: 2px; min-width: 0; flex: 1; }
+#exampleTitle { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#statusText { color: var(--muted); font-size: 12px; }
+.autoRunLabel { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+
+.workspace { display: grid; grid-template-columns: minmax(380px, 45vw) 1fr; min-height: 0; }
+.leftPane, .rightPane { min-width: 0; min-height: 0; }
+.leftPane { display: grid; grid-template-rows: 40px 42px 1fr; border-right: 1px solid var(--line); background: var(--panel); }
+.rightPane { display: grid; grid-template-rows: 42px 1fr; background: #11151b; }
+
+.tabs, .editorToolbar, .canvasToolbar { display: flex; align-items: center; gap: 8px; padding: 0 10px; border-bottom: 1px solid var(--line); background: var(--panel2); }
+.tab, .editorToolbar button, .canvasToolbar button, .menu > button {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #202734;
+  color: var(--text);
+  cursor: pointer;
+}
+.tab.active, button.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.toolbarSpacer { flex: 1; }
+.segmented { display: flex; gap: 0; }
+.segmented button { border-radius: 0; }
+.segmented button:first-child { border-radius: 5px 0 0 5px; }
+.segmented button:last-child { border-radius: 0 5px 5px 0; margin-left: -1px; }
+
+.editorPanel, .treePanel { min-height: 0; overflow: hidden; }
+.CodeMirror { height: 100%; font-size: 13px; line-height: 1.55; }
+.treePanel { padding: 12px; overflow: auto; background: #171d26; }
+.treeGroup { margin: 0 0 14px; }
+.treeGroup summary { margin: 0 0 8px; color: var(--muted); font-size: 13px; cursor: pointer; }
+.treeNode { display: block; width: 100%; margin: 0 0 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 5px; background: #202734; color: var(--text); text-align: left; cursor: pointer; }
+.treeNode:hover, .treeNode.active { border-color: var(--brand); color: #9ecbff; }
+.treeGroup h3 { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+
+.menu { position: relative; }
+.menuPanel { position: absolute; top: 32px; left: 0; z-index: 10; display: none; min-width: 140px; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+.menu:hover .menuPanel, .menu:focus-within .menuPanel { display: grid; gap: 6px; }
+
+#canvasWrap { position: relative; min-height: 0; background: #11151b; }
+#canvasContainer { display: block; width: 100%; height: 100%; background: #11151b; }
+#loadingMask { position: absolute; inset: 0; z-index: 5; display: none; align-items: center; justify-content: center; background: rgba(10, 12, 16, 0.72); color: #fff; }
+#loadingMask.visible { display: flex; }
+
+@media (max-width: 900px) {
+  .workspace { grid-template-columns: 1fr; grid-template-rows: 48vh 1fr; }
+  .leftPane { border-right: 0; border-bottom: 1px solid var(--line); }
+}

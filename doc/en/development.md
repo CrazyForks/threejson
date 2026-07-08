@@ -1,6 +1,8 @@
+[中文](../zh/development.md) | [English](./development.md)
+
 # Development and toolchain
 
-[中文](../development.md) | [English](./development.md)
+[中文](../zh/development.md) | [English](./development.md)
 
 The ThreeJSON **library** ([`core/`](../../core/), [`domains/`](../../domains/)) is **browser / bundler ESM** and does **not** require Node at runtime.
 
@@ -68,12 +70,12 @@ This project **allows** AI-assisted code, provided contributors follow:
 
 1. **Docs in sync**: code changes must update project docs (`doc/`, API, JSON contracts, examples, tool READMEs).
 2. **Plan before code**: a written plan must exist and be **human-reviewed** before implementation merges.
-3. **Attach plans on submit**: include related materials under [`doc/dev/plans/`](../dev/plans/).
-4. **Plan folder naming**: `{unix_ms_timestamp}_{brief-description}_{32-char-hex-uuid}` — e.g. `1782301810000` → `2026-06-24 19:50:10` (UTC+8). See [`doc/dev/plans/README.md`](../dev/plans/README.md).
+3. **Attach plans on submit**: include related materials under [`doc/dev/plans/`](../../dev/plans/).
+4. **Plan folder naming**: `{unix_ms_timestamp}_{brief-description}_{32-char-hex-uuid}` — e.g. `1782301810000` → `2026-06-24 19:50:10` (UTC+8). See [`doc/dev/plans/README.md`](../../dev/plans/README.md).
 5. **Plan contents**: prompt/context summary, requirements assessment, and solution design (may be split across `.md` files).
 6. **Tests**: when appropriate, add automated cases under [`tests/`](../../tests/) (`*.test.mjs`) and document coverage in the plan; otherwise document manual verification in acceptance criteria.
 
-Details and an example folder: **[`doc/dev/plans/README.md`](../dev/plans/README.md)**.
+Details and an example folder: **[`doc/dev/plans/README.md`](../../dev/plans/README.md)**.
 
 ## Language and documentation policy
 

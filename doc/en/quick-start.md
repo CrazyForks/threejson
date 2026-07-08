@@ -1,4 +1,4 @@
-[中文](../quick-start.md) | [English](./quick-start.md)
+[中文](../zh/quick-start.md) | [English](./quick-start.md)
 
 # Quick Start
 
@@ -50,7 +50,7 @@ If your page indirectly uses files that still rely on bare module names, add an 
 
 When `core` adds new bare specifiers, sync bare-ESM import maps (`node tools/dev/importmap/patch-gifuct-importmap.mjs`, etc.; Track 7 text lessons keep troika; other tutorial pages can use `strip-troika-importmap.mjs` to trim).
 
-**Three.js versions**: officially supported **r179–r184** (examples use `0.184.0`). For older revisions and CSG overrides, see [`../three-compat.md`](../three-compat.md) (Chinese).
+**Three.js versions**: officially supported **r179–r184** (examples use `0.184.0`). For older revisions and CSG overrides, see [`../three-compat.md`](./three-compat.md) (Chinese).
 
 ```html
 <script type="importmap">
@@ -103,12 +103,12 @@ sceneRuntime.start();
 
 ### Vue, React (Vite)
 
-When you install from npm, the package name is **`threejson`**. Also install the versions listed under `peerDependencies` in [`package.json`](../package.json) (`three`, `@tweenjs/tween.js`, `html2canvas-pro`, and so on). Vite resolves bare specifiers from `node_modules`, so you do not need an import map.
+When you install from npm, the package name is **`threejson`**. Also install the versions listed under `peerDependencies` in [`package.json`](../../package.json) (`three`, `@tweenjs/tween.js`, `html2canvas-pro`, and so on). Vite resolves bare specifiers from `node_modules`, so you do not need an import map.
 
 Minimal runnable samples live in the repo (run `npm install` and `npm run dev` inside each folder):
 
-- [`examples/vue-app`](../examples/vue-app)
-- [`examples/react-app`](../examples/react-app)
+- [`examples/vue-app`](../../examples/vue-app)
+- [`examples/react-app`](../../examples/react-app)
 
 Notes:
 

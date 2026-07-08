@@ -1,6 +1,6 @@
-# Lab 文档约定
+﻿# Lab 文档约定
 
-本目录记录**实验、评估、架构备忘与已落地项的历史索引**，与 [`doc/scope.md`](../doc/scope.md) 中的 **Core 发布承诺** 区分。读者若只需稳定 API，优先查 `doc/` 与 `core/ai/SKILL.md`。
+本目录记录**实验、评估、架构备忘与已落地项的历史索引**，与 [`doc/zh/scope.md`](../doc/zh/scope.md) 中的 **Core 发布承诺** 区分。读者若只需稳定 API，优先查 `doc/` 与 `core/ai/SKILL.md`。
 
 ---
 
@@ -56,7 +56,7 @@
 ## 与产品承诺的关系
 
 ```text
-doc/scope.md          → Core 对外承诺
+doc/zh/scope.md          → Core 对外承诺
 lab/ (shipped/partial) → 已实现或部分实现的实现索引
 lab/ (idea~deferred)   → 排期参考，非承诺
 lab/ (parked/rejected) → 明确不做或否决

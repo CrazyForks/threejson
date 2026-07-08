@@ -1,6 +1,8 @@
+[中文](../zh/scope.md) | [English](./scope.md)
+
 # Scope and data contract
 
-[中文](../scope.md) | [English](./scope.md)
+[中文](../zh/scope.md) | [English](./scope.md)
 
 This document describes **core** capability boundaries and how **canonical JSON** relates to the **runtime Object3D overlay**, so upstream callers and contributors share the same expectations.
 
@@ -36,4 +38,4 @@ Future-capability drafts and experiment index (**not** a release commitment), se
 
 ## Explicitly out of core
 
-Full network sync, ECS, production-level editor UI, anti-cheat and untrusted-input validation (see optional security placeholder in [`design-principles.md`](../design-principles.md))—implemented by hosts or optional extensions.
+Full network sync, ECS, production-level editor UI, anti-cheat and untrusted-input validation (see optional security placeholder in [`design-principles.md`](./design-principles.md))—implemented by hosts or optional extensions.

@@ -23,6 +23,7 @@ import {
 import { isLoadableScenePayload } from "../../../../core/handler/sceneFriendlyNormalizer.js";
 import { buildEditorScenePayload } from "../../shared/js/buildEditorRuntimeConfig.js";
 import { createEditorSysConfig } from "../../shared/js/createEditorSysConfig.js";
+import { resolveSceneHostUrl, sceneHostAssetUrl } from "../../shared/js/sceneHostPaths.js";
 import {
   fetchPlayerSettingsFileDefaults,
   getDefaultSceneUrl,
@@ -539,7 +540,7 @@ export async function bootstrapPlayerApp() {
   function buildCreateJsonSceneOptions() {
     const opts = {
       canvas: canvasContainer,
-      assetsBase: new URL("../../../../assets/", import.meta.url).href,
+      assetsBase: sceneHostAssetUrl("assets/"),
       autoFillLights: true,
       autoFillCamera: true,
       sceneAutoRotate: sysConfig.sceneAutoRotate,
@@ -841,6 +842,7 @@ export async function bootstrapPlayerApp() {
       } else {
         localStorage.removeItem(LS_PLAYLIST_CURRENT_ID_KEY);
       }
+      return true;
     } catch (err) {
       console.warn("[scene-editor player] savePlaylistState", err);
     }
@@ -945,7 +947,7 @@ export async function bootstrapPlayerApp() {
 
   async function activatePlaylistIndex(index) {
     if (sceneSwitchLocked || index < 0 || index >= playlist.length) {
-      return;
+      return false;
     }
     sceneSwitchLocked = true;
     currentPlaylistIndex = index;
@@ -992,6 +994,7 @@ export async function bootstrapPlayerApp() {
       } else {
         throw new Error("播放列表条目无效");
       }
+      return true;
     } catch (err) {
       setLoading(false);
       openOrCloseProgressManager(false);
@@ -1000,6 +1003,7 @@ export async function bootstrapPlayerApp() {
       if (!renderLoop) {
         setCanvasIdleOverlayVisible(true);
       }
+      return false;
     } finally {
       sceneSwitchLocked = false;
       syncTransportBar();
@@ -1028,33 +1032,6 @@ export async function bootstrapPlayerApp() {
     } catch {
       return resolveSceneHostUrl(fromQuery);
     }
-  }
-
-  function resolveSceneHostUrl(value) {
-    const raw = String(value || "").trim();
-    if (!raw) {
-      return raw;
-    }
-    if (/^(?:[a-z]+:)?\/\//i.test(raw) || raw.startsWith("data:") || raw.startsWith("blob:")) {
-      return raw;
-    }
-    const sceneHostRoot = new URL("../../../../", import.meta.url).href;
-    if (raw === "/demo.html" || raw === "./demo.html" || raw === "demo.html") {
-      return new URL("demo.html", sceneHostRoot).href;
-    }
-    if (raw.startsWith("/assets/")) {
-      return new URL(raw.slice(1), sceneHostRoot).href;
-    }
-    if (raw.startsWith("./")) {
-      return new URL(raw.slice(2), sceneHostRoot).href;
-    }
-    if (raw.startsWith("../")) {
-      return new URL(raw, sceneHostRoot).href;
-    }
-    if (raw.startsWith("assets/")) {
-      return new URL(raw, sceneHostRoot).href;
-    }
-    return raw;
   }
 
   let lastAppliedHostLocale = null;

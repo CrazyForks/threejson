@@ -1,11 +1,13 @@
+[中文](../zh/glossary.md) | [English](./glossary.md)
+
 # ThreeJSON Terminology Glossary
 
-[中文](../glossary.md) | [English](./glossary.md)
+[中文](../zh/glossary.md) | [English](./glossary.md)
 
 This page defines **key concepts** used across ThreeJSON docs and code—Chinese/English term pairs and short definitions—so contributors, translators, and readers of both doc tracks stay aligned.
 
 - **Language rules** (which layer uses which language, which pages skip UI i18n) live in [Development · Language and documentation policy](./development.md#language-and-documentation-policy)—that is **policy**, not this glossary.
-- Topic docs (e.g. [Editor selection](../editor-selection.md)) may link here; details remain in those topics.
+- Topic docs (e.g. [Editor selection](./editor-selection.md)) may link here; details remain in those topics.
 
 ## Architecture and layers
 
@@ -70,8 +72,8 @@ This page defines **key concepts** used across ThreeJSON docs and code—Chinese
 
 | English | 中文 | Brief definition | 简要说明 | Anchor |
 |---------|------|------------------|----------|--------|
-| outline (editor) | 描边 | Editor-only `BoxHelper` (#E59520) | 编辑器 BoxHelper | [`doc/editor-selection.md`](../editor-selection.md) |
-| highlight (`OutlinePass`) | 高亮 | Post-process channels: info / locate / alarm | 后处理高亮通道 | [`doc/editor-selection.md`](../editor-selection.md) |
+| outline (editor) | 描边 | Editor-only `BoxHelper` (#E59520) | 编辑器 BoxHelper | [`doc/editor-selection.md`](./editor-selection.md) |
+| highlight (`OutlinePass`) | 高亮 | Post-process channels: info / locate / alarm | 后处理高亮通道 | [`doc/editor-selection.md`](./editor-selection.md) |
 | `infoPanel` | 信息面板 | Static texture signage | 静态贴图标牌 | [`doc/info-panels.md`](./info-panels.md) |
 | `css3dPanel` | CSS3D 面板 | Interactive DOM over WebGL | 可交互 DOM 面板 | [`doc/info-panels.md`](./info-panels.md) |
 | `text` | 场景文字 | Text without required backing panel | 无背板文字实体 | [`doc/info-panels.md`](./info-panels.md) |
