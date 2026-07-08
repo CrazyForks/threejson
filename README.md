@@ -7,13 +7,15 @@
 
 ThreeJSON 是一个由 JSON 驱动的 [Three.js](https://threejs.org/) 场景运行时：你可以通过配置来构建 3D 场景，而不必手写大量 Three.js 模板代码。
 
+**官网**：https://threejson.org/
+
 **仓库**：[github.com/nnrj/threejson](https://github.com/nnrj/threejson) · **问题反馈**：[Issues](https://github.com/nnrj/threejson/issues)
 
 **npm**：[threejson - npm](https://www.npmjs.com/package/threejson) · [@threejson/assets - npm](https://www.npmjs.com/package/@threejson/assets?activeTab=versions)
 
-**Demo 及教程（GitHub Pages）**：[最小场景（异步） - ThreeJSON Demo 索引](https://nnrj.github.io/threejson/examples/html-demo/demo.html#demo=t00-01)
+**示例**：[ThreeJSON 示例 ]([ThreeJSON](https://threejson.org/website/#/examples))    **场景编辑器**：[ThreeJSON 场景编辑器](https://threejson.org/scene-editor)
 
-> 部分复杂 Demo 页（例如编辑器、播放器）在 GitHub Pages 上可能无法完整运行。若要体验完整功能，建议把仓库克隆到本地，用 VSCode + Live Server 运行。
+
 
 **一句话概括：**
 
