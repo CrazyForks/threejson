@@ -1,7 +1,7 @@
 const ROOT = new URL("../../", import.meta.url);
 const READER = new URL("../../tools/reader/reader.html", import.meta.url);
 const MANIFEST_URL = new URL("../../assets/json/demo-show/manifest.json", import.meta.url);
-const PLACEHOLDER_IMG = new URL("../../assets/img/ThreeJSON_desc.png", import.meta.url).href;
+const PLACEHOLDER_IMG = new URL("../../assets/img/ThreeJSON.png", import.meta.url).href;
 const STORAGE = {
   lang: "threejson.site.lang",
   theme: "threejson.site.theme"
