@@ -1,241 +1,382 @@
 [中文](../zh/quick-start.md) | [English](./quick-start.md)
 
-# Quick Start
+# ThreeJSON Quick Start
 
-ThreeJSON now treats two input shapes as first-class:
+ThreeJSON is a JSON-driven runtime for Three.js scenes. You describe the scene, camera, lights, objects, materials, interactions, and runtime options in JSON; ThreeJSON deploys that description into a Three.js scene.
 
-- Friendly JSON: `sceneConfig + typed lists + friendlyMap`
-- Standard JSON: `objectList + a small amount of top-level metadata`
+This guide focuses on one task: getting your first runnable ThreeJSON scene into your own project. For API details, see [API](./api.md). For JSON fields, see [JSON Format](./json-format.md).
 
-Full examples (Tutorial Track 0):
+## 1. Install Or Import
 
-- Friendly JSON: [examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html](../../examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html)
-- Standard JSON: [examples/html-demo/track-00-runtime/00-04-standard-objectlist.html](../../examples/html-demo/track-00-runtime/00-04-standard-objectlist.html)
+### npm
 
-Index: [demo.html](../../examples/html-demo/demo.html) · Catalog: [tutorial.md](./tutorial.md)
-
-## 0. Run the page
-
-Open the page through a local static server. Do not rely on `file://`, because ES modules, textures, and OBJ / GLTF loading usually need HTTP.
-
-### Running HTML in VS Code / Cursor
-
-1. Open the project root in **VS Code** or **Cursor**.
-2. Install the **Live Server** extension.
-3. Right-click the `.html` file you want to preview and choose **Open with Live Server**.
-4. Your browser will open the page through a local HTTP server.
-
-### Running HTML in WebStorm
-
-1. Open the project in **WebStorm**.
-2. In the project view, right-click the `.html` file and choose **Run**.
-
-## 1. Page skeleton
-
-Use the same basic shape as `examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html` or `00-04-standard-objectlist.html`:
-
-```html
-<div id="rootContainer">
-  <canvas id="canvasContainer">Sorry, your browser does not support WebGL.</canvas>
-  <div id="loadingMask">Loading 3D scene...</div>
-</div>
+```bash
+npm install threejson three
 ```
 
-If your page indirectly uses files that still rely on bare module names, add an import map. The browser resolves the **entire dependency graph** (including transitive imports from `../core/index.js`), so every bare specifier used by `core` or its imports must be mapped—for example `three`, `three/examples/jsm/`, `three-mesh-bvh`, `three-bvh-csg`, `@tweenjs/tween.js`, `html2canvas-pro`, `gifuct-js`. When `core` adds new bare specifiers, update every bare-ESM page’s import map (see `tools/dev/importmap/bump-three-importmap.mjs`).
+`three` is the core peer dependency. Some features use optional packages:
 
-**On-demand specifiers** (map only when the scene or feature needs them; missing entries do not break pages that never use the capability):
+```bash
+npm install @tweenjs/tween.js html2canvas-pro fflate gifuct-js three-bvh-csg troika-three-text
+```
 
-- **`troika-three-text`** + **`fflate`**: lazy-loaded for `objType: "text"` with `mode: "sdf"` (default). Omit from the import map when the scene has no SDF text.
-- **`gifuct-js`**: lazy-loaded for materials with `textureKind: "gif"`.
+Install them when you use animation helpers, screenshots, archives, GIF textures, CSG, text, or related features.
 
-When `core` adds new bare specifiers, sync bare-ESM import maps (`node tools/dev/importmap/patch-gifuct-importmap.mjs`, etc.; Track 7 text lessons keep troika; other tutorial pages can use `strip-troika-importmap.mjs` to trim).
+If your JSON references the official sample assets, you can install the optional asset package:
 
-**Three.js versions**: officially supported **r179–r184** (examples use `0.184.0`). For older revisions and CSG overrides, see [`../three-compat.md`](./three-compat.md) (Chinese).
+```bash
+npm install @threejson/assets
+```
+
+ThreeJSON can also resolve official assets from CDN. In production apps, prefer hosting assets under your own `public/assets` or CDN and set `assetsBase`.
+
+### CDN / Plain HTML
+
+Without a bundler, use native ES modules and an import map:
 
 ```html
 <script type="importmap">
 {
   "imports": {
     "three": "https://esm.sh/three@0.184.0",
-    "three/examples/jsm/": "https://esm.sh/three@0.184.0/examples/jsm/",
-    "three-mesh-bvh": "https://esm.sh/three-mesh-bvh@0.9.10?deps=three@0.184.0",
-    "three-bvh-csg": "https://esm.sh/three-bvh-csg@0.0.18?deps=three@0.184.0,three-mesh-bvh@0.9.10",
-    "@tweenjs/tween.js": "https://esm.sh/@tweenjs/tween.js@25.0.0",
-    "html2canvas-pro": "https://esm.sh/html2canvas-pro@2.0.4",
-    "gifuct-js": "https://esm.sh/gifuct-js@2.1.2"
+    "threejson": "https://esm.sh/threejson@0.1.0-alpha.4",
+    "threejson/core": "https://esm.sh/threejson@0.1.0-alpha.4/core"
   }
 }
 </script>
 ```
 
-When the scene includes **SDF scene text** (`objType: "text"`, default `mode: "sdf"`), add to the same `imports`:
+Application code should import public package entries such as `threejson` and `threejson/core`. Do not import repository internals such as `../core/index.js`.
 
-```json
-    "fflate": "https://esm.sh/fflate@0.8.3",
-    "troika-three-text": "https://esm.sh/troika-three-text@0.52.4?deps=three@0.184.0"
-```
+> Browser modules, textures, and models are not reliable through `file://`. Serve pages through HTTP, for example Vite, Live Server, or `npx serve`.
 
-## 2. Load JSON through the unified entry
+## 2. Minimal JSON
 
 ```js
-import { createJsonScene } from "../core/index.js";
-
-const response = await fetch("/assets/json/tutorial/track-00/00-03-friendly-full-scene.json");
-const sceneData = await response.json();
-
-sceneData.canvasWidth = window.innerWidth;
-sceneData.canvasHeight = window.innerHeight;
-
-const sceneRuntime = await createJsonScene(sceneData, {
-  canvas: document.getElementById("canvasContainer"),
-  resetScene: true
-});
-
-sceneRuntime.start();
-```
-
-`createJsonScene()` will:
-
-- create the runtime objects
-- detect whether the payload is friendly JSON or standard JSON
-- normalize everything into standard `objectList`
-- deploy records in `objType` phases
-
-### Vue, React (Vite)
-
-When you install from npm, the package name is **`threejson`**. Also install the versions listed under `peerDependencies` in [`package.json`](../../package.json) (`three`, `@tweenjs/tween.js`, `html2canvas-pro`, and so on). Vite resolves bare specifiers from `node_modules`, so you do not need an import map.
-
-Minimal runnable samples live in the repo (run `npm install` and `npm run dev` inside each folder):
-
-- [`examples/vue-app`](../../examples/vue-app)
-- [`examples/react-app`](../../examples/react-app)
-
-Notes:
-
-- **Vue**: in `onMounted`, take a `canvas` ref, `await createJsonScene(..., { canvas })`, then `start()`; in `onBeforeUnmount`, call `stop()` and `dispose()` on the returned runtime.
-- **React**: keep the canvas in `useRef`, initialize inside `useEffect`, and call `stop()` / `dispose()` in the effect cleanup. With **StrictMode** enabled, the effect runs twice in development—if async work finishes after teardown, guard with an `alive` flag (see `examples/react-app/src/App.tsx`).
-- **Assets**: put JSON and textures under `public/` (the samples use `public/demo-assets/scene/` and `public/demo-assets/textures/` with root-absolute paths like `/demo-assets/...` inside the JSON). `server.fs.allow` in `vite.config.ts` is for resolving the linked `threejson` package from the repo root, not for loading demo textures from `assets/`.
-
-### Static assets and CDN (npm)
-
-When you use **`npm install threejson`**, built-in domains and `/assets/textures/...` paths in scene JSON **default** to the active base first, then fall back to jsDelivr [`@threejson/assets`](https://www.npmjs.com/package/@threejson/assets) (version pinned in `ASSETS_PACKAGE_VERSION`). You usually **do not** need a separate assets install.
-
-Override the base for local dev or self-hosting:
-
-```js
-import { createJsonScene, LOCAL_ASSETS_BASE, setAssetsBaseUrl } from "threejson";
-
-setAssetsBaseUrl(LOCAL_ASSETS_BASE);
-
-await createJsonScene(sceneData, {
-  canvas,
-  assetsBase: "/assets",
-  resetScene: true
-});
-```
-
-You can also set `sceneConfig.assetsBase` in JSON. See [Static assets in `api.md`](./api.md#static-assets-coreutilassetsbasejs) and [`sceneConfig.assetsBase` in json-format](./json-format.md#sceneconfigassetsbase-optional-static-asset-base-url).
-
-When running HTML demos from a cloned repo, pages pass `assetsBase: "/assets"`; the loader tries repo-root assets first and falls back to CDN if needed. Serve from the **repo root**.
-
-## 3. Minimal friendly JSON
-
-```json
-{
-  "name": "friendly-scene",
-  "friendlyMap": {
-    "glassList": {
-      "objType": "glass",
-      "defaults": {
-        "material": {
-          "type": "standard",
-          "transparent": true,
-          "opacity": 0.35
-        }
+const sceneJson = {
+  version: "next",
+  name: "hello-threejson",
+  sceneConfig: {
+    scene: { background: "#11151b" },
+    camera: {
+      fov: 55,
+      near: 0.1,
+      far: 200,
+      position: { x: 10, y: 8, z: 12 }
+    },
+    controls: {
+      enableDamping: true,
+      target: { x: 0, y: 1.5, z: 0 }
+    },
+    renderer: { antialias: true, ratioRate: 1 },
+    lights: [
+      { type: "ambient", color: "#ffffff", intensity: 0.8 },
+      {
+        type: "directional",
+        color: "#ffffff",
+        intensity: 1.2,
+        position: { x: 10, y: 16, z: 12 }
       }
-    }
+    ],
+    renderLoop: { autoResize: true, firstAutoResize: true }
   },
-  "sceneConfig": {
-    "scene": { "background": "#222222" },
-    "camera": { "fov": 60, "position": { "x": 180, "y": 120, "z": 220 } },
-    "renderer": { "antialias": true },
-    "controls": { "enableDamping": true, "target": { "x": 0, "y": 30, "z": 0 } },
-    "lights": [
-      { "type": "ambient", "color": "#ffffff", "intensity": 0.45 }
-    ],
-    "renderLoop": { "autoResize": true, "firstAutoResize": true }
-  },
-  "worldInfo": {
-    "boxModelList": [
+  worldInfo: {
+    boxModelList: [
       {
-        "name": "main-box",
-        "objType": "box",
-        "geometry": { "width": 80, "height": 80, "depth": 80 },
-        "position": { "x": -60, "y": 40, "z": 0 },
-        "material": { "type": "standard", "color": "#409eff" }
-      }
-    ],
-    "glassList": [
-      {
-        "name": "glass-box",
-        "geometry": { "width": 70, "height": 100, "depth": 70 },
-        "position": { "x": 60, "y": 50, "z": 0 },
-        "material": { "color": "#67c23a" }
-      }
-    ],
-    "infoPanelList": [
-      {
-        "text": "hello friendly json",
-        "type": "text",
-        "panelBoxType": "sprite"
+        threeJsonId: "box-1",
+        name: "Box",
+        objType: "box",
+        geometry: { width: 3, height: 3, depth: 3 },
+        position: { x: 0, y: 1.5, z: 0 },
+        material: { type: "standard", color: "#5470c6" }
       }
     ]
   }
-}
+};
 ```
 
-## 4. Minimal standard JSON
+`worldInfo` is the friendly JSON shape. It is convenient for hand-written examples and AI-generated scenes. During loading, ThreeJSON normalizes it into the standard `objectList` shape.
 
-```json
-{
-  "name": "standard-scene",
-  "canvasWidth": 1920,
-  "canvasHeight": 1080,
-  "objectList": [
-    { "objType": "scene", "background": "#222222" },
-    { "objType": "camera", "fov": 60, "position": { "x": 180, "y": 120, "z": 220 } },
-    { "objType": "renderer", "antialias": true },
-    { "objType": "controls", "enableDamping": true, "target": { "x": 0, "y": 30, "z": 0 } },
-    { "objType": "light", "type": "ambient", "color": "#ffffff", "intensity": 0.45 },
-    { "objType": "renderLoop", "autoResize": true, "firstAutoResize": true },
-    {
-      "name": "main-box",
-      "objType": "box",
-      "geometry": { "width": 80, "height": 80, "depth": 80 },
-      "position": { "x": 0, "y": 40, "z": 0 },
-      "material": { "type": "standard", "color": "#409eff" }
+## 3. Plain HTML
+
+Create `index.html`:
+
+```html
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ThreeJSON Demo</title>
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+    #stage { width: 100vw; height: 100vh; display: block; background: #11151b; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://esm.sh/three@0.184.0",
+      "threejson": "https://esm.sh/threejson@0.1.0-alpha.4"
     }
-  ]
+  }
+  </script>
+</head>
+<body>
+  <canvas id="stage"></canvas>
+
+  <script type="module">
+    import { createJsonScene } from "threejson";
+
+    const sceneJson = {
+      version: "next",
+      sceneConfig: {
+        scene: { background: "#11151b" },
+        camera: { fov: 55, near: 0.1, far: 200, position: { x: 10, y: 8, z: 12 } },
+        controls: { enableDamping: true, target: { x: 0, y: 1.5, z: 0 } },
+        renderer: { antialias: true },
+        lights: [
+          { type: "ambient", color: "#ffffff", intensity: 0.8 },
+          { type: "directional", color: "#ffffff", intensity: 1.2, position: { x: 10, y: 16, z: 12 } }
+        ],
+        renderLoop: { autoResize: true, firstAutoResize: true }
+      },
+      worldInfo: {
+        boxModelList: [
+          {
+            threeJsonId: "box-1",
+            objType: "box",
+            geometry: { width: 3, height: 3, depth: 3 },
+            position: { x: 0, y: 1.5, z: 0 },
+            material: { type: "standard", color: "#5470c6" }
+          }
+        ]
+      }
+    };
+
+    const runtime = await createJsonScene(sceneJson, {
+      canvas: document.querySelector("#stage"),
+      resetScene: true,
+      assetsBaseMode: "cdn-first"
+    });
+
+    runtime.start();
+    window.addEventListener("beforeunload", () => runtime.dispose());
+  </script>
+</body>
+</html>
+```
+
+Start a static server:
+
+```bash
+npx serve .
+```
+
+Then open the printed local URL.
+
+## 4. React
+
+With Vite React:
+
+```bash
+npm create vite@latest threejson-react -- --template react
+cd threejson-react
+npm install
+npm install threejson three
+npm run dev
+```
+
+Component:
+
+```jsx
+import { useEffect, useRef } from "react";
+import { createJsonScene } from "threejson";
+
+const sceneJson = {
+  version: "next",
+  sceneConfig: {
+    scene: { background: "#11151b" },
+    camera: { position: { x: 10, y: 8, z: 12 }, fov: 55, near: 0.1, far: 200 },
+    controls: { enableDamping: true, target: { x: 0, y: 1.5, z: 0 } },
+    lights: [{ type: "ambient", intensity: 1 }],
+    renderLoop: { autoResize: true, firstAutoResize: true }
+  },
+  worldInfo: {
+    boxModelList: [
+      {
+        threeJsonId: "box-1",
+        objType: "box",
+        geometry: { width: 3, height: 3, depth: 3 },
+        position: { y: 1.5 },
+        material: { type: "standard", color: "#5470c6" }
+      }
+    ]
+  }
+};
+
+export default function ThreeJsonCanvas() {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    let runtime;
+    let disposed = false;
+
+    createJsonScene(sceneJson, {
+      canvas: canvasRef.current,
+      resetScene: true,
+      assetsBaseMode: "cdn-first"
+    }).then((nextRuntime) => {
+      if (disposed) {
+        nextRuntime.dispose();
+        return;
+      }
+      runtime = nextRuntime;
+      runtime.start();
+    });
+
+    return () => {
+      disposed = true;
+      runtime?.dispose();
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} style={{ width: "100vw", height: "100vh", display: "block" }} />;
 }
 ```
 
-## 5. Resize and cleanup
+## 5. Vue
+
+With Vite Vue:
+
+```bash
+npm create vite@latest threejson-vue -- --template vue
+cd threejson-vue
+npm install
+npm install threejson three
+npm run dev
+```
+
+Component:
+
+```vue
+<template>
+  <canvas ref="canvasRef" class="stage"></canvas>
+</template>
+
+<script setup>
+import { onBeforeUnmount, onMounted, ref } from "vue";
+import { createJsonScene } from "threejson";
+
+const canvasRef = ref(null);
+let runtime = null;
+
+const sceneJson = {
+  version: "next",
+  sceneConfig: {
+    scene: { background: "#11151b" },
+    camera: { position: { x: 10, y: 8, z: 12 }, fov: 55, near: 0.1, far: 200 },
+    controls: { enableDamping: true, target: { x: 0, y: 1.5, z: 0 } },
+    lights: [{ type: "ambient", intensity: 1 }],
+    renderLoop: { autoResize: true, firstAutoResize: true }
+  },
+  worldInfo: {
+    sphereModelList: [
+      {
+        threeJsonId: "sphere-1",
+        objType: "sphere",
+        geometry: { radius: 2, widthSegments: 32, heightSegments: 16 },
+        position: { y: 2 },
+        material: { type: "standard", color: "#73c0de" }
+      }
+    ]
+  }
+};
+
+onMounted(async () => {
+  runtime = await createJsonScene(sceneJson, {
+    canvas: canvasRef.value,
+    resetScene: true,
+    assetsBaseMode: "cdn-first"
+  });
+  runtime.start();
+});
+
+onBeforeUnmount(() => {
+  runtime?.dispose();
+});
+</script>
+
+<style scoped>
+.stage {
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  background: #11151b;
+}
+</style>
+```
+
+## 6. Electron
+
+In Electron, ThreeJSON runs in the renderer process. The rendering code is the same as a browser app. Prefer Vite or another frontend build tool for the renderer.
+
+Install:
+
+```bash
+npm install threejson three
+```
+
+Renderer code:
 
 ```js
-window.addEventListener("resize", () => {
-  sceneRuntime.resize({
-    width: window.innerWidth,
-    height: window.innerHeight
-  });
+import { createJsonScene } from "threejson";
+
+const runtime = await createJsonScene(sceneJson, {
+  canvas: document.querySelector("#stage"),
+  resetScene: true,
+  assetsBaseMode: "cdn-first"
 });
 
-window.addEventListener("beforeunload", () => {
-  sceneRuntime.dispose();
+runtime.start();
+window.addEventListener("beforeunload", () => runtime.dispose());
+```
+
+Path notes for Electron:
+
+- In development, load the renderer through a dev server instead of debugging modules and textures with `file://`.
+- In production, place assets in the app package and expose them through a custom protocol or build-tool public path.
+- JSON asset paths should be public URLs that the renderer can load, such as `/assets/textures/xxx.webp` or a CDN URL. Do not use local absolute file paths.
+
+## 7. Assets
+
+ThreeJSON resolves `/assets/...` and `assets/...` against the active asset base. Common setup:
+
+```js
+await createJsonScene(sceneJson, {
+  canvas,
+  assetsBase: "https://cdn.jsdelivr.net/npm/@threejson/assets@1.0.0",
+  assetsBaseMode: "cdn-first"
 });
 ```
 
-## 6. Which JSON should you choose?
+Or configure globally:
 
-- Use friendly JSON when humans will read and edit the scene by hand.
-- Use standard JSON when the payload is generated by code or AI, or when you want the canonical IR directly.
-- Both shapes end up in the same standard `objectList` pipeline internally.
+```js
+import { setAssetsBaseUrl, setAssetsBaseMode } from "threejson/core";
+
+setAssetsBaseUrl("/assets");
+setAssetsBaseMode("base-first");
+```
+
+Recommendations:
+
+- Put app assets under `public/assets` and write `/assets/...` in JSON.
+- Use the `@threejson/assets` CDN for official sample assets.
+- On GitHub Pages, do not assume `/assets` points to your project assets; project pages are usually deployed under a subpath.
+- Use an HTTP server for local development to avoid `file://` module and cross-origin issues.
+
+## 8. Next Steps
+
+- Read [JSON Format](./json-format.md) for `sceneConfig`, `worldInfo`, `objectList`, and object fields.
+- Read [API](./api.md) for runtime, object mutation, export, events, and assets APIs.
+- Open the website examples and edit JSON on the left while the scene updates on the right.

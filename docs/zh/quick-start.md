@@ -1,256 +1,390 @@
 [中文](./quick-start.md) | [English](../en/quick-start.md)
 
-# 快速开始
+# ThreeJSON 快速入门
 
-[中文](./quick-start.md) | [English](../en/quick-start.md)
+ThreeJSON 是一个 JSON 驱动的 Three.js 场景运行时。你把场景、相机、灯光、物体、材质、交互等写成 JSON，ThreeJSON 负责把它们部署到 Three.js 场景中。
 
-ThreeJSON 现在明确支持两种并列输入：
+本文只解决一个问题：如何在自己的项目里跑起第一个 ThreeJSON 场景。API 细节见 [API 文档](./api.md)，JSON 字段见 [JSON 配置](./json-format.md)。
 
-- 人类友好 JSON：`sceneConfig + typed lists + friendlyMap`
-- 标准 JSON：`objectList + 顶层少量元信息`
+## 1. 安装或引入
 
-完整示例（教程 Track 0）：
+### npm 项目
 
-- 友好 JSON：[examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html](../../examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html)
-- 标准 JSON：[examples/html-demo/track-00-runtime/00-04-standard-objectlist.html](../../examples/html-demo/track-00-runtime/00-04-standard-objectlist.html)
-
-教程总索引：[demo.html](../../examples/html-demo/demo.html) · 课表：[tutorial.md](./tutorial.md)
-
-## 0. 运行
-
-请通过本地静态服务器访问页面，不建议直接用 `file://` 打开。ES Module、纹理、OBJ/GLTF 文件加载通常需要 HTTP 环境。
-
-**在 VS Code / Cursor 中运行 HTML**
-
-1. 使用 **VS Code** 或 **Cursor** 打开本项目根目录。
-2. 在扩展市场安装 **Live Server** 插件。
-3. 右键需要预览的 `.html` 文件，选择 **Open with Live Server**。
-4. 浏览器会通过本地 HTTP 地址打开页面。
-
-**在 WebStorm 中运行 HTML**
-
-1. 使用 **WebStorm** 打开本项目。
-2. 在工程视图中右键 `.html` 文件，选择 **运行**。
-
-## 1. 页面骨架
-
-建议参考 `examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html` 或 `00-04-standard-objectlist.html`：
-
-```html
-<div id="rootContainer">
-  <canvas id="canvasContainer">抱歉，你的浏览器不支持 WebGL。</canvas>
-  <div id="loadingMask">3D 场景加载中...</div>
-</div>
+```bash
+npm install threejson three
 ```
 
-如果页面里会间接使用仍保留裸模块名的文件，可加入 importmap。浏览器会解析**整条依赖链**（含你从 `../core/index.js` 拉起的 core 内部 `import`），因此凡在 core 或其依赖里出现的裸说明符，都应在 import map 中有映射；例如 core 会用到 `three`、`three/examples/jsm/`、`three-mesh-bvh`、`three-bvh-csg`、`@tweenjs/tween.js`、`html2canvas-pro`、`gifuct-js` 等。
+ThreeJSON 的核心依赖是 `three`。部分能力会按需使用额外依赖：
 
-**按需说明符**（仅当场景或功能用到时才需映射，未配置时不会拖垮整页加载）：
+```bash
+npm install @tweenjs/tween.js html2canvas-pro fflate gifuct-js three-bvh-csg troika-three-text
+```
 
-- **`troika-three-text`** + **`fflate`**：`objType: "text"` 且 `mode: "sdf"`（默认）时懒加载；无 SDF 文字时可不写进 import map。
-- **`gifuct-js`**：材质 `textureKind: "gif"` 时懒加载。
+这些包不是每个最小场景都必须用到。使用动画、截图、压缩包、GIF 纹理、CSG、文本等能力时再安装即可。
 
-若 core 新增裸说明符，请同步补全各裸 ESM 页面的 import map（`node tools/dev/importmap/patch-gifuct-importmap.mjs` 等；Track 7 文字课保留 troika，其余教程页可用 `strip-troika-importmap.mjs` 精简）。
+如果你的 JSON 会引用项目自带资源，可以安装可选资源包：
 
-**Three.js 版本**：正式支持 **r179–r184**（推荐示例中的 `0.184.0`）。更低版本见 [`three-compat.md`](./three-compat.md)（含执意使用旧版时的 CSG overrides 说明）。
+```bash
+npm install @threejson/assets
+```
+
+ThreeJSON 默认也能通过 CDN 访问 `@threejson/assets`，但生产项目建议把资源托管到自己的 `public/assets` 或 CDN，并通过 `assetsBase` 指定。
+
+### CDN / 原生 HTML
+
+没有构建工具时，用浏览器原生 ES Module 和 import map：
 
 ```html
 <script type="importmap">
 {
   "imports": {
     "three": "https://esm.sh/three@0.184.0",
-    "three/examples/jsm/": "https://esm.sh/three@0.184.0/examples/jsm/",
-    "three-mesh-bvh": "https://esm.sh/three-mesh-bvh@0.9.10?deps=three@0.184.0",
-    "three-bvh-csg": "https://esm.sh/three-bvh-csg@0.0.18?deps=three@0.184.0,three-mesh-bvh@0.9.10",
-    "@tweenjs/tween.js": "https://esm.sh/@tweenjs/tween.js@25.0.0",
-    "html2canvas-pro": "https://esm.sh/html2canvas-pro@2.0.4",
-    "gifuct-js": "https://esm.sh/gifuct-js@2.1.2"
+    "threejson": "https://esm.sh/threejson@0.1.0-alpha.4",
+    "threejson/core": "https://esm.sh/threejson@0.1.0-alpha.4/core"
   }
 }
 </script>
 ```
 
-含 **SDF 场景文字**（`objType: "text"` 默认 `mode: "sdf"`）时，在同一 `imports` 中再增加：
+不要在业务项目中引用仓库内部路径，例如 `../core/index.js`。用户侧应使用 `threejson`、`threejson/core` 这样的公开入口。
 
-```json
-    "fflate": "https://esm.sh/fflate@0.8.3",
-    "troika-three-text": "https://esm.sh/troika-three-text@0.52.4?deps=three@0.184.0"
-```
+> 注意：浏览器模块、纹理、模型通常不能可靠地通过 `file://` 加载。请用本地 HTTP 服务打开页面，例如 Vite、Live Server、`npx serve`。
 
-## 2. 用统一入口加载 JSON
+## 2. 最小 JSON
 
-```js
-import { createJsonScene } from "../core/index.js";
-
-const response = await fetch("/assets/json/tutorial/track-00/00-03-friendly-full-scene.json");
-const sceneData = await response.json();
-
-sceneData.canvasWidth = window.innerWidth;
-sceneData.canvasHeight = window.innerHeight;
-
-const sceneRuntime = await createJsonScene(sceneData, {
-  canvas: document.getElementById("canvasContainer"),
-  resetScene: true
-});
-
-sceneRuntime.start();
-```
-
-推荐优先使用 `createJsonScene()`。它会：
-
-- 根据 runtime 配置创建 scene / camera / renderer / controls / lights / renderLoop
-- 识别输入是友好 JSON 还是标准 JSON
-- 先统一归一到标准 `objectList`
-- 再按 `objType` 分阶段部署对象
-
-### Vue、React（Vite）
-
-通过 npm 安装时包名为 **`threejson`**，并安装 [`package.json`](../../package.json) 中 `peerDependencies` 所列版本（`three`、`@tweenjs/tween.js`、`html2canvas-pro` 等）。Vite 会从 `node_modules` 解析裸模块名，无需 import map。
-
-仓库内提供最小可运行示例（在对应子目录执行 `npm install` 与 `npm run dev`）：
-
-- [`examples/vue-app`](../../examples/vue-app)
-- [`examples/react-app`](../../examples/react-app)
-
-要点：
-
-- **Vue**：在 `onMounted` 中取 `canvas` 引用并 `await createJsonScene(..., { canvas })` 后 `start()`；在 `onBeforeUnmount` 中调用返回值的 `stop()` 与 `dispose()`。
-- **React**：用 `useRef` 持有 canvas；在 `useEffect` 中异步初始化；在 effect 清理函数中 `stop()` / `dispose()`。若开启 **StrictMode**，开发环境下 effect 会执行两次，异步完成时需用「已卸载」标志避免对已释放实例重复操作（示例见 `react-app/src/App.tsx`）。
-- **资源路径**：可将场景 JSON 放在应用的 `public/`（示例中 `public/demo-assets/scene/` 与 `public/demo-assets/textures/`，JSON 内使用以 `/` 开头的站点根路径如 `/demo-assets/...`）；`vite.config.ts` 中的 `server.fs.allow` 仍用于解析已链接到仓库根的 `threejson` 包，与演示资源是否放在 `public/` 无关。
-
-### 静态资源与 CDN（npm）
-
-通过 **`npm install threejson`** 使用时，内置 domain 与场景 JSON 中的 `/assets/textures/...` 等路径**默认**解析到 jsDelivr [`@threejson/assets`](https://www.npmjs.com/package/@threejson/assets)（版本见 `ASSETS_PACKAGE_VERSION`）。一般**无需**单独安装资源包。
-
-本地开发或自托管时覆盖基址：
+下面是一个完整可运行的 ThreeJSON 场景。它包含深色背景、相机、控制器、灯光和一个蓝色盒子。
 
 ```js
-import { createJsonScene, LOCAL_ASSETS_BASE, setAssetsBaseUrl } from "threejson";
-
-setAssetsBaseUrl(LOCAL_ASSETS_BASE);
-
-await createJsonScene(sceneData, {
-  canvas,
-  assetsBase: "/assets",
-  resetScene: true
-});
-```
-
-亦可在 JSON 中写 `sceneConfig.assetsBase`。详见 [`api.md` 静态资源](./api.md#静态资源coreutilassetsbasejs)、[`json-format.md` 的 sceneConfig.assetsBase](./json-format.md#sceneconfigassetsbase-可选静态资源基址)。
-
-克隆本仓库跑 HTML demo 时，页面已传 `assetsBase: "/assets"`，需从**仓库根**起静态服务。
-
-## 3. 友好 JSON 最小示例
-
-```json
-{
-  "name": "friendly-scene",
-  "friendlyMap": {
-    "glassList": {
-      "objType": "glass",
-      "defaults": {
-        "material": {
-          "type": "standard",
-          "transparent": true,
-          "opacity": 0.35
-        }
+const sceneJson = {
+  version: "next",
+  name: "hello-threejson",
+  sceneConfig: {
+    scene: { background: "#11151b" },
+    camera: {
+      fov: 55,
+      near: 0.1,
+      far: 200,
+      position: { x: 10, y: 8, z: 12 }
+    },
+    controls: {
+      enableDamping: true,
+      target: { x: 0, y: 1.5, z: 0 }
+    },
+    renderer: {
+      antialias: true,
+      ratioRate: 1
+    },
+    lights: [
+      { type: "ambient", color: "#ffffff", intensity: 0.8 },
+      {
+        type: "directional",
+        color: "#ffffff",
+        intensity: 1.2,
+        position: { x: 10, y: 16, z: 12 }
       }
+    ],
+    renderLoop: {
+      autoResize: true,
+      firstAutoResize: true
     }
   },
-  "sceneConfig": {
-    "scene": { "background": "#222222" },
-    "camera": { "fov": 60, "position": { "x": 180, "y": 120, "z": 220 } },
-    "renderer": { "antialias": true },
-    "controls": { "enableDamping": true, "target": { "x": 0, "y": 30, "z": 0 } },
-    "lights": [
-      { "type": "ambient", "color": "#ffffff", "intensity": 0.45 }
-    ],
-    "renderLoop": { "autoResize": true, "firstAutoResize": true }
-  },
-  "worldInfo": {
-    "boxModelList": [
+  worldInfo: {
+    boxModelList: [
       {
-        "name": "main-box",
-        "objType": "box",
-        "geometry": { "width": 80, "height": 80, "depth": 80 },
-        "position": { "x": -60, "y": 40, "z": 0 },
-        "material": { "type": "standard", "color": "#409eff" }
-      }
-    ],
-    "glassList": [
-      {
-        "name": "glass-box",
-        "geometry": { "width": 70, "height": 100, "depth": 70 },
-        "position": { "x": 60, "y": 50, "z": 0 },
-        "material": { "color": "#67c23a" }
-      }
-    ],
-    "infoPanelList": [
-      {
-        "text": "hello friendly json",
-        "type": "text",
-        "panelBoxType": "sprite"
+        threeJsonId: "box-1",
+        name: "Box",
+        objType: "box",
+        geometry: { width: 3, height: 3, depth: 3 },
+        position: { x: 0, y: 1.5, z: 0 },
+        material: { type: "standard", color: "#5470c6" }
       }
     ]
   }
-}
+};
 ```
 
-要点：
+`worldInfo` 是友好 JSON 写法，适合手写和给 AI 生成；ThreeJSON 加载时会归一化为标准 `objectList`。
 
-- `sceneConfig` 负责 runtime
-- `worldInfo.*List` 负责按认知分组内容对象
-- `friendlyMap` 可把自定义列表映射到标准 `objType`，并声明默认字段
-- 固定语义列表里的单条记录通常可省略 `objType`
+## 3. 原生 HTML
 
-## 4. 标准 JSON 最小示例
+创建 `index.html`：
 
-```json
-{
-  "name": "standard-scene",
-  "canvasWidth": 1920,
-  "canvasHeight": 1080,
-  "objectList": [
-    { "objType": "scene", "background": "#222222" },
-    { "objType": "camera", "fov": 60, "position": { "x": 180, "y": 120, "z": 220 } },
-    { "objType": "renderer", "antialias": true },
-    { "objType": "controls", "enableDamping": true, "target": { "x": 0, "y": 30, "z": 0 } },
-    { "objType": "light", "type": "ambient", "color": "#ffffff", "intensity": 0.45 },
-    { "objType": "renderLoop", "autoResize": true, "firstAutoResize": true },
-    {
-      "name": "main-box",
-      "objType": "box",
-      "geometry": { "width": 80, "height": 80, "depth": 80 },
-      "position": { "x": 0, "y": 40, "z": 0 },
-      "material": { "type": "standard", "color": "#409eff" }
+```html
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ThreeJSON Demo</title>
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+    #stage { width: 100vw; height: 100vh; display: block; background: #11151b; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://esm.sh/three@0.184.0",
+      "threejson": "https://esm.sh/threejson@0.1.0-alpha.4"
     }
-  ]
+  }
+  </script>
+</head>
+<body>
+  <canvas id="stage"></canvas>
+
+  <script type="module">
+    import { createJsonScene } from "threejson";
+
+    const sceneJson = {
+      version: "next",
+      sceneConfig: {
+        scene: { background: "#11151b" },
+        camera: { fov: 55, near: 0.1, far: 200, position: { x: 10, y: 8, z: 12 } },
+        controls: { enableDamping: true, target: { x: 0, y: 1.5, z: 0 } },
+        renderer: { antialias: true },
+        lights: [
+          { type: "ambient", color: "#ffffff", intensity: 0.8 },
+          { type: "directional", color: "#ffffff", intensity: 1.2, position: { x: 10, y: 16, z: 12 } }
+        ],
+        renderLoop: { autoResize: true, firstAutoResize: true }
+      },
+      worldInfo: {
+        boxModelList: [
+          {
+            threeJsonId: "box-1",
+            objType: "box",
+            geometry: { width: 3, height: 3, depth: 3 },
+            position: { x: 0, y: 1.5, z: 0 },
+            material: { type: "standard", color: "#5470c6" }
+          }
+        ]
+      }
+    };
+
+    const runtime = await createJsonScene(sceneJson, {
+      canvas: document.querySelector("#stage"),
+      resetScene: true,
+      assetsBaseMode: "cdn-first"
+    });
+
+    runtime.start();
+    window.addEventListener("beforeunload", () => runtime.dispose());
+  </script>
+</body>
+</html>
+```
+
+启动一个静态服务：
+
+```bash
+npx serve .
+```
+
+然后在浏览器打开命令行输出的地址。
+
+## 4. React
+
+以 Vite React 为例：
+
+```bash
+npm create vite@latest threejson-react -- --template react
+cd threejson-react
+npm install
+npm install threejson three
+npm run dev
+```
+
+组件代码：
+
+```jsx
+import { useEffect, useRef } from "react";
+import { createJsonScene } from "threejson";
+
+const sceneJson = {
+  version: "next",
+  sceneConfig: {
+    scene: { background: "#11151b" },
+    camera: { position: { x: 10, y: 8, z: 12 }, fov: 55, near: 0.1, far: 200 },
+    controls: { enableDamping: true, target: { x: 0, y: 1.5, z: 0 } },
+    lights: [{ type: "ambient", intensity: 1 }],
+    renderLoop: { autoResize: true, firstAutoResize: true }
+  },
+  worldInfo: {
+    boxModelList: [
+      {
+        threeJsonId: "box-1",
+        objType: "box",
+        geometry: { width: 3, height: 3, depth: 3 },
+        position: { y: 1.5 },
+        material: { type: "standard", color: "#5470c6" }
+      }
+    ]
+  }
+};
+
+export default function ThreeJsonCanvas() {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    let runtime;
+    let disposed = false;
+
+    createJsonScene(sceneJson, {
+      canvas: canvasRef.current,
+      resetScene: true,
+      assetsBaseMode: "cdn-first"
+    }).then((nextRuntime) => {
+      if (disposed) {
+        nextRuntime.dispose();
+        return;
+      }
+      runtime = nextRuntime;
+      runtime.start();
+    });
+
+    return () => {
+      disposed = true;
+      runtime?.dispose();
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} style={{ width: "100vw", height: "100vh", display: "block" }} />;
 }
 ```
 
-标准 JSON 更适合：
+## 5. Vue
 
-- 程序生成或 AI 生成
-- 做内部 IR / 调试对照
-- 希望所有记录都统一走单列表与 `objType` 分发
+以 Vite Vue 为例：
 
-## 5. 尺寸变化与清理
+```bash
+npm create vite@latest threejson-vue -- --template vue
+cd threejson-vue
+npm install
+npm install threejson three
+npm run dev
+```
+
+组件代码：
+
+```vue
+<template>
+  <canvas ref="canvasRef" class="stage"></canvas>
+</template>
+
+<script setup>
+import { onBeforeUnmount, onMounted, ref } from "vue";
+import { createJsonScene } from "threejson";
+
+const canvasRef = ref(null);
+let runtime = null;
+
+const sceneJson = {
+  version: "next",
+  sceneConfig: {
+    scene: { background: "#11151b" },
+    camera: { position: { x: 10, y: 8, z: 12 }, fov: 55, near: 0.1, far: 200 },
+    controls: { enableDamping: true, target: { x: 0, y: 1.5, z: 0 } },
+    lights: [{ type: "ambient", intensity: 1 }],
+    renderLoop: { autoResize: true, firstAutoResize: true }
+  },
+  worldInfo: {
+    sphereModelList: [
+      {
+        threeJsonId: "sphere-1",
+        objType: "sphere",
+        geometry: { radius: 2, widthSegments: 32, heightSegments: 16 },
+        position: { y: 2 },
+        material: { type: "standard", color: "#73c0de" }
+      }
+    ]
+  }
+};
+
+onMounted(async () => {
+  runtime = await createJsonScene(sceneJson, {
+    canvas: canvasRef.value,
+    resetScene: true,
+    assetsBaseMode: "cdn-first"
+  });
+  runtime.start();
+});
+
+onBeforeUnmount(() => {
+  runtime?.dispose();
+});
+</script>
+
+<style scoped>
+.stage {
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  background: #11151b;
+}
+</style>
+```
+
+## 6. Electron
+
+Electron 中 ThreeJSON 运行在 renderer 进程，写法与普通浏览器项目一致。推荐使用 Vite 或其它前端构建工具管理 renderer。
+
+安装：
+
+```bash
+npm install threejson three
+```
+
+renderer 侧：
 
 ```js
-window.addEventListener("resize", () => {
-  sceneRuntime.resize({
-    width: window.innerWidth,
-    height: window.innerHeight
-  });
+import { createJsonScene } from "threejson";
+
+const runtime = await createJsonScene(sceneJson, {
+  canvas: document.querySelector("#stage"),
+  resetScene: true,
+  assetsBaseMode: "cdn-first"
 });
 
-window.addEventListener("beforeunload", () => {
-  sceneRuntime.dispose();
+runtime.start();
+window.addEventListener("beforeunload", () => runtime.dispose());
+```
+
+Electron 项目需要特别注意资源路径：
+
+- 开发环境建议让 renderer 走 Vite dev server，不要直接用 `file://` 调试模块和纹理。
+- 生产环境可以把资源放入应用包内，再用自定义协议或构建工具生成的 public 路径访问。
+- JSON 内的资源路径应写成应用可访问的公开 URL，例如 `/assets/textures/xxx.webp` 或 CDN URL，不要写仓库里的本机绝对路径。
+
+## 7. 资源路径
+
+ThreeJSON 会把 `/assets/...`、`assets/...` 等公共资源路径解析到当前资源基址。常用配置：
+
+```js
+await createJsonScene(sceneJson, {
+  canvas,
+  assetsBase: "https://cdn.jsdelivr.net/npm/@threejson/assets@1.0.0",
+  assetsBaseMode: "cdn-first"
 });
 ```
 
-## 6. 该选哪种 JSON
+也可以全局设置：
 
-- 人类手改、业务分组阅读优先：选友好 JSON
-- 程序输出、AI 输出、标准化对接优先：选标准 JSON
-- 无论输入哪种，底层都会先统一为标准 `objectList` 再解析
+```js
+import { setAssetsBaseUrl, setAssetsBaseMode } from "threejson/core";
+
+setAssetsBaseUrl("/assets");
+setAssetsBaseMode("base-first");
+```
+
+路径建议：
+
+- 自己项目的资源：放到 `public/assets`，JSON 写 `/assets/...`。
+- ThreeJSON 示例资源：可使用 `@threejson/assets` CDN。
+- GitHub Pages：不要写站点根绝对路径，项目页通常不是部署在域名根目录。
+- 本地开发：用 HTTP 服务打开页面，避免 `file://` 的跨源和模块解析问题。
+
+## 8. 下一步
+
+- 阅读 [JSON 配置](./json-format.md)，了解 `sceneConfig`、`worldInfo`、`objectList` 和常见对象字段。
+- 阅读 [API 文档](./api.md)，了解运行时、对象增量更新、导出、事件和资源路径 API。
+- 打开官网示例页，用左侧 JSON 修改右侧场景，理解 JSON 驱动的工作方式。
