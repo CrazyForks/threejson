@@ -100,6 +100,8 @@ import { buildCaptureOptionsForContext } from "./editorSessionCapture.js";
 import * as THREE from "three";
 import { sceneToNativeJson, buildRoomSavePayload } from "../../../../core/handler/sceneJsonHandler.js";
 
+const EDITOR_OPEN_SCENE_BRIDGE_PREFIX = "threejson.editor.openScene.";
+
 function readFileExtension(fileName = "") {
   const normalized = String(fileName || "").trim().toLowerCase();
   const idx = normalized.lastIndexOf(".");
@@ -1957,7 +1959,41 @@ export async function bootstrapSceneHostEditor() {
   primeCanvasLayout();
   editorSessionRecovery.bindLifecycle();
   await editorSessionRecovery.bootstrapFromRecovery();
+  await loadSceneFromExternalBridgeIfRequested();
   editorSessionRecovery.startAutoSnapshotTimer();
+
+  async function loadSceneFromExternalBridgeIfRequested() {
+    const pageParams = new URLSearchParams(window.location.search);
+    const sceneKey = pageParams.get("sceneKey");
+    if (!sceneKey || pageParams.get("openFrom") !== "shower") {
+      return false;
+    }
+    const storageKey = `${EDITOR_OPEN_SCENE_BRIDGE_PREFIX}${sceneKey}`;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) {
+        ui.showMessage("未找到外部传入的场景 JSON。", "error");
+        return false;
+      }
+      const record = JSON.parse(raw);
+      localStorage.removeItem(storageKey);
+      const sceneJson = record?.sceneJson;
+      if (!sceneJson || typeof sceneJson !== "object") {
+        throw new Error("外部传入的场景 JSON 无效。");
+      }
+      const loaded = await ingestScenePayload(sceneJson, record?.label || "Shower");
+      if (loaded) {
+        editorDocumentState?.markSaved?.();
+        editorDocumentState?.syncDocumentTitle?.();
+        ui.showMessage("已从 Shower 打开场景。", "success");
+      }
+      return loaded;
+    } catch (error) {
+      ui.showMessage(`从外部打开场景失败：${error?.message || error}`, "error");
+      console.error(error);
+      return false;
+    }
+  }
 
   function getSceneJsonString() {
     if (!scene?.isScene) {

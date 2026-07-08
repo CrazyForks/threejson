@@ -12,10 +12,20 @@ import {
 } from "../../../../core/util/util.js";
 import { resolveSceneHostUrl, sceneHostAssetUrl } from "../../shared/js/sceneHostPaths.js";
 
-const STORAGE_AUTO_RUN = "threejson.shower.autoRun";
+const STORAGE = {
+  autoRun: "threejson.shower.autoRun",
+  catalogOpen: "threejson.shower.catalogOpen",
+  jsonFormat: "threejson.shower.jsonFormat",
+  tab: "threejson.shower.tab",
+  lang: "threejson.site.lang",
+  theme: "threejson.site.theme"
+};
+const STORAGE_EDITOR_BRIDGE_PREFIX = "threejson.editor.openScene.";
 const AUTO_RENDER_DELAY_MS = 700;
+const DEMO_MANIFEST_URL = "assets/json/demo-show/manifest.json";
 const params = new URLSearchParams(window.location.search);
-const lang = params.get("lang") || (navigator.language?.toLowerCase().startsWith("zh") ? "zh-CN" : "en-US");
+let lang = resolveLang();
+let theme = localStorage.getItem(STORAGE.theme) || "auto";
 
 const labels = {
   "zh-CN": {
@@ -46,7 +56,18 @@ const labels = {
     confirmExport: "导出",
     alreadyFriendly: "当前已经是友好JSON。",
     alreadyStandard: "当前已经是标准JSON。",
-    modelExportDone: "三方模型已导出。"
+    modelExportDone: "三方模型已导出。",
+    catalog: "目录",
+    openInEditor: "在编辑器内打开",
+    editorOpenFailed: "打开编辑器失败：",
+    themeLabel: "主题",
+    themeAuto: "自动",
+    themeLight: "浅色",
+    themeDark: "深色",
+    langLabel: "语言",
+    langAuto: "自动",
+    langZh: "简体中文",
+    langEn: "English"
   },
   "en-US": {
     autoRun: "Live Render",
@@ -76,7 +97,18 @@ const labels = {
     confirmExport: "Export",
     alreadyFriendly: "Current JSON is already friendly JSON.",
     alreadyStandard: "Current JSON is already standard JSON.",
-    modelExportDone: "Model exported."
+    modelExportDone: "Model exported.",
+    catalog: "Catalog",
+    openInEditor: "Open In Editor",
+    editorOpenFailed: "Failed to open editor: ",
+    themeLabel: "Theme",
+    themeAuto: "Auto",
+    themeLight: "Light",
+    themeDark: "Dark",
+    langLabel: "Language",
+    langAuto: "Auto",
+    langZh: "Simplified Chinese",
+    langEn: "English"
   }
 };
 
@@ -87,6 +119,9 @@ const els = {
   status: document.getElementById("statusText"),
   editorPanel: document.getElementById("editorPanel"),
   treePanel: document.getElementById("treePanel"),
+  leftPane: document.querySelector(".leftPane"),
+  catalogPanel: document.getElementById("exampleCatalogPanel"),
+  catalogToggle: document.getElementById("catalogToggleBtn"),
   jsonToolbar: document.getElementById("jsonToolbar"),
   autoRun: document.getElementById("autoRunCheckbox"),
   canvas: document.getElementById("canvasContainer"),
@@ -99,7 +134,9 @@ const els = {
   modelExportModal: document.getElementById("modelExportModal"),
   modelExportFormat: document.getElementById("modelExportFormatSelect"),
   modelExportCancel: document.getElementById("modelExportCancelBtn"),
-  modelExportConfirm: document.getElementById("modelExportConfirmBtn")
+  modelExportConfirm: document.getElementById("modelExportConfirmBtn"),
+  langSelect: document.getElementById("langSelect"),
+  themeSelect: document.getElementById("themeSelect")
 };
 
 let fullJson = null;
@@ -112,6 +149,9 @@ let suppressAutoRender = false;
 let viewModeIndex = 0;
 let currentJsonFormat = "friendly";
 let messageTimer = 0;
+let hoverMenu = null;
+let demoManifest = [];
+let currentJsonUrl = "";
 
 const viewModes = [
   { name: "iso", dir: new THREE.Vector3(1, 0.72, 1) },
@@ -123,15 +163,27 @@ const viewModes = [
 init();
 
 async function init() {
-  document.documentElement.lang = lang === "zh-CN" ? "zh-CN" : "en";
-  document.querySelectorAll("[data-i18n]").forEach((node) => {
-    node.textContent = t(node.dataset.i18n);
-  });
+  els.langSelect.value = localStorage.getItem(STORAGE.lang) || "auto";
+  els.themeSelect.value = theme;
+  applyTheme();
+  applyI18n();
   els.status.textContent = t("ready");
-  els.autoRun.checked = localStorage.getItem(STORAGE_AUTO_RUN) !== "0";
+  els.autoRun.checked = localStorage.getItem(STORAGE.autoRun) !== "0";
   els.autoRun.addEventListener("change", () => {
-    localStorage.setItem(STORAGE_AUTO_RUN, els.autoRun.checked ? "1" : "0");
+    localStorage.setItem(STORAGE.autoRun, els.autoRun.checked ? "1" : "0");
   });
+  els.langSelect.addEventListener("change", () => {
+    localStorage.setItem(STORAGE.lang, els.langSelect.value);
+    lang = resolveLang();
+    applyI18n();
+    renderCatalog();
+  });
+  els.themeSelect.addEventListener("change", () => {
+    theme = els.themeSelect.value;
+    localStorage.setItem(STORAGE.theme, theme);
+    applyTheme();
+  });
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
 
   editor = window.CodeMirror(els.editorPanel, {
     value: "{}",
@@ -151,9 +203,44 @@ async function init() {
 
   wireControls();
   await loadInitialJson();
+  applyCachedCatalogState();
+}
+
+function getCachedTab() {
+  const cached = localStorage.getItem(STORAGE.tab);
+  return cached === "full" || cached === "tree" ? cached : "core";
+}
+
+function getCachedJsonFormat() {
+  const cached = localStorage.getItem(STORAGE.jsonFormat);
+  return cached === "friendly" || cached === "standard" ? cached : "";
+}
+
+function resolveLang() {
+  const selected = localStorage.getItem(STORAGE.lang) || "auto";
+  if (selected === "zh-CN" || selected === "en-US") return selected;
+  const paramLang = params.get("lang");
+  if (paramLang === "zh-CN" || paramLang === "en-US") return paramLang;
+  return navigator.language?.toLowerCase().startsWith("zh") ? "zh-CN" : "en-US";
+}
+
+function applyI18n() {
+  document.documentElement.lang = lang === "zh-CN" ? "zh-CN" : "en";
+  document.querySelectorAll("[data-i18n]").forEach((node) => {
+    node.textContent = t(node.dataset.i18n);
+  });
+}
+
+function applyTheme() {
+  const actual = theme === "auto"
+    ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+    : theme;
+  document.documentElement.dataset.theme = actual;
+  applyRuntimeCanvasThemeBackground();
 }
 
 function wireControls() {
+  wireMenuHoverBehavior();
   document.querySelectorAll(".tab").forEach((button) => {
     button.addEventListener("click", () => setTab(button.dataset.tab));
   });
@@ -161,6 +248,8 @@ function wireControls() {
   document.getElementById("runBtn").addEventListener("click", runFromEditor);
   document.getElementById("friendlyBtn").addEventListener("click", () => convertEditorJson("friendly"));
   document.getElementById("standardBtn").addEventListener("click", () => convertEditorJson("standard"));
+  document.getElementById("openInEditorBtn").addEventListener("click", openCurrentSceneInEditor);
+  els.catalogToggle?.addEventListener("click", toggleCatalog);
   document.getElementById("downloadHtmlBtn").addEventListener("click", downloadHtml);
   document.getElementById("exportThreeJsonBtn").addEventListener("click", () => {
     downloadText("threejson-scene.json", JSON.stringify(readCurrentScene(), null, 2));
@@ -198,19 +287,69 @@ function wireControls() {
   window.addEventListener("resize", resizeRuntime);
 }
 
+function wireMenuHoverBehavior() {
+  const toolbar = document.querySelector(".canvasToolbar");
+  const menus = Array.from(document.querySelectorAll(".canvasToolbar .menu"));
+  if (!toolbar || menus.length === 0) return;
+  menus.forEach((menu) => {
+    const button = menu.querySelector(":scope > button");
+    button?.addEventListener("mouseenter", () => setHoverMenu(menu));
+    menu.querySelector(".menuPanel")?.addEventListener("click", () => setHoverMenu(null));
+  });
+  toolbar.addEventListener("mousemove", (event) => {
+    const menu = event.target.closest?.(".menu");
+    if (menu && menus.includes(menu)) {
+      setHoverMenu(menu);
+    }
+  });
+  document.addEventListener("pointermove", (event) => {
+    if (!hoverMenu) return;
+    if (!toolbar.contains(event.target)) {
+      setHoverMenu(null);
+    }
+  });
+}
+
+function setHoverMenu(menu) {
+  if (hoverMenu === menu) return;
+  document.querySelectorAll(".canvasToolbar .menu.hoverOpen").forEach((node) => node.classList.remove("hoverOpen"));
+  hoverMenu = menu;
+  hoverMenu?.classList.add("hoverOpen");
+}
+
 async function loadInitialJson() {
   const raw = params.get("json") || "assets/json/demo-show/01-box.json";
+  await loadDemoManifest();
+  await loadExampleJson(raw);
+}
+
+async function loadDemoManifest() {
+  try {
+    const response = await fetch(resolveSceneHostUrl(DEMO_MANIFEST_URL));
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    demoManifest = await response.json();
+    renderCatalog();
+  } catch (error) {
+    console.warn("Failed to load demo-show manifest.", error);
+    demoManifest = [];
+  }
+}
+
+async function loadExampleJson(raw) {
   const url = resolveSceneHostUrl(raw);
   showLoading(true);
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     fullJson = await res.json();
+    currentJsonUrl = raw;
     currentJsonFormat = detectCurrentJsonFormat(fullJson);
+    applyCachedJsonFormatToFullJson();
     syncJsonFormatUi();
     els.title.textContent = fullJson.name || fullJson.threeJsonId || "ThreeJSON Shower";
-    setTab("core");
+    setTab(getCachedTab(), { persist: false });
     await runScene(fullJson);
+    renderCatalog();
   } catch (error) {
     els.status.textContent = String(error.message || error);
   } finally {
@@ -218,8 +357,57 @@ async function loadInitialJson() {
   }
 }
 
-function setTab(tab) {
+function toggleCatalog() {
+  const shouldOpen = !els.leftPane?.classList.contains("catalogOpen");
+  setCatalogOpen(shouldOpen);
+  localStorage.setItem(STORAGE.catalogOpen, shouldOpen ? "1" : "0");
+}
+
+function applyCachedCatalogState() {
+  setCatalogOpen(localStorage.getItem(STORAGE.catalogOpen) !== "0");
+}
+
+function setCatalogOpen(open) {
+  els.leftPane?.classList.toggle("catalogOpen", open);
+  if (els.catalogPanel) els.catalogPanel.hidden = !open;
+  els.catalogToggle?.classList.toggle("active", open);
+}
+
+function renderCatalog() {
+  if (!els.catalogPanel) return;
+  const useZh = lang === "zh-CN";
+  els.catalogPanel.innerHTML = Array.isArray(demoManifest) && demoManifest.length
+    ? demoManifest.map((section) => `
+      <section class="catalogGroup">
+        <h3 class="catalogGroupTitle">${escapeHtml(useZh ? section.sectionTitle : section.sectionTitleEn)}</h3>
+        ${(section.items || []).map((item) => {
+          const itemUrl = item.json || "";
+          const isActive = normalizeCatalogUrl(itemUrl) === normalizeCatalogUrl(currentJsonUrl);
+          return `<button class="catalogItem${isActive ? " active" : ""}" type="button" data-json="${escapeHtml(itemUrl)}">
+            <span class="catalogItemTitle">${escapeHtml(useZh ? item.title : item.titleEn)}</span>
+            <span class="catalogItemDesc">${escapeHtml(useZh ? item.desc : item.descEn)}</span>
+          </button>`;
+        }).join("")}
+      </section>`).join("")
+    : `<p>${t("noObjects")}</p>`;
+  els.catalogPanel.querySelectorAll(".catalogItem").forEach((node) => {
+    node.addEventListener("click", () => {
+      const jsonUrl = node.dataset.json || "";
+      if (jsonUrl) void loadExampleJson(jsonUrl);
+    });
+  });
+}
+
+function normalizeCatalogUrl(value) {
+  return String(value || "").replace(/\\/g, "/").replace(/^(\.\.\/)+/, "").replace(/^\.\//, "");
+}
+
+function setTab(tab, options = {}) {
+  if (!["core", "full", "tree"].includes(tab)) tab = "core";
   activeTab = tab;
+  if (options.persist !== false) {
+    localStorage.setItem(STORAGE.tab, tab);
+  }
   document.querySelectorAll(".tab").forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
   const isTree = tab === "tree";
   els.editorPanel.hidden = isTree;
@@ -269,6 +457,37 @@ function syncJsonFormatUi() {
   els.standardBtn?.classList.toggle("active", currentJsonFormat === "standard");
 }
 
+function openCurrentSceneInEditor() {
+  try {
+    const sceneJson = readCurrentScene();
+    const bridgeId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem(`${STORAGE_EDITOR_BRIDGE_PREFIX}${bridgeId}`, JSON.stringify({
+      source: "shower",
+      createdAt: Date.now(),
+      label: sceneJson?.name || sceneJson?.threeJsonId || "ThreeJSON Shower",
+      sceneJson
+    }));
+    const editorPath = lang === "zh-CN"
+      ? "../../../scene-editor.html"
+      : "../editor/index.html";
+    const url = `${editorPath}?openFrom=shower&sceneKey=${encodeURIComponent(bridgeId)}`;
+    window.open(url, "_blank", "noopener");
+  } catch (error) {
+    showMessage(t("editorOpenFailed") + (error.message || error));
+  }
+}
+
+function applyCachedJsonFormatToFullJson() {
+  const preferred = getCachedJsonFormat();
+  if (!preferred || preferred === currentJsonFormat) return;
+  try {
+    fullJson = preferred === "standard" ? toStandard(fullJson) : toFriendly(fullJson);
+    currentJsonFormat = preferred;
+  } catch (error) {
+    console.warn("Failed to apply cached JSON format.", error);
+  }
+}
+
 function detectCurrentJsonFormat(sceneJson) {
   try {
     return detectScenePayloadViewFormat(sceneJson || {});
@@ -292,6 +511,7 @@ async function convertEditorJson(format) {
     const detected = detectCurrentJsonFormat(complete);
     if (detected === format) {
       currentJsonFormat = format;
+      localStorage.setItem(STORAGE.jsonFormat, format);
       syncJsonFormatUi();
       showMessage(format === "friendly" ? t("alreadyFriendly") : t("alreadyStandard"));
       return;
@@ -301,6 +521,7 @@ async function convertEditorJson(format) {
       : toFriendly(complete);
     fullJson = structuredClone(converted);
     currentJsonFormat = format;
+    localStorage.setItem(STORAGE.jsonFormat, format);
     setEditorJson(activeTab === "core" ? toCore(fullJson) : fullJson);
     syncJsonFormatUi();
     showMessage(t("ready"));
@@ -325,6 +546,7 @@ async function runScene(sceneJson) {
   runtime?.dispose?.();
   fullJson = structuredClone(sceneJson);
   currentJsonFormat = detectCurrentJsonFormat(fullJson);
+  localStorage.setItem(STORAGE.jsonFormat, currentJsonFormat);
   syncJsonFormatUi();
   fullJson.canvasWidth = Math.max(1, els.canvasWrap.clientWidth);
   fullJson.canvasHeight = Math.max(1, els.canvasWrap.clientHeight);
@@ -335,12 +557,20 @@ async function runScene(sceneJson) {
       resetScene: true
     });
     runtime.start?.();
+    applyRuntimeCanvasThemeBackground();
     resizeRuntime();
     renderTree();
     els.status.textContent = t("ready");
   } finally {
     showLoading(false);
   }
+}
+
+function applyRuntimeCanvasThemeBackground() {
+  if (!runtime?.scene) return;
+  const color = getComputedStyle(document.documentElement).getPropertyValue("--canvas-bg").trim() || "#11151b";
+  runtime.scene.background = new THREE.Color(color);
+  runtime.renderer?.setClearColor?.(color, 1);
 }
 
 function toCore(sceneJson) {
@@ -594,6 +824,7 @@ function downloadHtml() {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ThreeJSON Scene</title>
+  <link rel="icon" href="https://cdn.jsdelivr.net/npm/@threejson/assets@latest/assets/img/threejson.ico" type="image/x-icon">
   <script type="importmap">
     {
       "imports": {

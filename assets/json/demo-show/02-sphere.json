@@ -7,8 +7,8 @@
     "renderer": { "antialias": true, "ratioRate": 1 },
     "controls": { "enableDamping": true, "target": { "x": 0, "y": 3, "z": 0 } },
     "lights": [
-      { "type": "ambient", "color": "#ffffff", "intensity": 0.7 },
-      { "type": "directional", "color": "#ffffff", "intensity": 1, "position": { "x": 20, "y": 30, "z": 20 } }
+      { "type": "ambient", "color": "#ffffff", "intensity": 1 },
+      { "type": "directional", "color": "#ffffff", "intensity": 1.35, "position": { "x": 20, "y": 30, "z": 20 } }
     ],
     "renderLoop": { "autoResize": true, "firstAutoResize": true }
   },

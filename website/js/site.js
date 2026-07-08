@@ -22,8 +22,8 @@ const I18N = {
     "docs.jsonConfig": "JSON 配置",
     "docs.changelog": "版本记录",
     "docs.faq": "常见问题",
-    "download.download": "下载",
-    "download.scenes": "示例场景",
+    "download.download": "下载 ThreeJSON",
+    "download.scenes": "下载示例JSON",
     "tools.editor": "场景编辑器",
     "tools.player": "场景播放器",
     "tools.glossary": "术语手册",
@@ -51,6 +51,7 @@ const I18N = {
     "home.features": "核心能力",
     "examples.title": "示例",
     "examples.desc": "每个示例聚焦一个 JSON 能力点。点击卡片后进入 shower，在左侧编辑 JSON，右侧实时渲染 ThreeJSON 场景。",
+    "examples.legacy": "旧版示例",
     "download.title": "下载 ThreeJSON",
     "contributors.title": "贡献者",
     "deps.title": "依赖项"
@@ -69,8 +70,8 @@ const I18N = {
     "docs.jsonConfig": "JSON Config",
     "docs.changelog": "Changelog",
     "docs.faq": "FAQ",
-    "download.download": "Download",
-    "download.scenes": "Demo Scenes",
+    "download.download": "Download ThreeJSON",
+    "download.scenes": "Download Demo JSON",
     "tools.editor": "Scene Editor",
     "tools.player": "Scene Player",
     "tools.glossary": "Glossary",
@@ -98,6 +99,7 @@ const I18N = {
     "home.features": "Core Features",
     "examples.title": "Examples",
     "examples.desc": "Each example focuses on one JSON capability. Open a card in shower, edit JSON on the left, and render the ThreeJSON scene on the right.",
+    "examples.legacy": "Legacy Examples",
     "download.title": "Download ThreeJSON",
     "contributors.title": "Contributors",
     "deps.title": "Dependencies"
@@ -337,6 +339,7 @@ async function renderExamples() {
     <section class="examplesPage">
       <aside class="examplesSideList">
         ${manifest.map((section, index) => `<a href="#section-${section.section}" class="${index === 0 ? "active" : ""}" data-section="${section.section}">${lang === "zh-CN" ? section.sectionTitle : section.sectionTitleEn}</a>`).join("")}
+        <a class="legacyExamplesLink" href="../examples/html-demo/demo.html" target="_blank" rel="noreferrer">${t("examples.legacy")}</a>
       </aside>
       <div class="examplesContent">
         <h1>${t("examples.title")}</h1>
@@ -357,7 +360,7 @@ async function renderExamples() {
           </section>`).join("")}
       </div>
     </section>`;
-  app.querySelectorAll(".examplesSideList a").forEach((link) => {
+  app.querySelectorAll(".examplesSideList a[data-section]").forEach((link) => {
     link.addEventListener("click", (event) => {
       event.preventDefault();
       app.querySelectorAll(".examplesSideList a").forEach((node) => node.classList.remove("active"));
@@ -370,7 +373,7 @@ async function renderExamples() {
       const shower = new URL("../../tools/scene-host/shower/index.html", import.meta.url);
       shower.searchParams.set("json", card.dataset.json);
       shower.searchParams.set("lang", lang);
-      window.location.href = shower.href;
+      window.open(shower.href, "_blank", "noreferrer");
     });
   });
 }

@@ -7,9 +7,9 @@
     "renderer": { "antialias": true, "ratioRate": 1 },
     "controls": { "enableDamping": true, "target": { "x": 0, "y": 4, "z": 0 } },
     "lights": [
-      { "type": "ambient", "color": "#6f83a5", "intensity": 0.25 },
-      { "type": "point", "color": "#ffdd99", "intensity": 900, "distance": 120, "position": { "x": -8, "y": 14, "z": 8 } },
-      { "type": "directional", "color": "#a0cfff", "intensity": 0.75, "position": { "x": 18, "y": 24, "z": 20 } }
+      { "type": "ambient", "color": "#6f83a5", "intensity": 0.45 },
+      { "type": "point", "color": "#ffdd99", "intensity": 1200, "distance": 120, "position": { "x": -8, "y": 14, "z": 8 } },
+      { "type": "directional", "color": "#a0cfff", "intensity": 1.05, "position": { "x": 18, "y": 24, "z": 20 } }
     ],
     "renderLoop": { "autoResize": true, "firstAutoResize": true }
   },
@@ -26,4 +26,3 @@
   },
   "threeJsonId": "demo-show-04-lighting"
 }
-

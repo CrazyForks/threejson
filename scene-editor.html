@@ -4610,6 +4610,7 @@ Powered by ThreeJSON and Three.js</div>
   const OBJECT_IMPORT_SESSION_FILL_LIGHTS = "sceneEditor_objectImportFillLights";
   const OBJECT_IMPORT_SESSION_FILL_CAMERA = "sceneEditor_objectImportFillCamera";
   const EDITOR_SETTINGS_JSON_URL = "./assets/json/other/scene-editor/setting.json";
+  const EDITOR_OPEN_SCENE_BRIDGE_PREFIX = "threejson.editor.openScene.";
   const LOADING_MASK_ACTIVITY_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
   const EDITOR_SETTINGS_DEFAULTS = {
@@ -15037,8 +15038,42 @@ Powered by ThreeJSON and Three.js</div>
     bindProgressElement(loadingMaskMessage || loadingMask);
     openOrCloseProgressManager(sysConfig.progressFlag);
     await bootstrapEditorSceneFromRecovery();
+    await loadSceneFromExternalBridgeIfRequested();
     startAutoSnapshotTimer();
   });
+
+  async function loadSceneFromExternalBridgeIfRequested() {
+    const pageParams = new URLSearchParams(window.location.search);
+    const sceneKey = pageParams.get("sceneKey");
+    if (!sceneKey || pageParams.get("openFrom") !== "shower") {
+      return false;
+    }
+    const storageKey = `${EDITOR_OPEN_SCENE_BRIDGE_PREFIX}${sceneKey}`;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) {
+        showMessage("未找到外部传入的场景 JSON。", "error");
+        return false;
+      }
+      const record = JSON.parse(raw);
+      localStorage.removeItem(storageKey);
+      const sceneJson = record?.sceneJson;
+      if (!sceneJson || typeof sceneJson !== "object") {
+        throw new Error("外部传入的场景 JSON 无效。");
+      }
+      const loaded = await ingestScenePayloadFromParsedJson(sceneJson, record?.label || "Shower");
+      if (loaded) {
+        markEditorSaved();
+        syncEditorDocumentTitle();
+        showMessage("已从 Shower 打开场景。", "success");
+      }
+      return loaded;
+    } catch (error) {
+      showMessage(`从外部打开场景失败：${error?.message || error}`, "error");
+      console.error(error);
+      return false;
+    }
+  }
 
   function onEditorPageHide(event) {
     if (event?.persisted) {

@@ -310,6 +310,17 @@ a { color: inherit; text-decoration: none; }
   color: var(--brand);
 }
 
+.examplesSideList .legacyExamplesLink {
+  margin-top: 12px;
+  padding-top: 13px;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+}
+
+.examplesSideList .legacyExamplesLink:hover {
+  border-radius: 6px;
+}
+
 .examplesContent {
   min-width: 0;
   padding: 42px 28px 64px;
