@@ -1,0 +1,23 @@
+# Git
+.git
+.git/**
+
+# Dependencies
+node_modules
+**/node_modules/**
+
+# IDE
+.idea
+.vscode
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Wrangler
+.wrangler
+.wrangler/**
+
+# Logs
+*.log
+package-lock.json
