@@ -649,6 +649,15 @@ html, body {
       z-index: 120;
     }
 
+    .topDropdown::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: -6px;
+      height: 6px;
+    }
+
     .topDropdown button {
       display: block;
       width: 100%;
@@ -1796,9 +1805,19 @@ html, body {
       z-index: 140;
     }
 
+    .topMenuNestedWrap[data-submenu-open='true'] > .topDropdownNested,
     .topMenuNestedWrap:hover > .topDropdownNested,
     .topMenuNestedWrap:focus-within > .topDropdownNested {
       display: block;
+    }
+
+    .topDropdownNested::before {
+      content: "";
+      position: absolute;
+      left: -8px;
+      top: 0;
+      bottom: 0;
+      width: 8px;
     }
 
     .topDropdownNested button {

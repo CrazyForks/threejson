@@ -40,6 +40,7 @@ export function wirePlayerTopMenu(deps) {
   function closeAllTopMenus() {
     document.querySelectorAll(".topMenu[open]").forEach((el) => {
       el.removeAttribute("open");
+      delete el.dataset.hoverOpen;
     });
   }
 

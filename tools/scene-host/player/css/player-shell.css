@@ -214,6 +214,15 @@ body {
   z-index: 300;
 }
 
+.topDropdown::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -6px;
+  height: 6px;
+}
+
 .topDropdown button {
   display: block;
   width: 100%;

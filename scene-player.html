@@ -490,6 +490,15 @@
       z-index: 120;
     }
 
+    .topDropdown::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: -6px;
+      height: 6px;
+    }
+
     .topDropdown button {
       display: block;
       width: 100%;
@@ -3576,21 +3585,86 @@ Powered by ThreeJSON and Three.js</div>
   function closeAllTopMenus() {
     document.querySelectorAll(".topMenubar details[open]").forEach((el) => {
       el.removeAttribute("open");
+      delete el.dataset.hoverOpen;
     });
   }
 
   function initTopMenubarExclusiveOpen() {
-    document.querySelectorAll(".topMenubar > .topMenu").forEach((details) => {
+    const root = document;
+    const menubars = Array.from(root.querySelectorAll(".topMenubar"));
+    const menus = Array.from(root.querySelectorAll(".topMenubar > .topMenu"));
+    let hoverCloseTimer = 0;
+
+    function clearHoverCloseTimer() {
+      if (hoverCloseTimer) {
+        window.clearTimeout(hoverCloseTimer);
+        hoverCloseTimer = 0;
+      }
+    }
+
+    function closeHoverMenus(scope) {
+      scope.querySelectorAll?.(".topMenubar > .topMenu[open][data-hover-open='true']").forEach((details) => {
+        details.removeAttribute("open");
+        delete details.dataset.hoverOpen;
+      });
+    }
+
+    function scheduleHoverClose(scope) {
+      clearHoverCloseTimer();
+      hoverCloseTimer = window.setTimeout(() => {
+        closeHoverMenus(scope);
+        hoverCloseTimer = 0;
+      }, 220);
+    }
+
+    menus.forEach((details) => {
+      const summary = details.querySelector(":scope > summary");
+      let suppressNextSummaryClick = false;
       details.addEventListener("toggle", () => {
         if (!details.open) {
+          delete details.dataset.hoverOpen;
           return;
         }
-        document.querySelectorAll(".topMenubar > .topMenu[open]").forEach((other) => {
+        root.querySelectorAll(".topMenubar > .topMenu[open]").forEach((other) => {
           if (other !== details) {
             other.removeAttribute("open");
           }
         });
         closePlaylistAddMenu();
+      });
+
+      details.addEventListener("pointerenter", () => {
+        clearHoverCloseTimer();
+        if (!details.open) {
+          details.dataset.hoverOpen = "true";
+          details.setAttribute("open", "");
+        }
+      });
+
+      summary?.addEventListener("pointerdown", (event) => {
+        if (details.open && details.dataset.hoverOpen === "true") {
+          event.preventDefault();
+          suppressNextSummaryClick = true;
+          delete details.dataset.hoverOpen;
+        }
+      });
+
+      summary?.addEventListener("click", (event) => {
+        if (!suppressNextSummaryClick) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        suppressNextSummaryClick = false;
+        details.setAttribute("open", "");
+        delete details.dataset.hoverOpen;
+      });
+    });
+
+    menubars.forEach((menubar) => {
+      menubar.addEventListener("pointerenter", clearHoverCloseTimer);
+      menubar.addEventListener("pointerleave", () => {
+        scheduleHoverClose(menubar.ownerDocument || root);
       });
     });
   }

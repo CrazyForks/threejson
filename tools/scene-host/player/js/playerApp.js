@@ -911,6 +911,18 @@ export async function bootstrapPlayerApp() {
     }
   }
 
+  async function clearStoredPlaylistState({ clearFiles = false } = {}) {
+    try {
+      localStorage.removeItem(LS_PLAYLIST_MANIFEST_KEY);
+      localStorage.removeItem(LS_PLAYLIST_CURRENT_ID_KEY);
+      if (clearFiles) {
+        await playerPlaylistIdbClear();
+      }
+    } catch (err) {
+      console.warn("[scene-host player] clearStoredPlaylistState", err);
+    }
+  }
+
   function appendUrlToPlaylist(url, label = "") {
     const entry = {
       id: nextPlaylistId(),
@@ -950,6 +962,7 @@ export async function bootstrapPlayerApp() {
         return false;
       }
     } catch {
+      await clearStoredPlaylistState();
       return false;
     }
 
@@ -1003,6 +1016,7 @@ export async function bootstrapPlayerApp() {
     renderPlaylistUi();
     const ok = await activatePlaylistIndex(idx);
     if (!ok) {
+      await clearStoredPlaylistState();
       showPlayerStartupEmptyState();
     }
     return ok;
@@ -1215,13 +1229,7 @@ export async function bootstrapPlayerApp() {
   async function clearPlaylistAndStop() {
     playlist.length = 0;
     currentPlaylistIndex = -1;
-    try {
-      localStorage.removeItem(LS_PLAYLIST_MANIFEST_KEY);
-      localStorage.removeItem(LS_PLAYLIST_CURRENT_ID_KEY);
-      await playerPlaylistIdbClear();
-    } catch (err) {
-      console.warn("[scene-host player] clearPlaylist storage", err);
-    }
+    await clearStoredPlaylistState({ clearFiles: true });
     stopPlayerAndClearScene();
     showMessage(t("player.message.playlistCleared", "Playlist cleared and playback stopped."), "info");
   }

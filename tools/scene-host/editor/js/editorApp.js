@@ -1569,6 +1569,11 @@ export async function bootstrapSceneHostEditor() {
   function closeAllDropdowns() {
     document.querySelectorAll("details.topMenu[open]").forEach((el) => {
       el.open = false;
+      delete el.dataset.hoverOpen;
+    });
+    document.querySelectorAll(".topMenuNestedWrap[data-submenu-open]").forEach((el) => {
+      delete el.dataset.submenuOpen;
+      delete el.dataset.submenuPinned;
     });
   }
   host.closeAllDropdowns = closeAllDropdowns;
