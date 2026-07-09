@@ -63,7 +63,9 @@ export const EDITOR_SETTINGS_DEFAULTS = {
       autoRenderDefault: false,
       autoRenderDelayMs: 1000,
       syncCodeAndSidebarPrefs: true,
+      codeViewScope: "core",
       codeViewFormat: "auto",
+      codeViewFormatWriteback: false,
       subSceneLayout: "subSceneList",
       subSceneNormalizePolicy: "warn"
     },
@@ -373,6 +375,12 @@ export const EDITOR_SETTINGS_FIELDS = [
         { value: "standard", label: "标准" },
         { value: "friendly", label: "友好" }
       ]
+    },
+    {
+      section: "sceneJson",
+      path: "sceneJson.codeViewFormatWriteback",
+      type: "checkbox",
+      label: "Code 模式导出时回写所选 JSON 形式"
     },
     {
       section: "sceneJson",

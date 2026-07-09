@@ -1489,6 +1489,11 @@ html, body {
       right: 238px;
     }
 
+    #rootContainer.codeEditMode.codeAllMode #codeEditorStage {
+      right: 50%;
+      border-right: 1px solid #30363f;
+    }
+
     /* 模式切换遮罩：覆盖中央舞台，避免切换 3D/Code 时的卡顿被用户当成无响应 */
     #modeSwitchMask {
       position: absolute;
@@ -1532,16 +1537,77 @@ html, body {
       flex: 0 0 auto;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 8px;
       padding: 8px 12px;
       background: #2b2b2b;
       border-bottom: 1px solid #3c3c3c;
+      min-width: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
     }
 
     .codeEditorStageTitle {
       font-size: 12px;
       color: #d8d8d8;
       font-weight: 600;
+      white-space: nowrap;
+      margin-right: 2px;
+    }
+
+    .codeJsonScopeToggle {
+      display: inline-flex;
+      align-items: center;
+      flex: 0 0 auto;
+      padding: 2px;
+      border: 1px solid rgba(148, 163, 184, 0.32);
+      border-radius: 6px;
+      background: rgba(15, 23, 42, 0.34);
+    }
+
+    .codeJsonScopeBtn {
+      height: 24px;
+      padding: 0 9px;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: #aeb7c4;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .codeJsonScopeBtn:hover {
+      background: rgba(96, 165, 250, 0.16);
+      color: #e5eefc;
+    }
+
+    .codeJsonScopeBtn.active {
+      background: rgba(64, 158, 255, 0.92);
+      color: #ffffff;
+    }
+
+    .codeEditorToolbarField {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #c9c9c9;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .codeEditorToolbarField select {
+      height: 26px;
+      min-width: 96px;
+      border: 1px solid rgba(148, 163, 184, 0.34);
+      border-radius: 5px;
+      background: #1f242b;
+      color: #e5e9ef;
+      outline: none;
+    }
+
+    .codeEditorToolbarSpacer {
+      flex: 1 1 auto;
+      min-width: 12px;
     }
 
     /* 3D 悬浮窗顶部的控制条：渲染按钮靠左，机位保持/自动渲染靠右 */
@@ -1562,7 +1628,7 @@ html, body {
     }
 
     #rootContainer.codeEditMode .pipControlBar {
-      display: flex;
+      display: none;
     }
 
     .pipControlBarRight {
@@ -1576,21 +1642,6 @@ html, body {
     }
 
     /* 渲染按钮改为无边框纯文字，节省悬浮窗底部空间 */
-    #codeEditorRenderBtn.toolBtn {
-      height: auto;
-      padding: 0;
-      border: none;
-      background: transparent;
-      color: #66b1ff;
-      font-size: 11px;
-    }
-
-    #codeEditorRenderBtn.toolBtn:hover {
-      background: transparent;
-      color: #8fc4ff;
-      text-decoration: underline;
-    }
-
     .codeEditorCheckboxLabel {
       display: inline-flex;
       align-items: center;
@@ -1641,7 +1692,7 @@ html, body {
 
     /* Code 模式下，唯一画布收为右上角画中画小窗（复用同一渲染器） */
     /* top 下移避开编辑器上方标题栏；right 偏移额外留出 CM6 纵向滚动条宽度 */
-    #rootContainer.codeEditMode #canvasWrap {
+    #rootContainer.codeEditMode:not(.codeAllMode) #canvasWrap {
       inset: auto;
       top: calc(var(--dockInsetTop, 0px) + 48px);
       right: 26px;
@@ -1655,8 +1706,28 @@ html, body {
     }
 
     /* 右侧属性面板钉住时，PiP 右偏让位，避免被压住（右栏宽 238px） */
-    #rootContainer.codeEditMode.rightDockPinned #canvasWrap {
+    #rootContainer.codeEditMode:not(.codeAllMode).rightDockPinned #canvasWrap {
       right: 262px;
+    }
+
+    #rootContainer.codeEditMode.codeAllMode #canvasWrap {
+      inset: auto;
+      top: var(--dockInsetTop, 0px);
+      bottom: var(--dockInsetBottom, 0px);
+      left: 50%;
+      right: 0;
+      width: auto;
+      height: auto;
+      z-index: 4;
+      border: none;
+      border-radius: 0;
+      border-left: 1px solid #30363f;
+      overflow: hidden;
+      box-shadow: none;
+    }
+
+    #rootContainer.codeEditMode.codeAllMode.rightDockPinned #canvasWrap {
+      right: 238px;
     }
 
     /* PiP 缩放把手：仅 code 模式显示，四边 + 四角，类似系统窗口 */
@@ -1664,7 +1735,7 @@ html, body {
       display: none;
     }
 
-    #rootContainer.codeEditMode #pipResizeHandles {
+    #rootContainer.codeEditMode:not(.codeAllMode) #pipResizeHandles {
       display: block;
     }
 
@@ -2747,7 +2818,8 @@ html, body {
       display: flex;
     }
 
-    #tjzExportModal {
+    #tjzExportModal,
+    #templateExportModal {
       position: absolute;
       inset: 0;
       z-index: 57;
@@ -2757,7 +2829,8 @@ html, body {
       background: rgba(12, 12, 12, 0.62);
     }
 
-    #tjzExportModal.visible {
+    #tjzExportModal.visible,
+    #templateExportModal.visible {
       display: flex;
     }
 

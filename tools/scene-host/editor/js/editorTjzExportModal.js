@@ -14,7 +14,13 @@ export function createEditorTjzExportModal(host) {
       return;
     }
     if (formatSelect && tjz.format) {
-      formatSelect.value = tjz.format;
+      const sceneJson = host.getEditorSettings()?.sceneJson;
+      const committedFormat =
+        sceneJson?.codeViewFormatWriteback &&
+        (sceneJson?.codeViewFormat === "friendly" || sceneJson?.codeViewFormat === "standard")
+          ? sceneJson.codeViewFormat
+          : tjz.format;
+      formatSelect.value = committedFormat;
     }
     if (assetPolicySelect && tjz.assetPolicy) {
       assetPolicySelect.value = tjz.assetPolicy;

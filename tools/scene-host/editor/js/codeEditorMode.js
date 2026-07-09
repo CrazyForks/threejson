@@ -4,6 +4,10 @@ import {
   resolveScenePayloadForLoad,
   sceneToJson
 } from "threejson";
+import {
+  buildFriendlyScenePayloadFromCanonical,
+  normalizeScenePayload
+} from "threejson/core";
 
 const PIP_MIN_WIDTH = 220;
 const PIP_MIN_HEIGHT = 140;
@@ -17,6 +21,7 @@ export function createCodeEditorMode(host) {
   const codeEditorStage = document.getElementById("codeEditorStage");
   const editModeToggle = document.getElementById("editModeToggle");
   const editModeSeg3d = document.getElementById("editModeSeg3d");
+  const editModeSegAll = document.getElementById("editModeSegAll");
   const editModeSegCode = document.getElementById("editModeSegCode");
   const pipControlBar = document.getElementById("pipControlBar");
   const modeSwitchMask = document.getElementById("modeSwitchMask");
@@ -24,6 +29,13 @@ export function createCodeEditorMode(host) {
   const codeEditorRenderBtn = document.getElementById("codeEditorRenderBtn");
   const codeEditorCameraLockCheckbox = document.getElementById("codeEditorCameraLockCheckbox");
   const codeEditorAutoRenderCheckbox = document.getElementById("codeEditorAutoRenderCheckbox");
+  const codeJsonScopeCoreBtn = document.getElementById("codeJsonScopeCoreBtn");
+  const codeJsonScopeFullBtn = document.getElementById("codeJsonScopeFullBtn");
+  const codeEditorFormatSelect = document.getElementById("codeEditorFormatSelect");
+  const codeEditorFormatWritebackLabel = document.getElementById("codeEditorFormatWritebackLabel");
+  const codeEditorFormatWritebackCheckbox = document.getElementById("codeEditorFormatWritebackCheckbox");
+  const codeEditorFormatBtn = document.getElementById("codeEditorFormatBtn");
+  const codeEditorCanvasToggleBtn = document.getElementById("codeEditorCanvasToggleBtn");
 
   let codeMirrorModulePromise = null;
   let codeMirrorView = null;
@@ -33,9 +45,14 @@ export function createCodeEditorMode(host) {
   let pipSavedGeometry = null;
   let autoRenderTimer = null;
   let objectPatchBaselinePayload = null;
+  let codeJsonScope = host.getEditorSettings()?.sceneJson?.codeViewScope === "full" ? "full" : "core";
 
   function isCodeEditMode() {
     return Boolean(rootContainer?.classList.contains("codeEditMode"));
+  }
+
+  function isAllEditMode() {
+    return Boolean(rootContainer?.classList.contains("codeAllMode"));
   }
 
   function getAutoRenderDelayMs() {
@@ -72,6 +89,88 @@ export function createCodeEditorMode(host) {
     return options;
   }
 
+  function getJsonIndent() {
+    return host.getEditorSettings()?.io?.exportJsonIndent ?? 2;
+  }
+
+  function getSceneJsonSettings() {
+    const settings = host.getEditorSettings();
+    settings.sceneJson = settings.sceneJson || {};
+    return settings.sceneJson;
+  }
+
+  function persistSceneJsonSetting(key, value) {
+    const sceneJson = getSceneJsonSettings();
+    sceneJson[key] = value;
+    host.persistSettings?.();
+  }
+
+  function getCorePayloadFromFullPayload(payload) {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return payload;
+    }
+    const core = {};
+    for (const key of ["name", "worldInfo", "sceneConfig", "objectList", "subSceneList"]) {
+      if (Object.prototype.hasOwnProperty.call(payload, key)) {
+        core[key] = cloneJson(payload[key]);
+      }
+    }
+    for (const [key, value] of Object.entries(payload)) {
+      if (Array.isArray(value) && /List$/.test(key) && !Object.prototype.hasOwnProperty.call(core, key)) {
+        core[key] = cloneJson(value);
+      }
+    }
+    return Object.keys(core).length ? core : cloneJson(payload);
+  }
+
+  function mergeCorePayloadIntoFullPayload(corePayload) {
+    const base = cloneJson(host.getSysConfig?.()?.jsonData || objectPatchBaselinePayload || {});
+    if (!base || typeof base !== "object" || Array.isArray(base)) {
+      return corePayload;
+    }
+    const next = { ...base };
+    for (const key of Object.keys(base)) {
+      if (/List$/.test(key) && !Object.prototype.hasOwnProperty.call(corePayload, key)) {
+        delete next[key];
+      }
+    }
+    for (const [key, value] of Object.entries(corePayload || {})) {
+      next[key] = cloneJson(value);
+    }
+    return next;
+  }
+
+  function normalizePayloadForDisplay(payload, format = resolveCodeViewFormat()) {
+    const resolved = resolveScenePayloadForLoad(payload);
+    if (format !== "friendly") {
+      return resolved;
+    }
+    const normalized = normalizeScenePayload(resolved, {
+      subSceneLayout: host.getEditorSettings()?.sceneJson?.subSceneLayout ?? "subSceneList",
+      subSceneNormalizePolicy: host.getEditorSettings()?.sceneJson?.subSceneNormalizePolicy ?? "warn"
+    });
+    return buildFriendlyScenePayloadFromCanonical(resolved, normalized.payload, {
+      friendlyMap:
+        host.getScenePayloadFormat?.()?.resolveEditorSceneJsonFriendlyMapForDisplay?.() ??
+        host.resolveFriendlyMapFromPayload?.(resolved)
+    });
+  }
+
+  function getCodeViewPayloadForDisplay(fullPayload) {
+    const displayPayload = normalizePayloadForDisplay(fullPayload);
+    return codeJsonScope === "core" ? getCorePayloadFromFullPayload(displayPayload) : displayPayload;
+  }
+
+  function parseActiveCodePayload() {
+    const raw = String(getActiveCodeJsonText() || "").trim();
+    if (!raw) {
+      throw new Error("JSON 不能为空。");
+    }
+    const parsed = parseSceneJsonString(raw);
+    const payload = codeJsonScope === "core" ? mergeCorePayloadIntoFullPayload(parsed) : parsed;
+    return resolveScenePayloadForLoad(payload);
+  }
+
   async function getSceneJsonTextForCodeView() {
     await host.ensureCanvasSyncedBeforeExport?.();
     const scene = host.getScene();
@@ -83,7 +182,7 @@ export function createCodeEditorMode(host) {
       buildSceneToJsonOptions({ format: "standard" });
     const indent = host.getEditorSettings()?.io?.exportJsonIndent ?? 2;
     const payload = await sceneToJson(scene, displayOpts);
-    return JSON.stringify(payload, null, indent);
+    return JSON.stringify(getCodeViewPayloadForDisplay(payload), null, indent);
   }
 
   function getActiveCodeJsonText() {
@@ -222,14 +321,40 @@ export function createCodeEditorMode(host) {
     if (codeEditorAutoRenderCheckbox && sj) {
       codeEditorAutoRenderCheckbox.checked = Boolean(sj.autoRenderDefault);
     }
+    if (codeEditorFormatSelect && sj?.codeViewFormat) {
+      codeEditorFormatSelect.value = sj.codeViewFormat;
+    }
+    if (codeEditorFormatWritebackCheckbox) {
+      codeEditorFormatWritebackCheckbox.checked = Boolean(sj?.codeViewFormatWriteback);
+    }
+    codeJsonScope = sj?.codeViewScope === "full" ? "full" : "core";
+    syncCodeEditorToolbarUi();
+  }
+
+  function syncCodeEditorToolbarUi() {
+    const coreOn = codeJsonScope !== "full";
+    codeJsonScopeCoreBtn?.classList.toggle("active", coreOn);
+    codeJsonScopeFullBtn?.classList.toggle("active", !coreOn);
+    codeJsonScopeCoreBtn?.setAttribute("aria-pressed", coreOn ? "true" : "false");
+    codeJsonScopeFullBtn?.setAttribute("aria-pressed", coreOn ? "false" : "true");
+    const formatValue = codeEditorFormatSelect?.value || host.getEditorSettings()?.sceneJson?.codeViewFormat || "auto";
+    if (codeEditorFormatWritebackLabel) {
+      codeEditorFormatWritebackLabel.hidden = formatValue === "auto";
+    }
+    if (codeEditorCanvasToggleBtn) {
+      codeEditorCanvasToggleBtn.textContent = isAllEditMode() ? "收起画布" : "展开画布";
+    }
   }
 
   function syncEditModeToggleUi() {
     const codeOn = isCodeEditMode();
+    const allOn = isAllEditMode();
     editModeSeg3d?.classList.toggle("editModeSegActive", !codeOn);
-    editModeSegCode?.classList.toggle("editModeSegActive", codeOn);
+    editModeSegAll?.classList.toggle("editModeSegActive", allOn);
+    editModeSegCode?.classList.toggle("editModeSegActive", codeOn && !allOn);
     editModeSeg3d?.setAttribute("aria-pressed", codeOn ? "false" : "true");
-    editModeSegCode?.setAttribute("aria-pressed", codeOn ? "true" : "false");
+    editModeSegAll?.setAttribute("aria-pressed", allOn ? "true" : "false");
+    editModeSegCode?.setAttribute("aria-pressed", codeOn && !allOn ? "true" : "false");
     if (codeEditorStage) {
       codeEditorStage.setAttribute("aria-hidden", codeOn ? "false" : "true");
     }
@@ -241,6 +366,7 @@ export function createCodeEditorMode(host) {
     if (menuToggleEdit) {
       menuToggleEdit.textContent = codeOn ? "编辑 3D" : "编辑 JSON";
     }
+    syncCodeEditorToolbarUi();
     host.getEditorInteraction?.()?.syncTransModeButtonsVisibility?.();
   }
 
@@ -376,8 +502,19 @@ export function createCodeEditorMode(host) {
     return true;
   }
 
-  async function enterCodeMode() {
-    if (isCodeEditMode() || modeSwitchInProgress) {
+  async function enterCodeMode(options = {}) {
+    const split = Boolean(options.split);
+    if (modeSwitchInProgress) {
+      return;
+    }
+    if (isCodeEditMode()) {
+      rootContainer?.classList.toggle("codeAllMode", split);
+      clearPipInlineGeometry();
+      if (!split) {
+        restorePipGeometryForCodeMode();
+      }
+      syncEditModeToggleUi();
+      requestAnimationFrame(() => host.windowResize?.());
       return;
     }
     beginModeSwitch("正在切换到代码编辑模式…");
@@ -399,9 +536,13 @@ export function createCodeEditorMode(host) {
       setObjectPatchBaselineFromText(codeText);
       syncCodeModeCheckboxesFromSettings();
       rootContainer?.classList.add("codeEditMode");
+      rootContainer?.classList.toggle("codeAllMode", split);
       syncEditModeToggleUi();
       host.closeAllDropdowns?.();
-      restorePipGeometryForCodeMode();
+      clearPipInlineGeometry();
+      if (!split) {
+        restorePipGeometryForCodeMode();
+      }
       requestAnimationFrame(() => {
         host.windowResize?.();
         requestAnimationFrame(() => {
@@ -432,6 +573,10 @@ export function createCodeEditorMode(host) {
     }
   }
 
+  function enterAllMode() {
+    return enterCodeMode({ split: true });
+  }
+
   async function enterThreeMode() {
     if (!isCodeEditMode() || modeSwitchInProgress) {
       return;
@@ -439,6 +584,7 @@ export function createCodeEditorMode(host) {
     beginModeSwitch("正在切换到 3D 编辑模式…");
     cancelAutoRenderTimer();
     rootContainer?.classList.remove("codeEditMode");
+    rootContainer?.classList.remove("codeAllMode");
     clearPipInlineGeometry();
     syncEditModeToggleUi();
     requestAnimationFrame(() => {
@@ -662,7 +808,13 @@ export function createCodeEditorMode(host) {
   function setObjectPatchBaselineFromText(text) {
     try {
       const raw = String(text || "").trim();
-      setObjectPatchBaseline(raw ? resolveScenePayloadForLoad(parseSceneJsonString(raw)) : null);
+      if (!raw) {
+        setObjectPatchBaseline(null);
+        return;
+      }
+      const parsed = parseSceneJsonString(raw);
+      const payload = codeJsonScope === "core" ? mergeCorePayloadIntoFullPayload(parsed) : parsed;
+      setObjectPatchBaseline(resolveScenePayloadForLoad(payload));
     } catch (_err) {
       setObjectPatchBaseline(null);
     }
@@ -709,12 +861,7 @@ export function createCodeEditorMode(host) {
     }
     const hasLoadedScene = host.hasRuntimeReady?.() ?? Boolean(host.getSceneRuntime?.()?.scene || host.getScene?.()?.isScene);
     cancelAutoRenderTimer();
-    const raw = String(getActiveCodeJsonText() || "").trim();
-    if (!raw) {
-      throw new Error("JSON 不能为空。");
-    }
-    const parsed = parseSceneJsonString(raw);
-    let payload = resolveScenePayloadForLoad(parsed);
+    const payload = parseActiveCodePayload();
     if (!isLoadableScenePayload(payload)) {
       throw new Error("JSON 格式无效（需要 worldInfo 或非空 objectList）");
     }
@@ -747,6 +894,68 @@ export function createCodeEditorMode(host) {
     return true;
   }
 
+  function rewriteCurrentEditorPayload(nextScope = codeJsonScope, nextFormat = resolveCodeViewFormat()) {
+    const payload = parseActiveCodePayload();
+    if (!isLoadableScenePayload(payload)) {
+      throw new Error("JSON 格式无效（需要 worldInfo 或非空 objectList）。");
+    }
+    const displayPayload = normalizePayloadForDisplay(payload, nextFormat);
+    const textPayload = nextScope === "core" ? getCorePayloadFromFullPayload(displayPayload) : displayPayload;
+    setActiveCodeJsonText(JSON.stringify(textPayload, null, getJsonIndent()));
+    setObjectPatchBaseline(payload);
+  }
+
+  async function switchCodeJsonScope(nextScope) {
+    const normalizedScope = nextScope === "full" ? "full" : "core";
+    if (normalizedScope === codeJsonScope) {
+      return;
+    }
+    try {
+      rewriteCurrentEditorPayload(normalizedScope);
+      codeJsonScope = normalizedScope;
+      persistSceneJsonSetting("codeViewScope", codeJsonScope);
+      syncCodeEditorToolbarUi();
+    } catch (error) {
+      host.showMessage(`切换 JSON 范围失败：${error?.message || error}`, "error");
+    }
+  }
+
+  function syncFormatSelectFromSettings() {
+    const value = host.getEditorSettings()?.sceneJson?.codeViewFormat || "auto";
+    if (codeEditorFormatSelect) {
+      codeEditorFormatSelect.value = value;
+    }
+    syncCodeEditorToolbarUi();
+  }
+
+  function handleCodeFormatChanged() {
+    const value = codeEditorFormatSelect?.value || "auto";
+    persistSceneJsonSetting("codeViewFormat", value);
+    syncCodeEditorToolbarUi();
+    if (!isCodeEditMode()) {
+      return;
+    }
+    try {
+      const targetFormat = resolveCodeViewFormat();
+      rewriteCurrentEditorPayload(codeJsonScope, targetFormat);
+    } catch (error) {
+      host.showMessage(`JSON 格式转换失败：${error?.message || error}`, "warning");
+    }
+  }
+
+  function handleFormatWritebackChanged() {
+    persistSceneJsonSetting("codeViewFormatWriteback", Boolean(codeEditorFormatWritebackCheckbox?.checked));
+  }
+
+  function formatCurrentCodeJson() {
+    try {
+      rewriteCurrentEditorPayload(codeJsonScope, resolveCodeViewFormat());
+      host.showMessage("JSON 已格式化。", "success");
+    } catch (error) {
+      host.showMessage(`JSON 格式化失败：${error?.message || error}`, "error");
+    }
+  }
+
   function initPipDrag() {
     if (!pipControlBar || !canvasWrap || !stageShell) {
       return;
@@ -762,7 +971,7 @@ export function createCodeEditorMode(host) {
     let stageH = 0;
 
     pipControlBar.addEventListener("pointerdown", (event) => {
-      if (!isCodeEditMode() || event.button !== 0) {
+      if (!isCodeEditMode() || isAllEditMode() || event.button !== 0) {
         return;
       }
       if (event.target?.closest?.("button, input, label")) {
@@ -908,7 +1117,7 @@ export function createCodeEditorMode(host) {
 
     handles.forEach((handle) => {
       handle.addEventListener("pointerdown", (event) => {
-        if (!isCodeEditMode() || event.button !== 0) {
+        if (!isCodeEditMode() || isAllEditMode() || event.button !== 0) {
           return;
         }
         const pipRect = canvasWrap.getBoundingClientRect();
@@ -940,6 +1149,9 @@ export function createCodeEditorMode(host) {
 
   function init() {
     editModeSeg3d?.addEventListener("click", () => enterThreeMode());
+    editModeSegAll?.addEventListener("click", () => {
+      void enterAllMode();
+    });
     editModeSegCode?.addEventListener("click", () => {
       void enterCodeMode();
     });
@@ -968,8 +1180,26 @@ export function createCodeEditorMode(host) {
         cancelAutoRenderTimer();
       }
     });
+    codeJsonScopeCoreBtn?.addEventListener("click", () => {
+      void switchCodeJsonScope("core");
+    });
+    codeJsonScopeFullBtn?.addEventListener("click", () => {
+      void switchCodeJsonScope("full");
+    });
+    codeEditorFormatSelect?.addEventListener("change", handleCodeFormatChanged);
+    codeEditorFormatWritebackCheckbox?.addEventListener("change", handleFormatWritebackChanged);
+    codeEditorFormatBtn?.addEventListener("click", formatCurrentCodeJson);
+    codeEditorCanvasToggleBtn?.addEventListener("click", () => {
+      if (isAllEditMode()) {
+        void enterCodeMode();
+      } else {
+        void enterAllMode();
+      }
+    });
     initPipDrag();
     initPipResize();
+    syncCodeModeCheckboxesFromSettings();
+    syncFormatSelectFromSettings();
     syncEditModeToggleUi();
   }
 
@@ -978,6 +1208,7 @@ export function createCodeEditorMode(host) {
     isCodeEditMode,
     toggleEditMode,
     enterCodeMode,
+    enterAllMode,
     enterThreeMode,
     refreshFromScene,
     renderJsonToCanvas,

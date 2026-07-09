@@ -77,6 +77,7 @@ import { createEditorDomainDrillIn } from "./editorDomainDrillIn.js";
 import { createEditorMeshExportModal } from "./editorMeshExportModal.js";
 import { createEditorExportDownload } from "./editorExportDownload.js";
 import { createEditorTjzExportModal } from "./editorTjzExportModal.js";
+import { createEditorTemplateExportModal } from "./editorTemplateExportModal.js";
 import { createEditorCapture } from "./editorCapture.js";
 import { createSceneTreeContextMenu } from "./sceneTreeContextMenu.js";
 import { exportNativeSceneJson } from "./editorNativeJsonExport.js";
@@ -258,6 +259,7 @@ export async function bootstrapSceneHostEditor() {
   let editorMeshExportModal = null;
   let editorExportDownload = null;
   let editorTjzExportModal = null;
+  let editorTemplateExportModal = null;
   let editorCapture = null;
   let editorHelpAndSceneJson = null;
   let editorViewChrome = null;
@@ -529,10 +531,18 @@ export async function bootstrapSceneHostEditor() {
     const subSceneLayout = extra.subSceneLayout ?? editorSettings?.sceneJson?.subSceneLayout ?? "nested";
     const subSceneNormalizePolicy =
       extra.subSceneNormalizePolicy ?? editorSettings?.sceneJson?.subSceneNormalizePolicy ?? "warn";
+    const committedFormat =
+      editorSettings?.sceneJson?.codeViewFormatWriteback &&
+      (editorSettings?.sceneJson?.codeViewFormat === "friendly" ||
+        editorSettings?.sceneJson?.codeViewFormat === "standard")
+        ? editorSettings.sceneJson.codeViewFormat
+        : undefined;
+    const format = extra.format ?? committedFormat;
     return {
       basePayload,
       shouldSkipObject: (obj) => sceneTree?.isRuntimeOnlyObject?.(obj) ?? false,
       merge: extra.merge !== false,
+      ...(format ? { format } : {}),
       subSceneLayout,
       subSceneNormalizePolicy,
       ...extra,
@@ -1933,6 +1943,7 @@ export async function bootstrapSceneHostEditor() {
   editorMeshExportModal = createEditorMeshExportModal(host);
   editorExportDownload = createEditorExportDownload(host);
   editorTjzExportModal = createEditorTjzExportModal(host);
+  editorTemplateExportModal = createEditorTemplateExportModal(host);
   editorCapture = createEditorCapture(host);
   editorHelpAndSceneJson = createEditorHelpAndSceneJson(host);
   editorViewChrome = createEditorViewChrome(host);
@@ -1950,6 +1961,7 @@ export async function bootstrapSceneHostEditor() {
   editorDomainDrillIn.init();
   editorMeshExportModal.init();
   editorTjzExportModal.init();
+  editorTemplateExportModal.init();
   editorCapture.init();
   editorHelpAndSceneJson.init();
   editorViewChrome.init();
