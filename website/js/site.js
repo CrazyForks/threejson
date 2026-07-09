@@ -458,7 +458,9 @@ function enqueueThumbnail(card) {
 
 function applyThumbnail(card, dataUrl) {
   const img = card.querySelector(".exampleThumb img");
-  if (img) img.src = dataUrl;
+  if (!img) return;
+  img.src = dataUrl;
+  img.classList.add("captured");
 }
 
 async function runThumbQueue() {
