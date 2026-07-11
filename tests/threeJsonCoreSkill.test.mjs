@@ -29,6 +29,9 @@ test("generation system prompt covers core ThreeJSON capabilities", () => {
   assert.match(prompt, /device\.cabinet/);
   assert.match(prompt, /createStatBars/);
   assert.match(prompt, /Do NOT put plain objType "box" records in domainModelList/);
+  assert.match(prompt, /simplest faithful/);
+  assert.match(prompt, /not a checklist/);
+  assert.match(prompt, /Never add decorative lineList, particleEmitter/);
   assert.match(prompt, /sceneConfig/);
   assert.match(THREE_JSON_LIST_PLACEMENT, /nativeThree/);
   assert.match(THREE_JSON_PRIMITIVE_GEOMETRY, /radiusTop/);
@@ -41,6 +44,8 @@ test("outline system prompt includes capability catalog", () => {
   const prompt = buildSceneOutlineSystemPrompt();
   assert.match(prompt, /Do NOT output JSON/);
   assert.match(prompt, /particleList/);
+  assert.match(prompt, /plan only the capabilities needed/);
+  assert.match(prompt, /Why any non-basic capability is necessary/);
 });
 
 test("buildIntentHints maps solar system prompt to sphere capability", () => {

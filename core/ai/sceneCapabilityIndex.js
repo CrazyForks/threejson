@@ -6,7 +6,14 @@
  */
 
 const THREE_JSON_AGENT_CAPABILITY_INDEX = `
-ThreeJSON capability index (choose the most specific supported feature, not only boxes):
+ThreeJSON capability index (choose the simplest faithful feature; this is not a checklist):
+
+Selection principle:
+- Prefer basic primitives and semantic presets when they fully satisfy the user's scene.
+- Use advanced/native/domain/effect features only when the user explicitly asks for them or the scene clearly needs them.
+- Do not add lineList, particleEmitter, shaderSurface, native geometry, domain records, audio, or lifecycle scripts just to demonstrate capability.
+- lineList is for visible paths/routes/cables/boundaries/outlines; particleEmitter is for particles, rain, snow, dust, sparks, starfields, or similar atmospheric effects.
+- If a requested edit targets size/color/position of an existing object, preserve unrelated dimensions and materials unless the user asks to change them.
 
 Authoring shapes:
 - Friendly JSON: sceneConfig + worldInfo lists; best for hand-authored and AI scenes.
@@ -17,7 +24,7 @@ Geometry and composition:
 - Basic primitives: box/floor/wall/glass/door/cabinet/road, sphere, cylinder, cone, torus, ring, capsule, plane.
 - Complex geometry: shapePlane, shapeExtrude, irregularPlane, irregularGeometry, bufferMesh, CSG joins/inters/holes.
 - Native Three.js inference: objType native, geometry.type (TorusKnotGeometry, LatheGeometry, DodecahedronGeometry, etc.), parseMode auto|native, geometryRef/materialRef via assetLibrary.
-- Reuse and scale: groupList/subScene for assemblies, instancedList for repeated props, lineList for paths/boundaries, tubeList for pipes/splines, spriteList for billboards.
+- Reuse and scale: groupList/subScene for assemblies, instancedList for repeated props, lineList only for visible paths/boundaries, tubeList for pipes/splines, spriteList for billboards.
 
 Materials, assets, and rendering:
 - Materials support standard/phong/lambert/basic/physical-like fields, textureUrl/map, normal/roughness/metalness/emissive/alpha maps, repeat/offset/rotation/wrap/filter/anisotropy.
@@ -26,7 +33,7 @@ Materials, assets, and rendering:
 - sceneConfig supports scene background/environment/fog, perspective or orthographic camera, orbit/firstPerson/fly controls, lights, helpers, renderLoop, passList/post-processing, intro.postLoad.
 
 Effects and media:
-- shaderSurface for custom/preset shader surfaces; particleEmitter for CPU/GPU particles; particleList/points only for legacy point clouds.
+- shaderSurface for requested custom/preset shader surfaces; particleEmitter for CPU/GPU particles when an effect/weather/particle field is actually needed; particleList/points only for legacy point clouds.
 - windList, heatList, weather domains, nature.sky, nature.water, sprites, tubes.
 - audioList supports ambient or positional audio attached to scene/camera/object; use audioUrl and sensible playback policy fields.
 - externalModelList/objModelList load GLTF/GLB/OBJ-style assets; animationMode mixer and animationGraph support clip state machines.
