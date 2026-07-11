@@ -191,7 +191,7 @@ async function main() {
       });
       sidebar.touchActiveConversation(text);
     } catch (error) {
-      console.error("[three-box] generate turn failed:", error);
+      console.error("[threebox] generate turn failed:", error);
       streaming.remove();
       api.updateAssistantMessage(textEl, t("threebox.app.generateFailed", "生成失败：{error}", { error: error?.message || error }));
     }
@@ -211,7 +211,7 @@ async function main() {
     try {
       targetSceneJsonString = await resolveSceneJsonStringForTurn(targetTurn, conversationId);
     } catch (error) {
-      console.error("[three-box] failed to resolve target scene JSON:", error);
+      console.error("[threebox] failed to resolve target scene JSON:", error);
       return handleGenerateTurn(text, api, { conversationId, turnId });
     }
     const targetSceneJson = JSON.parse(targetSceneJsonString);
@@ -305,7 +305,7 @@ async function main() {
       });
       sidebar.touchActiveConversation(text);
     } catch (error) {
-      console.error("[three-box] adjust turn failed:", error);
+      console.error("[threebox] adjust turn failed:", error);
       streaming.remove();
       api.updateAssistantMessage(textEl, t("threebox.app.adjustFailed", "调整失败：{error}", { error: error?.message || error }));
     }
@@ -363,7 +363,7 @@ async function main() {
       // attached template/upload throwing inside sceneCard.render()) must still surface to the
       // user instead of vanishing — an unhandled rejection here would otherwise leave the chat
       // looking like it did nothing at all after Send was clicked.
-      console.error("[three-box] handleUserMessage failed:", error);
+      console.error("[threebox] handleUserMessage failed:", error);
       api.appendAssistantMessage(t("threebox.app.processingFailed", "处理失败：{error}", { error: error?.message || error }));
     }
   }
@@ -386,7 +386,7 @@ async function main() {
     try {
       seed = await consumeAttachedContextAsSeedTurn(api);
     } catch (error) {
-      console.error("[three-box] consumeAttachedContextAsSeedTurn failed:", error);
+      console.error("[threebox] consumeAttachedContextAsSeedTurn failed:", error);
       api.appendAssistantMessage(
         t("threebox.app.loadAttachedFailed", "加载已附加的场景失败：{error}", { error: error?.message || error })
       );
@@ -451,7 +451,7 @@ async function main() {
         // threeBoxOrchestrator.js's resolveTurnSceneJsonString).
         sceneJsonString = await resolveSceneJsonStringForTurn(turn, conversationId);
       } catch (error) {
-        console.error("[three-box] failed to reconstruct turn scene JSON:", turn.id, error);
+        console.error("[threebox] failed to reconstruct turn scene JSON:", turn.id, error);
         chatPanel.updateAssistantMessage(
           textEl,
           t("threebox.app.replayFailed", "该轮场景重放失败：{error}", { error: error?.message || error })

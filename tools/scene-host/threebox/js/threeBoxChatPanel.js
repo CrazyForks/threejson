@@ -265,7 +265,7 @@ export function createThreeBoxChatPanel(host = {}) {
         // Top-level safety net: onUserMessage is expected to handle its own errors, but an
         // uncaught rejection here must still surface something in the chat rather than leaving
         // the UI looking like Send did nothing at all.
-        console.error("[three-box] onUserMessage failed:", error);
+        console.error("[threebox] onUserMessage failed:", error);
         appendMessage(
           "assistant",
           t("threebox.app.processingFailed", "处理失败：{error}", { error: error?.message || error })

@@ -16,7 +16,7 @@ import {
 import { sceneHostAssetUrl } from "../../shared/js/sceneHostPaths.js";
 
 /**
- * Resolves a saved provider config (tools/scene-host/three-box/js/threeBoxSettingsSchema.js's
+ * Resolves a saved provider config (tools/scene-host/threebox/js/threeBoxSettingsSchema.js's
  * `ai.providers[]`) into the transport options `requestChatCompletion` (core/ai/sceneAiService.js)
  * expects: { provider, apiKey, model, baseUrl }.
  * @param {object} settings ThreeBox settings bundle

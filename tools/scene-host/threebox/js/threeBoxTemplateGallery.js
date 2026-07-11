@@ -147,7 +147,7 @@ async function runThumbQueue() {
         }
       }
     } catch (error) {
-      console.warn("[three-box template gallery] thumbnail capture failed:", task.jsonUrl, error);
+      console.warn("[threebox template gallery] thumbnail capture failed:", task.jsonUrl, error);
     }
   }
   thumbQueueRunning = false;
@@ -246,7 +246,7 @@ export function createThreeBoxTemplateGallery(host = {}) {
         );
       }
     } catch (error) {
-      console.warn("[three-box template gallery] open failed:", error);
+      console.warn("[threebox template gallery] open failed:", error);
       showToast(t("threebox.gallery.loadFailed", "模板加载失败，请稍后重试。"), "warning");
     }
   }
@@ -283,7 +283,7 @@ export function createThreeBoxTemplateGallery(host = {}) {
     try {
       items = await loadManifest();
     } catch (error) {
-      console.warn("[three-box template gallery] manifest load failed:", error);
+      console.warn("[threebox template gallery] manifest load failed:", error);
       items = [];
     }
     renderCards("");

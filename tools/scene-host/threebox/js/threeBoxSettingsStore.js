@@ -76,7 +76,7 @@ export function saveThreeBoxSettingsCache(settings) {
   try {
     localStorage.setItem(THREEBOX_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
   } catch (error) {
-    console.warn("[three-box settings] save cache failed:", error);
+    console.warn("[threebox settings] save cache failed:", error);
   }
 }
 

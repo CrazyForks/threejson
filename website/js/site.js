@@ -811,7 +811,7 @@ function openPlayerTool(event) {
 
 function openThreeBoxTool(event) {
   event.preventDefault();
-  window.open(new URL("../../tools/scene-host/three-box/index.html", import.meta.url), "_blank", "noreferrer");
+  window.open(new URL("../../tools/scene-host/threebox/index.html", import.meta.url), "_blank", "noreferrer");
 }
 
 async function downloadSceneJsons(event) {
