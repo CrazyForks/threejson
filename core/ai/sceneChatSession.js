@@ -139,7 +139,7 @@ function buildSummarizeTurnSystemPrompt() {
   ].join("\n");
 }
 
-function buildSummarizeTurnUserMessage({ userPrompt, mode, targetTurnId, turnId, resultDigest }) {
+function buildSummarizeTurnUserMessage({ userPrompt, mode, targetTurnId, turnId, resultDigest, responseLanguage }) {
   const lines = [
     `Turn id: ${turnId || "(unknown)"}`,
     `Mode: ${mode === "adjust" ? "adjustment" : "new generation"}`
@@ -149,6 +149,9 @@ function buildSummarizeTurnUserMessage({ userPrompt, mode, targetTurnId, turnId,
   }
   lines.push(`User request:\n${String(userPrompt || "").trim()}`);
   lines.push(`Result digest (for your reference, not to be echoed verbatim):\n${String(resultDigest || "").trim() || "(none)"}`);
+  if (responseLanguage) {
+    lines.push(`Write the recap in ${responseLanguage}, regardless of what language the user request above is in.`);
+  }
   return lines.join("\n\n");
 }
 
@@ -157,7 +160,11 @@ function buildSummarizeTurnUserMessage({ userPrompt, mode, targetTurnId, turnId,
  * Deliberately never sends/receives full scene JSON (token cost) — callers should pass a compact
  * `resultDigest` string (e.g. object-type/count summary) instead of the raw scene payload.
  *
- * @param {{ userPrompt: string, mode: "generate"|"adjust", targetTurnId?: string|null, turnId: string, resultDigest?: string }} input
+ * @param {{ userPrompt: string, mode: "generate"|"adjust", targetTurnId?: string|null, turnId: string, resultDigest?: string, responseLanguage?: string }} input
+ *   `responseLanguage` is an optional human-readable language name (e.g. "Simplified Chinese",
+ *   "English") — when provided, the recap is written in that language regardless of the user
+ *   request's own language, so a chat host can keep summaries consistent with its current UI
+ *   locale setting rather than whatever language the user happened to type in.
  * @param {object} [options] requestChatCompletion transport options
  * @returns {Promise<string>} plain-text summary; empty string on failure (caller may still cache the turn without a summary)
  */
@@ -192,7 +199,8 @@ async function summarizeSceneTurn(input = {}, options = {}) {
  *   intent: "generate"|"adjust",
  *   targetTurnId?: string|null,
  *   contextPayload?: object|null,
- *   adjustOutputMode?: "commands"|"json-incremental"|"json-full"|null
+ *   adjustOutputMode?: "commands"|"json-incremental"|"json-full"|null,
+ *   globalPromptPrefix?: string|null
  * }} input
  * @returns {string}
  */
@@ -201,6 +209,10 @@ function buildStructuredTurnEnvelope(input = {}) {
     intent: input?.intent === "adjust" ? "adjust" : "generate",
     userRequest: String(input?.userPrompt || "").trim()
   };
+  const globalInstructions = typeof input?.globalPromptPrefix === "string" ? input.globalPromptPrefix.trim() : "";
+  if (globalInstructions) {
+    envelope.globalInstructions = globalInstructions;
+  }
   if (envelope.intent === "adjust") {
     envelope.targetTurnId = typeof input?.targetTurnId === "string" ? input.targetTurnId : null;
     if (input?.adjustOutputMode) {

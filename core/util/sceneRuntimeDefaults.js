@@ -216,6 +216,13 @@ function accumulateItemsBounds(items, bounds, filter) {
       const group = subGroup[j];
       next = accumulateItemsBounds(listOr(group?.boxModelList), next, filter);
     }
+    // Standard-format records (payload.objectList) nest children under `subScene` instead of
+    // `boxModelList`/`subGroup` — recurse into it too so extent estimation works the same way
+    // for both formats.
+    const subScene = listOr(item?.subScene);
+    if (subScene.length > 0) {
+      next = accumulateItemsBounds(subScene, next, filter);
+    }
   }
   return next;
 }
@@ -228,20 +235,29 @@ function accumulateItemsBounds(items, bounds, filter) {
  */
 function estimateSceneExtentFromPayload(payload, options = {}) {
   const wi = payload?.worldInfo;
-  if (!wi || typeof wi !== "object") {
-    return null;
-  }
   const filter = options.extentInclude;
-  const listNames = listOr(filter?.listNames);
-  const scanLists =
-    listNames.length > 0
-      ? listNames.filter((name) => hasOwn(wi, name))
-      : DEFAULT_EXTENT_LIST_NAMES;
-
   let raw = null;
-  for (let i = 0; i < scanLists.length; i += 1) {
-    const listName = scanLists[i];
-    raw = accumulateItemsBounds(listOr(wi[listName]), raw, filter);
+
+  if (wi && typeof wi === "object") {
+    const listNames = listOr(filter?.listNames);
+    const scanLists =
+      listNames.length > 0
+        ? listNames.filter((name) => hasOwn(wi, name))
+        : DEFAULT_EXTENT_LIST_NAMES;
+    for (let i = 0; i < scanLists.length; i += 1) {
+      const listName = scanLists[i];
+      raw = accumulateItemsBounds(listOr(wi[listName]), raw, filter);
+    }
+  }
+
+  // Standard-format payloads (e.g. sceneToStandardJsonSimple's output — used when re-exporting a
+  // scene after AI command/patch adjustments) put objects in a flat `objectList` array instead of
+  // `worldInfo.<kind>List`. Without this fallback, auto-fit-camera silently no-ops for any such
+  // payload (estimateSceneExtentFromPayload always returned null), leaving the camera at whatever
+  // raw position the export carried rather than framed to the actual content — which made
+  // AI-adjusted scenes render with a wrong/tiny framing compared to the original generation.
+  if ((!raw || !Number.isFinite(raw.minX)) && Array.isArray(payload?.objectList)) {
+    raw = accumulateItemsBounds(payload.objectList, raw, filter);
   }
 
   if (!raw || !Number.isFinite(raw.minX)) {

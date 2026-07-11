@@ -1,4 +1,6 @@
 import { renderMarkdownToSafeHtml } from "./threeBoxMarkdown.js";
+import { showToast } from "./threeBoxUiFeedback.js";
+import { t } from "../../shared/i18n/index.js";
 
 /**
  * @param {{ onUserMessage?: (text: string, api: { appendAssistantMessage: (t: string) => HTMLElement, updateAssistantMessage: (el: HTMLElement, t: string) => void }) => Promise<void>|void }} [host]
@@ -114,29 +116,118 @@ export function createThreeBoxChatPanel(host = {}) {
    * renderer). Click toggles between the compact scroll view and a taller expanded view. */
   function createStreamingBlock() {
     const el = document.createElement("pre");
-    el.className = "streamingPreview";
+    el.className = "streamingPreview streamingPreviewPending";
+    // Show something immediately: with a slow model the first delta can take several seconds to
+    // arrive, and an empty block during that wait reads as "nothing happened" after Send.
+    el.textContent = t("threebox.chat.generating", "正在生成…");
     el.addEventListener("click", () => el.classList.toggle("expanded"));
     function update(text) {
+      el.classList.remove("streamingPreviewPending");
       el.textContent = text;
       el.scrollTop = el.scrollHeight;
     }
     return { el, update, remove: () => el.remove() };
   }
 
+  const COPY_ICON =
+    '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.5" y="5.5" width="8" height="8" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.2"/><path fill="none" stroke="currentColor" stroke-width="1.2" d="M3.5 10.5v-6a1 1 0 0 1 1-1h6"/></svg>';
+  const CHECK_ICON =
+    '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M3.5 8.5 6.5 11.5 12.5 4.5"/></svg>';
+
+  /** Wires a copy-to-clipboard button: click copies `getText()`'s current value, briefly swaps
+   * the icon to a checkmark as feedback, then reverts. */
+  function wireCopyButton(btn, getText) {
+    let revertTimer = null;
+    btn.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      try {
+        await navigator.clipboard.writeText(getText());
+      } catch (_error) {
+        showToast(t("threebox.chat.copyFailed", "复制失败，请手动选择文本复制。"), "warning");
+        return;
+      }
+      btn.innerHTML = CHECK_ICON;
+      btn.classList.add("copied");
+      clearTimeout(revertTimer);
+      revertTimer = setTimeout(() => {
+        btn.innerHTML = COPY_ICON;
+        btn.classList.remove("copied");
+      }, 1400);
+    });
+  }
+
+  /** Builds a `<summary>` containing a label span + a copy button — the button must be a
+   * descendant of `<summary>` itself (not a sibling) for native `<details>` toggle behavior to
+   * keep working; wireCopyButton's preventDefault/stopPropagation on the button keeps clicking it
+   * from also toggling the details open/closed. */
+  function buildCollapseSummary(labelText, copyTitle, getText) {
+    const summary = document.createElement("summary");
+    const label = document.createElement("span");
+    label.className = "jsonCollapseSummaryText";
+    label.textContent = labelText;
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "jsonCollapseCopyBtn";
+    copyBtn.title = copyTitle;
+    copyBtn.innerHTML = COPY_ICON;
+    wireCopyButton(copyBtn, getText);
+    summary.appendChild(label);
+    summary.appendChild(copyBtn);
+    return summary;
+  }
+
   /** Collapsed-by-default <details> block holding the final generated JSON (kept out of the
-   * markdown-rendered recap text since it can be very long). */
+   * markdown-rendered recap text since it can be very long), with a copy button in its header. */
   function buildJsonCollapse(jsonString) {
     const details = document.createElement("details");
     details.className = "jsonCollapse";
-    const summary = document.createElement("summary");
-    summary.textContent = "查看生成的 JSON";
+    details.appendChild(
+      buildCollapseSummary(
+        t("threebox.chat.viewGeneratedJson", "查看生成的 JSON"),
+        t("threebox.chat.copyJson", "复制 JSON"),
+        () => jsonString
+      )
+    );
     const pre = document.createElement("pre");
     const code = document.createElement("code");
     code.textContent = jsonString;
     pre.appendChild(code);
-    details.appendChild(summary);
     details.appendChild(pre);
     return details;
+  }
+
+  /** Collapsed-by-default <details> block showing the AI's raw adjustment output — operation
+   * commands or an RFC-6902-style JSON Patch — placed above the final-JSON collapse so the user
+   * can see what the model actually changed, not just the merged result.
+   * @param {"commands"|"patch"} kind
+   */
+  function buildDiffCollapse(kind, text) {
+    const details = document.createElement("details");
+    details.className = "jsonCollapse diffCollapse";
+    const label =
+      kind === "patch"
+        ? t("threebox.chat.viewAdjustPatch", "查看调整的 JSON Patch")
+        : t("threebox.chat.viewAdjustCommands", "查看调整命令");
+    const copyTitle =
+      kind === "patch" ? t("threebox.chat.copyAdjustPatch", "复制 JSON Patch") : t("threebox.chat.copyAdjustCommands", "复制调整命令");
+    details.appendChild(buildCollapseSummary(label, copyTitle, () => text));
+    const pre = document.createElement("pre");
+    const code = document.createElement("code");
+    code.textContent = text;
+    pre.appendChild(code);
+    details.appendChild(pre);
+    return details;
+  }
+
+  /** Markdown-rendered summary text block, appended below the scene card (per the "场景生成后输出
+   * 简短总结" setting) rather than as the message's primary text — keeps the summary visually
+   * scoped to "what this turn's result is" instead of reading as the whole reply. */
+  function buildSummaryBlock(text) {
+    const el = document.createElement("div");
+    el.className = "sceneSummaryText markdown-body";
+    el.innerHTML = renderMarkdownToSafeHtml(text);
+    return el;
   }
 
   function clear() {
@@ -160,23 +251,36 @@ export function createThreeBoxChatPanel(host = {}) {
     }
 
     if (host.onUserMessage) {
-      await host.onUserMessage(text, {
-        appendAssistantMessage: (t) => appendMessage("assistant", t),
-        updateAssistantMessage,
-        appendToBody,
-        createStreamingBlock,
-        buildJsonCollapse
-      });
+      try {
+        await host.onUserMessage(text, {
+          appendAssistantMessage: (t) => appendMessage("assistant", t),
+          updateAssistantMessage,
+          appendToBody,
+          createStreamingBlock,
+          buildJsonCollapse,
+          buildDiffCollapse,
+          buildSummaryBlock
+        });
+      } catch (error) {
+        // Top-level safety net: onUserMessage is expected to handle its own errors, but an
+        // uncaught rejection here must still surface something in the chat rather than leaving
+        // the UI looking like Send did nothing at all.
+        console.error("[three-box] onUserMessage failed:", error);
+        appendMessage(
+          "assistant",
+          t("threebox.app.processingFailed", "处理失败：{error}", { error: error?.message || error })
+        );
+      }
       return;
     }
 
     // No generation wiring yet (next milestone) — a canned reply exercises the markdown /
     // code-block rendering pipeline end to end so it can be verified now.
     const demoReply = [
-      "这是一个演示回复，用于验证 Markdown 渲染管线（真正的 AI 对话生成将在下一个里程碑接入）。",
+      t("threebox.chat.demoReply", "这是一个演示回复，用于验证 Markdown 渲染管线（真正的 AI 对话生成将在下一个里程碑接入）。"),
       "",
       "```json",
-      JSON.stringify({ threeJsonId: "demo", note: "占位 JSON 代码块" }, null, 2),
+      JSON.stringify({ threeJsonId: "demo", note: t("threebox.chat.demoJsonNote", "占位 JSON 代码块") }, null, 2),
       "```"
     ].join("\n");
     appendMessage("assistant", demoReply);
@@ -208,6 +312,8 @@ export function createThreeBoxChatPanel(host = {}) {
     appendToBody,
     createStreamingBlock,
     buildJsonCollapse,
+    buildDiffCollapse,
+    buildSummaryBlock,
     clear,
     showHeroView,
     showMessagesView

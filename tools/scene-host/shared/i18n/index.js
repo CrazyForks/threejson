@@ -5,6 +5,7 @@ import { EDITOR_SETTINGS_LABELS_EN } from "./editorSettingsLabels.en.js";
 import { EDITOR_SHELL_LABELS_EN } from "./editorShellLabels.en.js";
 import { PLAYER_SETTINGS_LABELS_EN } from "./playerSettingsLabels.en.js";
 import { PLAYER_SHELL_LABELS_EN } from "./playerShellLabels.en.js";
+import { THREEBOX_SHELL_LABELS_EN } from "./threeboxShellLabels.en.js";
 import { applyShellI18n } from "./applyShellI18n.js";
 
 export { applyShellI18n };
@@ -63,7 +64,8 @@ export async function loadHostLocaleCatalog(locale) {
       ...EDITOR_SETTINGS_LABELS_EN,
       ...EDITOR_SHELL_LABELS_EN,
       ...PLAYER_SETTINGS_LABELS_EN,
-      ...PLAYER_SHELL_LABELS_EN
+      ...PLAYER_SHELL_LABELS_EN,
+      ...THREEBOX_SHELL_LABELS_EN
     };
     currentLocale = loc;
     return catalog;
@@ -72,13 +74,14 @@ export async function loadHostLocaleCatalog(locale) {
     const res = await fetch(new URL(`./locales/${name}`, import.meta.url));
     return res.ok ? res.json() : {};
   }
-  const [settings, editorShell, playerSettings, playerShell] = await Promise.all([
+  const [settings, editorShell, playerSettings, playerShell, threeboxShell] = await Promise.all([
     fetchJson(`${loc}.json`),
     fetchJson(`editor-shell.${loc}.json`),
     fetchJson(`player-settings.${loc}.json`),
-    fetchJson(`player-shell.${loc}.json`)
+    fetchJson(`player-shell.${loc}.json`),
+    fetchJson(`threebox-shell.${loc}.json`)
   ]);
-  catalog = { ...settings, ...editorShell, ...playerSettings, ...playerShell };
+  catalog = { ...settings, ...editorShell, ...playerSettings, ...playerShell, ...threeboxShell };
   currentLocale = loc;
   return catalog;
 }

@@ -94,17 +94,37 @@ button { font: inherit; }
 .chatMessageAssistant .chatMessageText { font-size: 14.5px; line-height: 1.65; color: var(--text); }
 
 /* ---- Inline scene card (AI-generated scene rendered at the end of a reply) ---- */
-.sceneCard {
+.sceneCard { width: 100%; margin-top: 12px; }
+.sceneCardCanvasWrap {
   position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 420px;
-  border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
-  background: var(--canvas-bg); margin-top: 12px;
+  border: 1px solid var(--line); border-radius: 14px 14px 0 0; overflow: hidden;
+  background: var(--canvas-bg);
 }
+.sceneCardCanvasWrap:fullscreen { max-height: none; border-radius: 0; aspect-ratio: auto; }
 .sceneCardCanvas { display: block; width: 100%; height: 100%; }
 .sceneCardLoadingMask {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   background: rgba(0, 0, 0, 0.45); color: var(--muted); font-size: 13px;
 }
 .sceneCardLoadingMask[hidden] { display: none; }
+
+/* ---- Scene card action bar (download / export / open-in-editor / open-in-player / refresh / fullscreen) ---- */
+.sceneCardActionBar {
+  display: flex; align-items: center; gap: 4px; padding: 6px 8px;
+  border: 1px solid var(--line); border-top: none; border-radius: 0 0 14px 14px;
+  background: var(--panel2);
+}
+.sceneCardActionBtn {
+  flex: 0 0 auto; width: 28px; height: 28px; border-radius: 8px; border: none;
+  background: transparent; color: var(--muted); font-size: 14px; line-height: 1;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.sceneCardActionBtn:hover { background: var(--button-hover); color: var(--text); }
+.sceneCardActionBtn:disabled { opacity: 0.5; cursor: default; background: transparent; }
+
+/* ---- Post-generation summary (shown below the scene card when enabled in settings) ---- */
+.sceneSummaryText { margin-top: 10px; font-size: 13.5px; line-height: 1.6; color: var(--muted); }
 
 /* ---- Streaming raw-JSON preview (scroll-collapsed until generation finishes) ---- */
 .streamingPreview {
@@ -116,16 +136,30 @@ button { font: inherit; }
 .streamingPreview.expanded { max-height: 360px; }
 .streamingPreview::-webkit-scrollbar { width: 6px; }
 .streamingPreview::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 999px; }
+.streamingPreviewPending { color: var(--muted); font-style: italic; font-family: inherit; }
 
 /* ---- Collapsible final-JSON block ---- */
 .jsonCollapse { margin: 4px 0 10px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #17171a; }
-.jsonCollapse summary { padding: 9px 12px; font-size: 12.5px; color: var(--muted); cursor: pointer; list-style: none; user-select: none; }
+.jsonCollapse summary {
+  display: flex; align-items: center; gap: 8px; padding: 9px 8px 9px 12px;
+  font-size: 12.5px; color: var(--muted); cursor: pointer; list-style: none; user-select: none;
+}
 .jsonCollapse summary:hover { color: var(--text); }
 .jsonCollapse summary::-webkit-details-marker { display: none; }
 .jsonCollapse summary::before { content: "▸ "; }
 .jsonCollapse[open] summary::before { content: "▾ "; }
+.jsonCollapseSummaryText { flex: 1; min-width: 0; }
+.jsonCollapseCopyBtn {
+  flex: 0 0 auto; width: 24px; height: 24px; border: none; background: transparent; color: var(--muted);
+  cursor: pointer; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.jsonCollapseCopyBtn svg { width: 14px; height: 14px; }
+.jsonCollapseCopyBtn:hover { background: var(--button-hover); color: var(--text); }
+.jsonCollapseCopyBtn.copied { color: #6bd987; }
 .jsonCollapse pre { margin: 0; padding: 0 12px 12px; overflow-x: auto; max-height: 400px; overflow-y: auto; }
 .jsonCollapse code { font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace; font-size: 12px; line-height: 1.55; color: #d7dae0; }
+.diffCollapse { background: #14181f; }
 
 .chatMessageText.markdown-body p { margin: 0 0 10px; }
 .chatMessageText.markdown-body p:last-child { margin-bottom: 0; }
@@ -204,7 +238,9 @@ button { font: inherit; }
 }
 .attachedContextHeaderBtn:hover { background: var(--button-hover); color: var(--text); }
 .attachedContextCanvasWrap { position: relative; height: 140px; background: var(--canvas-bg); }
-.attachedContextCanvasWrap .sceneCard { width: 100%; height: 140px; aspect-ratio: auto; max-height: none; margin-top: 0; border: none; border-radius: 0; }
+.attachedContextCanvasWrap .sceneCard { width: 100%; height: 140px; margin-top: 0; }
+.attachedContextCanvasWrap .sceneCardCanvasWrap { width: 100%; height: 140px; aspect-ratio: auto; max-height: none; border: none; border-radius: 0; }
+.attachedContextCanvasWrap .sceneCardActionBar { display: none; }
 
 .attachedContextChip {
   display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px 3px 4px; margin-bottom: 8px;
@@ -346,6 +382,34 @@ details[open] > .sidebarSectionTitle::before { transform: rotate(90deg); }
 .templateCardThumb { width: 100%; aspect-ratio: 8 / 5; background: var(--canvas-bg); object-fit: cover; display: block; }
 .templateCardLabel { padding: 7px 8px; font-size: 12px; color: var(--text); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* ---- Resource library (composer-uploaded files) ---- */
+.resourceCategoryTabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.resourceCategoryTab {
+  padding: 4px 9px; border: 1px solid var(--line); border-radius: 999px; background: transparent;
+  color: var(--muted); font-size: 11.5px; cursor: pointer; transition: background 0.12s ease, color 0.12s ease;
+}
+.resourceCategoryTab:hover { color: var(--text); }
+.resourceCategoryTab.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+.resourceList { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
+.resourceList::-webkit-scrollbar { width: 6px; }
+.resourceList::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 999px; }
+.resourceItem {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px;
+  cursor: default; color: var(--text);
+}
+.resourceItem.resourceItemLoadable { cursor: pointer; }
+.resourceItem.resourceItemLoadable:hover { background: var(--button-hover); }
+.resourceItemIcon { flex: 0 0 auto; width: 16px; height: 16px; color: var(--muted); }
+.resourceItemIcon svg { width: 100%; height: 100%; }
+.resourceItemInfo { flex: 1; min-width: 0; }
+.resourceItemName { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.resourceItemMeta { font-size: 10.5px; color: var(--muted); }
+.resourceItemRemoveBtn {
+  flex: 0 0 auto; width: 20px; height: 20px; border: none; background: transparent; color: var(--muted);
+  cursor: pointer; border-radius: 6px; font-size: 13px; line-height: 1;
+}
+.resourceItemRemoveBtn:hover { background: var(--button-hover); color: var(--text); }
+
 .projectList { display: flex; flex-direction: column; gap: 2px; }
 .projectItem { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 8px; font-size: 13.5px; color: var(--text); cursor: pointer; }
 .projectItem:hover { background: var(--button-hover); }
@@ -443,6 +507,13 @@ details[open] > .sidebarSectionTitle::before { transform: rotate(90deg); }
   background: var(--button); color: var(--text); font-size: 13px; min-width: 160px;
 }
 .settingsFieldControl input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--brand); cursor: pointer; }
+.settingsField:has(textarea) { flex-direction: column; align-items: stretch; gap: 6px; }
+.settingsField:has(textarea) .settingsFieldControl { flex: 1 1 auto; width: 100%; }
+.settingsFieldControl textarea {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--button); color: var(--text); font-size: 13px; font-family: inherit;
+  resize: vertical; box-sizing: border-box;
+}
 .settingsSectionHeading { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 4px 0 -4px; }
 
 .providerList { display: flex; flex-direction: column; gap: 10px; }
@@ -486,5 +557,35 @@ details[open] > .sidebarSectionTitle::before { transform: rotate(90deg); }
 .contextMenuSubList { display: flex; flex-direction: column; max-height: 140px; overflow: auto; }
 .contextMenuSubList .contextMenuEmptyHint { padding: 6px 10px; color: var(--muted); font-size: 11.5px; }
 
-.messageToast { position: fixed; left: 50%; bottom: 28px; z-index: 80; min-width: 220px; max-width: min(520px, calc(100vw - 32px)); padding: 10px 15px; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background: rgba(28,28,28,0.96); color: var(--text); box-shadow: 0 12px 30px rgba(0,0,0,0.32); opacity: 0; transform: translate(-50%, 12px); pointer-events: none; transition: opacity .18s ease, transform .18s ease; font-size: 13.5px; }
+.messageToast { position: fixed; left: 50%; top: 20px; z-index: 80; min-width: 220px; max-width: min(520px, calc(100vw - 32px)); padding: 10px 15px; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background: rgba(28,28,28,0.96); color: var(--text); box-shadow: 0 12px 30px rgba(0,0,0,0.32); opacity: 0; transform: translate(-50%, -12px); pointer-events: none; transition: opacity .18s ease, transform .18s ease; font-size: 13.5px; }
 .messageToast.visible { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---- Mobile menu button (top-left of the main chat column, opens the sidebar as an overlay) ---- */
+.mobileMenuBtn {
+  display: none; position: absolute; top: 12px; left: 12px; z-index: 40;
+  width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--panel2); color: var(--text); align-items: center; justify-content: center; cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
+}
+.mobileMenuBtn svg { width: 16px; height: 16px; }
+
+/* ---- Phone width: sidebar is always an overlay drawer (never pushes content), opened via
+   #mobileMenuBtn instead of edge-hover (no hover state on touch); pin/unpin is meaningless here
+   so the pin row is hidden and threeBoxViewChrome.js forces leftDockPinned=false on this
+   viewport regardless of the desktop-persisted preference. ---- */
+@media (max-width: 720px) {
+  .mobileMenuBtn { display: flex; }
+  #rootContainer.leftDockPinned .mainArea { margin-left: 0; }
+  .sidebarPinRow { display: none; }
+  .flyoutHostLeft { width: var(--peekStripWidth); }
+  #rootContainer.leftDockPinned .flyoutHostLeft,
+  #rootContainer.leftDockPeek .flyoutHostLeft { width: 100vw; }
+  .leftDock { width: min(86vw, 340px); transform: translateX(-100%); }
+  #rootContainer.leftDockPinned .leftDock { transform: translateX(-100%); }
+  #rootContainer.leftDockPeek .leftDock { transform: translateX(0); }
+  #rootContainer.leftDockPeek .flyoutHostLeft::after {
+    content: ""; position: absolute; inset: 0; left: min(86vw, 340px);
+    background: rgba(0, 0, 0, 0.4); pointer-events: none;
+  }
+  .composerHint { display: none; }
+}

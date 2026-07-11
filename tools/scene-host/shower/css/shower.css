@@ -228,3 +228,13 @@ button { font: inherit; }
   .workspace { grid-template-columns: 1fr; grid-template-rows: 48vh 1fr; }
   .leftPane { border-right: 0; border-bottom: 1px solid var(--line); }
 }
+
+/* ---- Phone width: scene view on top, code editor below (reverse of the 900px tablet stack) ---- */
+@media (max-width: 640px) {
+  .workspace { grid-template-rows: 46vh 1fr; }
+  .rightPane { order: -1; }
+  .leftPane { border-bottom: 0; border-top: 1px solid var(--line); }
+  .showerHeader { flex-wrap: wrap; height: auto; padding: 8px 12px; gap: 8px; }
+  .titleBlock { order: 3; width: 100%; }
+  .headerTools { flex-wrap: wrap; gap: 6px; }
+}

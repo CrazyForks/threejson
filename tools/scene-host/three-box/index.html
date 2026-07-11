@@ -67,6 +67,21 @@
             </button>
           </nav>
 
+          <details class="sidebarSection" id="resourceLibrarySection">
+            <summary class="sidebarSectionTitle" data-i18n="threebox.shell.resourceLibrary">资源库</summary>
+            <div class="sidebarSectionBody">
+              <div class="resourceCategoryTabs" id="resourceCategoryTabs">
+                <button type="button" class="resourceCategoryTab active" data-category="all" data-i18n="threebox.shell.resourceAll">全部</button>
+                <button type="button" class="resourceCategoryTab" data-category="json" data-i18n="threebox.shell.attachKindJson">ThreeJSON</button>
+                <button type="button" class="resourceCategoryTab" data-category="tjz" data-i18n="threebox.shell.attachKindTjz">.tjz</button>
+                <button type="button" class="resourceCategoryTab" data-category="model" data-i18n="threebox.shell.attachKindModel">三方模型</button>
+                <button type="button" class="resourceCategoryTab" data-category="image" data-i18n="threebox.shell.attachKindImage">图片</button>
+                <button type="button" class="resourceCategoryTab" data-category="other" data-i18n="threebox.shell.attachKindOther">其他</button>
+              </div>
+              <div class="resourceList" id="resourceList"></div>
+            </div>
+          </details>
+
           <details class="sidebarSection" id="templateGallerySection">
             <summary class="sidebarSectionTitle" data-i18n="threebox.shell.templateGallery">模板库</summary>
             <div class="sidebarSectionBody">
@@ -119,6 +134,9 @@
       </aside>
     </div>
     <main id="mainArea" class="mainArea">
+      <button type="button" id="mobileMenuBtn" class="mobileMenuBtn" aria-label="菜单">
+        <svg viewBox="0 0 18 14" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M1 1.5h16M1 7h16M1 12.5h16"/></svg>
+      </button>
       <div id="chatMessages" class="chatMessages" hidden></div>
       <button type="button" id="scrollToBottomBtn" class="scrollToBottomBtn" hidden data-i18n-title="threebox.shell.scrollToBottom" title="回到底部">
         <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M4 6.5 8 10.5 12 6.5"/></svg>
@@ -131,9 +149,9 @@
           <h1 class="chatHeroTitle" data-i18n="threebox.shell.heroTitle">打开盒子，看见世界</h1>
           <p class="chatHeroSubtitle" data-i18n="threebox.shell.heroSubtitle">描述一个世界，看它成为现实。</p>
           <div class="chatHeroSuggestions" id="chatHeroSuggestions">
-            <button type="button" class="chatSuggestionChip" data-prompt="创建一个蓝色的立方体">添加一个立方体</button>
-            <button type="button" class="chatSuggestionChip" data-prompt="一个智慧园区场景，包含建筑、道路和绿化">智慧园区场景</button>
-            <button type="button" class="chatSuggestionChip" data-prompt="一个数据中心机房，包含多排机柜">数据中心机房</button>
+            <button type="button" class="chatSuggestionChip" data-i18n="threebox.hero.suggestion1Label" data-prompt="创建一个蓝色的立方体" data-prompt-en="Create a blue cube">添加一个立方体</button>
+            <button type="button" class="chatSuggestionChip" data-i18n="threebox.hero.suggestion2Label" data-prompt="一个智慧园区场景，包含建筑、道路和绿化" data-prompt-en="A smart campus scene with buildings, roads, and greenery">智慧园区场景</button>
+            <button type="button" class="chatSuggestionChip" data-i18n="threebox.hero.suggestion3Label" data-prompt="一个数据中心机房，包含多排机柜" data-prompt-en="A data center room with multiple rows of server racks">数据中心机房</button>
           </div>
         </div>
       </div>
@@ -144,7 +162,7 @@
             <button type="button" class="composerIconBtn" id="composerAttachBtn" data-i18n-title="threebox.shell.attach" title="上传文件或图片">
               <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M10 4v12M4 10h12"/></svg>
             </button>
-            <input type="file" id="composerFileInput" hidden multiple accept="image/*">
+            <input type="file" id="composerFileInput" hidden accept="*/*">
             <textarea id="composerInput" class="composerInput" rows="1" data-i18n-placeholder="threebox.shell.composerPlaceholder" placeholder="描述你想创造的 3D 世界..."></textarea>
             <div class="composerActions">
               <select id="composerModelSelect" class="composerModelSelect" aria-label="模型">
@@ -194,6 +212,14 @@
     <button type="button" data-action="archive" data-i18n="threebox.shell.archive">归档</button>
     <div class="contextMenuSubLabel" id="moveToProjectLabel" data-i18n="threebox.shell.moveToProject">移入项目</div>
     <div id="moveToProjectList" class="contextMenuSubList"></div>
+  </div>
+
+  <div id="attachTypeMenu" class="contextMenu" hidden>
+    <button type="button" data-kind="json" data-i18n="threebox.shell.attachKindJson">场景 JSON</button>
+    <button type="button" data-kind="tjz" data-i18n="threebox.shell.attachKindTjz">场景 .tjz 包</button>
+    <button type="button" data-kind="image" data-i18n="threebox.shell.attachKindImage">图片</button>
+    <button type="button" data-kind="model" data-i18n="threebox.shell.attachKindModel">三方模型</button>
+    <button type="button" data-kind="other" data-i18n="threebox.shell.attachKindOther">其他文件</button>
   </div>
 
   <script type="module" src="./js/threeBoxApp.js"></script>

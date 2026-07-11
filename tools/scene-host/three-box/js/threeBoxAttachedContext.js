@@ -1,4 +1,5 @@
 import { createThreeBoxSceneCard } from "./threeBoxSceneCard.js";
+import { t } from "../../shared/i18n/index.js";
 
 /**
  * Manages the "attached scene" preview row above the composer (ChatGPT-style image-attachment
@@ -26,13 +27,13 @@ export function createThreeBoxAttachedContext() {
     header.className = "attachedContextHeader";
     const label = document.createElement("span");
     label.className = "attachedContextLabel";
-    label.textContent = `将作为上下文：${current.label}`;
+    label.textContent = t("threebox.attached.willUseAsContext", "将作为上下文：{label}", { label: current.label });
     header.appendChild(label);
 
     const collapseBtn = document.createElement("button");
     collapseBtn.type = "button";
     collapseBtn.className = "attachedContextHeaderBtn";
-    collapseBtn.title = "折叠";
+    collapseBtn.title = t("threebox.attached.collapse", "折叠");
     collapseBtn.textContent = "–";
     collapseBtn.addEventListener("click", () => {
       expanded = false;
@@ -43,7 +44,7 @@ export function createThreeBoxAttachedContext() {
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
     removeBtn.className = "attachedContextHeaderBtn";
-    removeBtn.title = "移除";
+    removeBtn.title = t("threebox.attached.remove", "移除");
     removeBtn.textContent = "×";
     removeBtn.addEventListener("click", () => clear());
     header.appendChild(removeBtn);
@@ -66,7 +67,7 @@ export function createThreeBoxAttachedContext() {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "attachedContextChip";
-    chip.title = "点击展开预览";
+    chip.title = t("threebox.attached.clickToExpand", "点击展开预览");
 
     const thumb = document.createElement("span");
     thumb.className = "attachedContextChipThumb";

@@ -1985,7 +1985,8 @@ export async function bootstrapSceneHostEditor() {
   async function loadSceneFromExternalBridgeIfRequested() {
     const pageParams = new URLSearchParams(window.location.search);
     const sceneKey = pageParams.get("sceneKey");
-    if (!sceneKey || pageParams.get("openFrom") !== "shower") {
+    const openFromSource = pageParams.get("openFrom");
+    if (!sceneKey || !["shower", "threebox"].includes(openFromSource)) {
       return false;
     }
     const storageKey = `${EDITOR_OPEN_SCENE_BRIDGE_PREFIX}${sceneKey}`;
@@ -2001,11 +2002,12 @@ export async function bootstrapSceneHostEditor() {
       if (!sceneJson || typeof sceneJson !== "object") {
         throw new Error("外部传入的场景 JSON 无效。");
       }
-      const loaded = await ingestScenePayload(sceneJson, record?.label || "Shower");
+      const sourceLabel = openFromSource === "threebox" ? "ThreeBox" : "Shower";
+      const loaded = await ingestScenePayload(sceneJson, record?.label || sourceLabel);
       if (loaded) {
         editorDocumentState?.markSaved?.();
         editorDocumentState?.syncDocumentTitle?.();
-        ui.showMessage("已从 Shower 打开场景。", "success");
+        ui.showMessage(`已从 ${sourceLabel} 打开场景。`, "success");
       }
       return loaded;
     } catch (error) {

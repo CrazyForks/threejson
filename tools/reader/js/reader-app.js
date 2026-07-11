@@ -14,6 +14,10 @@ const SOURCE_EXTENSIONS = new Set([
 
 const TEXTUAL_EXTENSIONS = new Set([...MARKDOWN_EXTENSIONS, ...JSON_EXTENSIONS, ...SOURCE_EXTENSIONS]);
 
+/** Well-known project files that conventionally ship without a file extension (e.g. `LICENSE` at
+ * a repo root) — treated as plaintext so they can be opened in the reader like any other doc. */
+const EXTENSIONLESS_TEXT_BASENAMES = new Set(["LICENSE", "LICENCE", "NOTICE", "AUTHORS", "CONTRIBUTORS", "COPYING"]);
+
 const EXTENSION_TO_LANGUAGE = {
   md: "markdown",
   markdown: "markdown",
@@ -290,7 +294,11 @@ function resolveSourceUrl(rawValue) {
 function getExtension(pathname) {
   const cleanPath = pathname.split("?")[0];
   const match = /\.([^.\/]+)$/.exec(cleanPath);
-  return match ? match[1].toLowerCase() : "";
+  if (match) {
+    return match[1].toLowerCase();
+  }
+  const basename = (cleanPath.split("/").pop() || "").toUpperCase();
+  return EXTENSIONLESS_TEXT_BASENAMES.has(basename) ? "txt" : "";
 }
 
 function isTextualPath(pathname) {

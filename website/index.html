@@ -66,12 +66,22 @@
           <a href="#" data-doc="contributing-guide.md" data-i18n="community.contribute">如何贡献</a>
           <a href="#/dependencies" data-i18n="community.dependencies">依赖项</a>
           <a href="#" data-doc="design-principles.md" data-i18n="community.codeStyle">代码规范</a>
+          <details class="dropdownSubmenu">
+            <summary data-i18n="community.license">许可协议</summary>
+            <div class="dropdownSubmenuPanel">
+              <a href="#" id="communityLicenseLink" target="_blank" rel="noreferrer" data-i18n="community.licenseMit">MIT 许可证（LICENSE）</a>
+              <a href="#" id="communityTrademarkLink" target="_blank" rel="noreferrer" data-i18n="community.licenseTrademark">商标声明（TRADEMARK）</a>
+            </div>
+          </details>
           <a href="https://github.com/nnrj/threejson" target="_blank" rel="noreferrer" data-i18n="community.source">源码（GitHub）</a>
           <a href="https://github.com/nnrj/threejson/issues" target="_blank" rel="noreferrer" data-i18n="community.issues">Issues（GitHub）</a>
         </div>
       </div>
     </nav>
-    <div class="headerTools">
+    <button type="button" id="headerToolsToggle" class="headerToolsToggle" aria-label="更多" aria-expanded="false">
+      <svg viewBox="0 0 4 16" aria-hidden="true" focusable="false"><circle cx="2" cy="2" r="1.8" fill="currentColor"/><circle cx="2" cy="8" r="1.8" fill="currentColor"/><circle cx="2" cy="14" r="1.8" fill="currentColor"/></svg>
+    </button>
+    <div class="headerTools" id="headerTools">
       <label class="selectTool">
         <span data-i18n="theme.label">主题</span>
         <select id="themeSelect">

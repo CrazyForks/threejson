@@ -10,8 +10,10 @@ import {
   updateSceneJsonString as requestUpdatedSceneJsonString,
   executeCommands,
   createCommandContext,
-  sceneToStandardJsonSimple
+  sceneToStandardJsonSimple,
+  createJsonScene
 } from "threejson/core";
+import { sceneHostAssetUrl } from "../../shared/js/sceneHostPaths.js";
 
 /**
  * Resolves a saved provider config (tools/scene-host/three-box/js/threeBoxSettingsSchema.js's
@@ -78,10 +80,10 @@ export function buildResultDigest(sceneJson) {
 /**
  * First-turn (no prior context) generation: builds the structured JSON envelope and calls
  * core/ai's generateSceneJsonString with streaming enabled.
- * @param {{ userPrompt: string, providerOptions: object, onDelta?: (delta:string)=>void, signal?: AbortSignal }} input
+ * @param {{ userPrompt: string, providerOptions: object, onDelta?: (delta:string)=>void, signal?: AbortSignal, globalPromptPrefix?: string }} input
  */
-export async function runThreeBoxGenerateTurn({ userPrompt, providerOptions, onDelta, signal }) {
-  const envelope = buildStructuredTurnEnvelope({ userPrompt, intent: "generate" });
+export async function runThreeBoxGenerateTurn({ userPrompt, providerOptions, onDelta, signal, globalPromptPrefix }) {
+  const envelope = buildStructuredTurnEnvelope({ userPrompt, intent: "generate", globalPromptPrefix });
   const sceneJsonString = await generateSceneJsonString(envelope, {
     ...providerOptions,
     stream: true,
@@ -103,10 +105,12 @@ export async function classifyThreeBoxTurnIntent({ userPrompt, history }, provid
 
 /**
  * Best-effort post-turn recap for the session cache; never throws (returns "" on failure) so a
- * failed summary call never blocks the turn from being cached/displayed.
+ * failed summary call never blocks the turn from being cached/displayed. `responseLanguage`
+ * (e.g. "Simplified Chinese"/"English") keeps the recap's language following the host's current
+ * UI locale setting rather than whatever language the user happened to type their prompt in.
  */
-export async function runThreeBoxSummary({ userPrompt, mode, targetTurnId, turnId, resultDigest, providerOptions }) {
-  return summarizeSceneTurn({ userPrompt, mode, targetTurnId, turnId, resultDigest }, providerOptions);
+export async function runThreeBoxSummary({ userPrompt, mode, targetTurnId, turnId, resultDigest, providerOptions, responseLanguage }) {
+  return summarizeSceneTurn({ userPrompt, mode, targetTurnId, turnId, resultDigest, responseLanguage }, providerOptions);
 }
 
 /**
@@ -130,43 +134,90 @@ export function resolveAdjustContextPayload(targetSceneJson, settings = {}) {
   return {};
 }
 
+/** Serializes a runtime's current scene state back to a standard JSON string. `runtimeTarget:
+ * runtime` is required — without it, sceneToStandardJsonSimple has no camera/renderer/controls to
+ * read, so the exported sceneConfig silently drops the camera entirely (objects export fine, but
+ * the resulting scene renders as a tiny speck from whatever default camera the next viewer falls
+ * back to). */
+function exportRuntimeSceneJsonString(runtime) {
+  return JSON.stringify(
+    sceneToStandardJsonSimple(runtime.scene, { merge: false, runtimeTarget: runtime }),
+    null,
+    2
+  );
+}
+
+/**
+ * Builds a throwaway, never-displayed runtime from a cached turn's JSON purely so the commands
+ * stage has a real `core/command` scene context to mutate. This is deliberately NOT the live,
+ * on-screen runtime for that turn's scene card: history must stay immutable (like a ChatGPT
+ * image — an earlier turn's rendered result never changes when a later turn adjusts it), so
+ * command execution always happens on a private clone, and the *result* is what gets rendered
+ * into the NEW turn's own scene card.
+ */
+async function createOffscreenRuntimeFromSceneJsonString(sceneJsonString) {
+  const sceneJson = parseSceneJsonString(sceneJsonString);
+  const canvas = document.createElement("canvas");
+  canvas.width = 32;
+  canvas.height = 32;
+  return createJsonScene(sceneJson, {
+    canvas,
+    resetScene: true,
+    assetsBase: sceneHostAssetUrl("assets/")
+  });
+}
+
 /**
  * Three-stage adjust fallback chain, mirroring the editor's AI-adjust panel
- * (tools/scene-host/editor/lib/ai/runEditorAiUpdate.js): try operation commands against the
- * live runtime first (undoable, no full reload); if that produces no usable mutation, fall back
- * to an RFC 6902 JSON-Patch regeneration; if that also fails, fall back to a full scene JSON
- * regeneration (always succeeds or throws).
+ * (tools/scene-host/editor/lib/ai/runEditorAiUpdate.js): try operation commands against a
+ * private offscreen clone of the target turn's scene first (undoable-shaped, no full JSON
+ * regeneration needed); if that produces no usable mutation, fall back to an RFC 6902 JSON-Patch
+ * regeneration; if that also fails, fall back to a full scene JSON regeneration (always succeeds
+ * or throws). The target turn's own on-screen scene card is never touched by any stage — every
+ * path here returns a fresh `sceneJson`/`sceneJsonString` for the CALLER to render into a new card.
  *
  * @param {{
  *   userPrompt: string,
  *   envelope: string,
  *   targetSceneJsonString: string,
- *   runtime: { scene: object, camera: object, renderer?: object, controls?: object },
  *   providerOptions: object,
  *   onDelta?: (delta: string) => void
  * }} input
  * @returns {Promise<
- *   | { stage: "commands", commands: object[], execResult: object }
- *   | { stage: "json-incremental" | "json-full", sceneJson: object, sceneJsonString: string }
+ *   | { stage: "commands", commands: object[], execResult: object, sceneJson: object, sceneJsonString: string }
+ *   | { stage: "json-incremental", patch: object[]|null, sceneJson: object, sceneJsonString: string }
+ *   | { stage: "json-full", sceneJson: object, sceneJsonString: string }
  * >}
  */
-export async function runThreeBoxAdjustTurn({ userPrompt, envelope, targetSceneJsonString, runtime, providerOptions, onDelta }) {
+export async function runThreeBoxAdjustTurn({ userPrompt, envelope, targetSceneJsonString, providerOptions, onDelta }) {
   try {
     const cmdResult = await requestUpdatedSceneEditCommands(
       userPrompt,
       { userMessage: envelope, currentSceneJsonString: targetSceneJsonString, fullSceneJson: targetSceneJsonString },
       { ...providerOptions, outputMode: "commands", fallbackToJson: false, stream: true, onDelta }
     );
-    if (cmdResult.outputMode === "commands" && cmdResult.commands?.length && runtime?.scene) {
-      const ctx = createCommandContext({
-        scene: runtime.scene,
-        camera: runtime.camera,
-        renderer: runtime.renderer,
-        controls: runtime.controls
-      });
-      const execResult = await executeCommands(ctx, cmdResult.commands);
-      if (execResult.results.some((r) => r.ok)) {
-        return { stage: "commands", commands: cmdResult.commands, execResult };
+    if (cmdResult.outputMode === "commands" && cmdResult.commands?.length) {
+      const offscreenRuntime = await createOffscreenRuntimeFromSceneJsonString(targetSceneJsonString);
+      try {
+        const ctx = createCommandContext({
+          scene: offscreenRuntime.scene,
+          camera: offscreenRuntime.camera,
+          renderer: offscreenRuntime.renderer,
+          controls: offscreenRuntime.controls
+        });
+        const execResult = await executeCommands(ctx, cmdResult.commands);
+        if (execResult.results.some((r) => r.ok)) {
+          const sceneJsonString = exportRuntimeSceneJsonString(offscreenRuntime);
+          return {
+            stage: "commands",
+            commands: cmdResult.commands,
+            execResult,
+            sceneJson: parseSceneJsonString(sceneJsonString),
+            sceneJsonString
+          };
+        }
+      } finally {
+        offscreenRuntime.dispose?.();
       }
     }
   } catch (_error) {
@@ -174,13 +225,19 @@ export async function runThreeBoxAdjustTurn({ userPrompt, envelope, targetSceneJ
   }
 
   try {
-    const patchedJsonString = await requestUpdatedSceneJsonString(userPrompt, targetSceneJsonString, {
+    const { sceneJsonString: patchedJsonString, patch } = await requestUpdatedSceneJsonString(userPrompt, targetSceneJsonString, {
       ...providerOptions,
       updateMode: "incremental",
+      includePatch: true,
       stream: true,
       onDelta
     });
-    return { stage: "json-incremental", sceneJson: parseSceneJsonString(patchedJsonString), sceneJsonString: patchedJsonString };
+    return {
+      stage: "json-incremental",
+      patch,
+      sceneJson: parseSceneJsonString(patchedJsonString),
+      sceneJsonString: patchedJsonString
+    };
   } catch (_error) {
     /* fall through to json-full */
   }
@@ -194,8 +251,55 @@ export async function runThreeBoxAdjustTurn({ userPrompt, envelope, targetSceneJ
   return { stage: "json-full", sceneJson: parseSceneJsonString(fullJsonString), sceneJsonString: fullJsonString };
 }
 
-/** Serializes a live runtime's current scene state back to a standard JSON string — used after a
- * successful command-stage mutation to capture the post-mutation state for caching/re-rendering. */
-export function exportRuntimeSceneJsonString(runtime) {
-  return JSON.stringify(sceneToStandardJsonSimple(runtime.scene, { merge: false }), null, 2);
+/**
+ * Reconstructs a turn's full scene JSON string when it wasn't cached directly — i.e. when
+ * `io.turnCacheMode` is "diff" and this turn's result came from the "commands" stage, so only its
+ * `commands` array was persisted (see threeBoxSessionStore.js's turn record shape). Walks
+ * backward from the target turn to the nearest earlier turn in the same conversation that still
+ * has a full `sceneJson`, then replays every intermediate commands-only turn's commands in order
+ * against one offscreen runtime to rebuild the target's state.
+ *
+ * `orderedTurns` must be every turn for the conversation, sorted oldest-first (as returned by
+ * threeBoxSessionStore.js's getTurnsForConversation). Turns are never diff-cached across a
+ * "template"/"generate"/"json-incremental"/"json-full" stage — those always carry a full
+ * `sceneJson` — so a diff chain only ever needs to replay "commands"-stage turns.
+ *
+ * @param {Array<object>} orderedTurns
+ * @param {string} targetTurnId
+ * @returns {Promise<string>} the reconstructed (or directly cached) full scene JSON string
+ */
+export async function resolveTurnSceneJsonString(orderedTurns, targetTurnId) {
+  const targetIndex = orderedTurns.findIndex((t) => t.id === targetTurnId);
+  if (targetIndex === -1) {
+    throw new Error(`resolveTurnSceneJsonString: turn ${targetTurnId} not found in orderedTurns`);
+  }
+  if (orderedTurns[targetIndex].sceneJson) {
+    return orderedTurns[targetIndex].sceneJson;
+  }
+  let baseIndex = targetIndex - 1;
+  while (baseIndex >= 0 && !orderedTurns[baseIndex].sceneJson) {
+    baseIndex -= 1;
+  }
+  if (baseIndex < 0) {
+    throw new Error(`resolveTurnSceneJsonString: no earlier full-JSON turn found to reconstruct ${targetTurnId} from`);
+  }
+
+  const offscreenRuntime = await createOffscreenRuntimeFromSceneJsonString(orderedTurns[baseIndex].sceneJson);
+  try {
+    const ctx = createCommandContext({
+      scene: offscreenRuntime.scene,
+      camera: offscreenRuntime.camera,
+      renderer: offscreenRuntime.renderer,
+      controls: offscreenRuntime.controls
+    });
+    for (let i = baseIndex + 1; i <= targetIndex; i += 1) {
+      const commands = orderedTurns[i].commands;
+      if (commands?.length) {
+        await executeCommands(ctx, commands);
+      }
+    }
+    return exportRuntimeSceneJsonString(offscreenRuntime);
+  } finally {
+    offscreenRuntime.dispose?.();
+  }
 }

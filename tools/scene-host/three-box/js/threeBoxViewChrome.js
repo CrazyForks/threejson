@@ -1,7 +1,20 @@
+import { t } from "../../shared/i18n/index.js";
+
 const LEFT_DOCK_PINNED_STORAGE_KEY = "threejson.threebox.leftDockPinned";
 const PEEK_HIDE_DELAY_MS = 260;
+const MOBILE_MEDIA_QUERY = "(max-width: 720px)";
+
+/** A permanently "pinned" 288px sidebar would eat most of a phone-width viewport, so mobile
+ * ignores the persisted pin preference entirely and always starts collapsed — the sidebar only
+ * ever appears as a tap-to-open overlay there (via #mobileMenuBtn), never pushes content. */
+function isMobileViewport() {
+  return window.matchMedia(MOBILE_MEDIA_QUERY).matches;
+}
 
 function readPinnedFromStorage() {
+  if (isMobileViewport()) {
+    return false;
+  }
   try {
     const raw = localStorage.getItem(LEFT_DOCK_PINNED_STORAGE_KEY);
     return raw === null ? true : raw === "1";
@@ -40,7 +53,9 @@ export function createThreeBoxViewChrome() {
     leftDock?.setAttribute("aria-hidden", leftDockPinned || leftDockPeek ? "false" : "true");
     if (leftDockPinBtn) {
       leftDockPinBtn.setAttribute("aria-pressed", leftDockPinned ? "true" : "false");
-      leftDockPinBtn.title = leftDockPinned ? "已钉住：鼠标移开仍显示" : "未钉住：移到屏幕左边缘唤出";
+      leftDockPinBtn.title = leftDockPinned
+        ? t("threebox.viewChrome.pinnedTitle", "已钉住：鼠标移开仍显示")
+        : t("threebox.viewChrome.unpinnedTitle", "未钉住：移到屏幕左边缘唤出");
     }
     window.dispatchEvent(new Event("resize"));
   }
@@ -54,6 +69,11 @@ export function createThreeBoxViewChrome() {
   }
 
   function togglePinned() {
+    if (isMobileViewport()) {
+      // Pinning has no meaning on a phone-width overlay drawer — the pin button is hidden there
+      // via CSS, but guard here too in case it's reachable some other way.
+      return;
+    }
     leftDockPinned = !leftDockPinned;
     if (leftDockPinned) {
       leftDockPeek = true;
@@ -62,6 +82,12 @@ export function createThreeBoxViewChrome() {
       leftDockPeek = false;
     }
     persistPinnedToStorage(leftDockPinned);
+    syncClasses();
+  }
+
+  function openMobilePeek() {
+    clearTimeout(peekHideTimer);
+    leftDockPeek = true;
     syncClasses();
   }
 
@@ -91,8 +117,12 @@ export function createThreeBoxViewChrome() {
       event.stopPropagation();
       togglePinned();
     });
+    document.getElementById("mobileMenuBtn")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openMobilePeek();
+    });
     syncClasses();
   }
 
-  return { init };
+  return { init, refresh: syncClasses };
 }

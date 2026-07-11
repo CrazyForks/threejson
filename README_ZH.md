@@ -118,3 +118,7 @@ await createJsonScene(payload, {
 ## 许可证
 
 [MIT](./LICENSE)
+
+## 商标声明
+
+"ThreeJSON" 名称及其标志均为 ThreeJSON 项目的商标。MIT 许可证仅覆盖源代码本身，不授予对 ThreeJSON 名称/标志的使用权。使用规范及冒充行为举报方式详见 [TRADEMARK.zh-CN.md](./TRADEMARK.zh-CN.md)（English: [TRADEMARK.md](./TRADEMARK.md)）。

@@ -496,7 +496,14 @@ async function generateSceneJsonFromImage(input = {}, options = {}) {
   return sceneJsonString;
 }
 
-/** Request a model update with the full current scene and return a formatted JSON string (also importable from external Node tools). */
+/**
+ * Request a model update with the full current scene and return a formatted JSON string (also
+ * importable from external Node tools). Pass `options.includePatch: true` to additionally get
+ * back the raw RFC-6902-ish patch ops the model produced for `updateMode: "incremental"` (e.g.
+ * so a chat-style host can show the user "what changed" instead of only the merged result) — this
+ * is opt-in and changes the return shape to `{ sceneJsonString, patch }`; existing callers that
+ * don't pass it keep getting a plain string back.
+ */
 async function requestUpdatedSceneJsonString(prompt, currentSceneJsonString, options = {}) {
   if (!prompt || !String(prompt).trim()) {
     throw new Error("prompt is required.");
@@ -506,6 +513,7 @@ async function requestUpdatedSceneJsonString(prompt, currentSceneJsonString, opt
   }
 
   const updateMode = options.updateMode === "incremental" ? "incremental" : "full";
+  const includePatch = options.includePatch === true;
   const chatOpts = stripChatTransportOptions(options);
   const currentSceneObj = parseSceneJsonString(String(currentSceneJsonString));
 
@@ -530,13 +538,15 @@ async function requestUpdatedSceneJsonString(prompt, currentSceneJsonString, opt
     if (!applied.ok) {
       throw new Error(`incremental patch failed: ${applied.error}`);
     }
+    let sceneJsonString;
     try {
       const { normalizeScenePayload } = await import("../handler/sceneFriendlyNormalizer.js");
       const normalized = normalizeScenePayload(applied.scene);
-      return prettyJson(normalized.compatPayload || normalized.sourcePayload || applied.scene);
+      sceneJsonString = prettyJson(normalized.compatPayload || normalized.sourcePayload || applied.scene);
     } catch {
-      return prettyJson(applied.scene);
+      sceneJsonString = prettyJson(applied.scene);
     }
+    return includePatch ? { sceneJsonString, patch } : sceneJsonString;
   }
 
   const currentScenePrettyJson = prettyJson(currentSceneObj);
@@ -557,7 +567,8 @@ async function requestUpdatedSceneJsonString(prompt, currentSceneJsonString, opt
 
   const updatedJsonText = extractJsonText(content);
   const updatedSceneObj = parseSceneJsonString(updatedJsonText);
-  return prettyJson(updatedSceneObj);
+  const sceneJsonString = prettyJson(updatedSceneObj);
+  return includePatch ? { sceneJsonString, patch: null } : sceneJsonString;
 }
 
 /**

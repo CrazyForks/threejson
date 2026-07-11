@@ -23,12 +23,15 @@ export const THREEBOX_SETTINGS_DEFAULTS = {
     updateOutputMode: "commands",
     includeSpatialSummary: true,
     includeFullJson: false,
-    defaultImageModel: "dall-e-3"
+    defaultImageModel: "dall-e-3",
+    globalPromptPrefix: "",
+    includeTurnSummary: true
   },
   io: {
     exportJsonIndent: 2,
     copyFriendlyJson: false,
-    tjzAssetPolicy: "preserve"
+    tjzAssetPolicy: "preserve",
+    turnCacheMode: "full"
   }
 };
 
@@ -49,10 +52,29 @@ export const THREEBOX_SETTINGS_FIELDS = [
   { section: "ai", path: "ai.includeSpatialSummary", type: "checkbox", label: "调整时附带空间摘要" },
   { section: "ai", path: "ai.includeFullJson", type: "checkbox", label: "调整时附带完整 JSON（更耗费 Token）" },
   { section: "ai", path: "ai.defaultImageModel", type: "text", label: "默认图像模型" },
+  {
+    section: "ai",
+    path: "ai.globalPromptPrefix",
+    type: "textarea",
+    label: "全局提示词",
+    placeholder: "会自动附加到每次发送给 AI 的结构化提示词中，例如统一的风格、单位、命名约定等要求。",
+    rows: 4
+  },
+  { section: "ai", path: "ai.includeTurnSummary", type: "checkbox", label: "场景生成后输出简短总结" },
 
   { section: "io", path: "io.exportJsonIndent", type: "number", label: "导出 JSON 缩进", min: 0, max: 4 },
   { section: "io", path: "io.copyFriendlyJson", type: "checkbox", label: "复制 JSON 时使用友好格式" },
-  { section: "io", path: "io.tjzAssetPolicy", type: "select", label: ".tjz 资源策略", options: [["preserve", "保留原始 URL"], ["tryPack", "尝试打包资源"]] }
+  { section: "io", path: "io.tjzAssetPolicy", type: "select", label: ".tjz 资源策略", options: [["preserve", "保留原始 URL"], ["tryPack", "尝试打包资源"]] },
+  {
+    section: "io",
+    path: "io.turnCacheMode",
+    type: "select",
+    label: "聊天记录缓存方式",
+    options: [
+      ["full", "完整 JSON（每轮都存完整场景，占用更多空间）"],
+      ["diff", "仅保存差异（命令调整只存调整命令，重新打开时按需重放）"]
+    ]
+  }
 ];
 
 export const THREEBOX_PROVIDER_TYPES = [

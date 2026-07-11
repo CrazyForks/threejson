@@ -69,5 +69,48 @@
   window.addEventListener("resize", () => runtime?.resize?.(window.innerWidth, window.innerHeight));
   document.getElementById("loadingMask").style.display = "none";
 </script>
+<!-- ThreeJSON demo hint (zh/en) -->
+<div id="demoHintBox" class="demoHintBox" role="note">
+  <button id="demoHintLangBtn" class="demoHintLangBtn" type="button" aria-label="Switch language">EN</button>
+  <button id="demoHintCloseBtn" class="demoHintCloseBtn" type="button" aria-label="Close">&times;</button>
+  <div id="demoHintText" class="demoHintText"></div>
+</div>
+<style>
+  .demoHintBox{position:fixed;left:12px;bottom:12px;z-index:999;max-width:min(440px,calc(100vw - 24px));padding:10px 34px 10px 14px;background:rgba(18,18,22,.88);color:#e7e7ea;border:1px solid rgba(255,255,255,.14);border-radius:10px;font:12.5px/1.62 Arial,"Microsoft YaHei",sans-serif;box-shadow:0 10px 26px rgba(0,0,0,.32);backdrop-filter:blur(6px)}
+  .demoHintBox code{color:#8fc4ff;font-size:11.5px;background:rgba(143,196,255,.12);padding:1px 4px;border-radius:4px}
+  .demoHintBox[hidden]{display:none}
+  .demoHintLangBtn,.demoHintCloseBtn{position:absolute;top:6px;border:none;background:transparent;color:#9aa0ab;font-size:11px;cursor:pointer;line-height:1;padding:2px 4px}
+  .demoHintLangBtn{right:26px}
+  .demoHintCloseBtn{right:6px;font-size:14px}
+  .demoHintLangBtn:hover,.demoHintCloseBtn:hover{color:#fff}
+</style>
+<script>
+(function(){
+  var ZH_HINT = "【Track 4 · Declarative actions】左侧灰色方块由 <code>scene.ready</code> 改成绿色；\n    点击中间蓝色方块会先执行 <code>actions</code>（移动与改材质），再执行 <code>script</code>（短暂上移）；\n    点击右侧红色方块会通过 <code>object.toggleVisible</code> 显隐左侧方块。";
+  var EN_HINT = "【Track 4 · Declarative actions】The left gray box turns green via <code>scene.ready</code>;\n    clicking the middle blue box first runs <code>actions</code> (move + material change), then <code>script</code> (a brief lift);\n    clicking the right red box toggles the left box's visibility via <code>object.toggleVisible</code>.";
+  var box = document.getElementById("demoHintBox");
+  var textEl = document.getElementById("demoHintText");
+  var langBtn = document.getElementById("demoHintLangBtn");
+  var closeBtn = document.getElementById("demoHintCloseBtn");
+  if (!box) return;
+  var KEY = "threejson.demoHint.lang";
+  function detectLang(){
+    try { var saved = localStorage.getItem(KEY); if (saved) return saved; } catch(e){}
+    return (navigator.language||"").toLowerCase().indexOf("zh")===0 ? "zh" : "en";
+  }
+  var lang = detectLang();
+  function render(){
+    textEl.innerHTML = lang === "zh" ? ZH_HINT : EN_HINT;
+    langBtn.textContent = lang === "zh" ? "EN" : "中";
+  }
+  langBtn.addEventListener("click", function(){
+    lang = lang === "zh" ? "en" : "zh";
+    try { localStorage.setItem(KEY, lang); } catch(e){}
+    render();
+  });
+  closeBtn.addEventListener("click", function(){ box.hidden = true; });
+  render();
+})();
+</script>
 </body>
 </html>

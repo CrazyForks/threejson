@@ -47,6 +47,9 @@ const I18N = {
     "community.contribute": "如何贡献",
     "community.dependencies": "依赖项",
     "community.codeStyle": "代码规范",
+    "community.license": "许可协议",
+    "community.licenseMit": "MIT 许可证（LICENSE）",
+    "community.licenseTrademark": "商标声明（TRADEMARK）",
     "community.source": "源码（GitHub）",
     "community.issues": "Issues（GitHub）",
     "theme.label": "主题",
@@ -99,6 +102,9 @@ const I18N = {
     "community.contribute": "How To Contribute",
     "community.dependencies": "Dependencies",
     "community.codeStyle": "Code Style",
+    "community.license": "License Agreement",
+    "community.licenseMit": "MIT License (LICENSE)",
+    "community.licenseTrademark": "Trademark Notice (TRADEMARK)",
     "community.source": "Source (GitHub)",
     "community.issues": "Issues (GitHub)",
     "theme.label": "Theme",
@@ -165,7 +171,9 @@ function init() {
   applyTheme();
   applyI18n();
   wireMenuHoverBehavior();
+  wireHeaderToolsToggle();
   wireDocLinks();
+  wireLegalLinks();
   window.addEventListener("hashchange", renderRoute);
   langSelect.addEventListener("change", () => {
     localStorage.setItem(STORAGE.lang, langSelect.value);
@@ -174,6 +182,7 @@ function init() {
     document.documentElement.lang = lang === "zh-CN" ? "zh-CN" : "en";
     applyI18n();
     wireDocLinks();
+    wireLegalLinks();
     syncReaderRouteLanguage(previousLang, lang);
     renderRoute();
   });
@@ -229,6 +238,30 @@ function readerHref(file, targetLang = lang) {
   const src = targetLang === "en-US" ? `../../docs/en/${file}` : `../../docs/zh/${file}`;
   readerUrl.searchParams.set("src", src);
   return readerUrl.href;
+}
+
+/** Like {@link readerHref}, but for root-level project files (LICENSE, TRADEMARK.md, ...) that
+ * live outside the `docs/{lang}/` tree, so the caller supplies the exact repo-root-relative path
+ * rather than just a filename. */
+function readerHrefForRootPath(rootRelativePath) {
+  const readerUrl = new URL(READER.href);
+  readerUrl.searchParams.set("src", `../../${rootRelativePath}`);
+  return readerUrl.href;
+}
+
+/** Wires the 社区 (Community) menu's "许可协议" submenu links: LICENSE is language-independent
+ * (points at the single root LICENSE file regardless of site language); TRADEMARK has a matching
+ * `TRADEMARK.zh-CN.md` for the Chinese site language, so it's re-resolved on every language
+ * switch (called from both `init()` and the `langSelect` change handler, same as wireDocLinks). */
+function wireLegalLinks() {
+  const licenseLink = document.getElementById("communityLicenseLink");
+  if (licenseLink) {
+    licenseLink.href = readerHrefForRootPath("LICENSE");
+  }
+  const trademarkLink = document.getElementById("communityTrademarkLink");
+  if (trademarkLink) {
+    trademarkLink.href = readerHrefForRootPath(lang === "en-US" ? "TRADEMARK.md" : "TRADEMARK.zh-CN.md");
+  }
 }
 
 function syncReaderRouteLanguage(previousLang, nextLang) {
@@ -806,6 +839,26 @@ function resolveRootAssetUrl(raw) {
   if (/^(?:[a-z]+:)?\/\//i.test(value)) return value;
   const clean = value.replace(/^(\.\.\/)+/, "").replace(/^\.\//, "").replace(/^\//, "");
   return new URL(clean, ROOT).href;
+}
+
+/** Mobile-only "..." toggle: collapses theme/lang/npm/GitHub into a dropdown panel below 640px
+ * (see @media (max-width: 640px) in site.css). Above that breakpoint the toggle button itself is
+ * hidden via CSS and .headerTools renders inline as normal, so this wiring is inert on desktop. */
+function wireHeaderToolsToggle() {
+  const toggle = document.getElementById("headerToolsToggle");
+  const panel = document.getElementById("headerTools");
+  if (!toggle || !panel) return;
+  toggle.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const open = panel.classList.toggle("open");
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+  document.addEventListener("click", (event) => {
+    if (!panel.classList.contains("open")) return;
+    if (panel.contains(event.target) || event.target === toggle) return;
+    panel.classList.remove("open");
+    toggle.setAttribute("aria-expanded", "false");
+  });
 }
 
 function wireMenuHoverBehavior() {

@@ -1,5 +1,6 @@
 import { resolveSceneHostUrl, sceneHostAssetUrl } from "../../shared/js/sceneHostPaths.js";
 import { showToast } from "./threeBoxUiFeedback.js";
+import { t, getHostLocale } from "../../shared/i18n/index.js";
 
 /**
  * Template-card thumbnail pipeline: clone of website/js/site.js's examples-page pipeline
@@ -50,6 +51,12 @@ function withReducedQuality(payload) {
       imageMap: { generateMipmaps: false, anisotropy: 1, ...clone.sceneConfig?.textureDefaults?.imageMap }
     }
   };
+  // Some templates (e.g. the port scene) carry autoplay/looping background audio for full-page
+  // shower-style viewing — a thumbnail is a silent, offscreen, throwaway render, so strip audio
+  // entirely rather than let it start playing (and looping) the moment its card scrolls into view.
+  if (clone.worldInfo?.audioList?.length) {
+    clone.worldInfo = { ...clone.worldInfo, audioList: [] };
+  }
   return clone;
 }
 
@@ -73,6 +80,16 @@ function writeThumbCache(cache) {
       /* give up */
     }
   }
+}
+
+/** Template titles come from manifest.json, which carries a Chinese `title` plus an optional
+ * English `titleEn` — falls back to `title` for templates that haven't been given an English
+ * variant yet. */
+function localizedTitle(item) {
+  if (getHostLocale() === "en-US" && item.titleEn) {
+    return item.titleEn;
+  }
+  return item.title || item.id;
 }
 
 function withTimeout(promise, ms) {
@@ -197,13 +214,13 @@ export function createThreeBoxTemplateGallery(host = {}) {
 
     const img = document.createElement("img");
     img.className = "templateCardThumb";
-    img.alt = item.title || item.id;
+    img.alt = localizedTitle(item);
     img.loading = "lazy";
     card.appendChild(img);
 
     const label = document.createElement("div");
     label.className = "templateCardLabel";
-    label.textContent = item.title || item.id;
+    label.textContent = localizedTitle(item);
     card.appendChild(label);
 
     card.addEventListener("click", () => {
@@ -221,21 +238,29 @@ export function createThreeBoxTemplateGallery(host = {}) {
       if (host.onSelectTemplate) {
         host.onSelectTemplate(item, payload);
       } else {
-        showToast(`已选择模板「${item.title}」，聊天区接入将在后续里程碑完成。`, "info");
+        showToast(
+          t("threebox.gallery.selectedComingSoon", "已选择模板「{title}」，聊天区接入将在后续里程碑完成。", {
+            title: localizedTitle(item)
+          }),
+          "info"
+        );
       }
     } catch (error) {
       console.warn("[three-box template gallery] open failed:", error);
-      showToast("模板加载失败，请稍后重试。", "warning");
+      showToast(t("threebox.gallery.loadFailed", "模板加载失败，请稍后重试。"), "warning");
     }
   }
+
+  let lastFilterQuery = "";
 
   function renderCards(filterQuery = "") {
     if (!templateGrid) {
       return;
     }
+    lastFilterQuery = filterQuery;
     templateGrid.innerHTML = "";
     const q = filterQuery.trim().toLowerCase();
-    const filtered = q ? items.filter((item) => String(item.title || "").toLowerCase().includes(q)) : items;
+    const filtered = q ? items.filter((item) => localizedTitle(item).toLowerCase().includes(q)) : items;
     const observer = getThumbObserver();
     for (const item of filtered) {
       const card = buildCardEl(item);
@@ -245,7 +270,7 @@ export function createThreeBoxTemplateGallery(host = {}) {
     if (filtered.length === 0) {
       const hint = document.createElement("div");
       hint.className = "sidebarStubHint";
-      hint.textContent = "未找到匹配的模板。";
+      hint.textContent = t("threebox.gallery.noResults", "未找到匹配的模板。");
       templateGrid.appendChild(hint);
     }
   }
@@ -264,5 +289,11 @@ export function createThreeBoxTemplateGallery(host = {}) {
     renderCards("");
   }
 
-  return { init, filter };
+  /** Re-renders cards after a locale switch so titles/empty-state text pick up the new language,
+   * preserving whatever search query was active. */
+  function refresh() {
+    renderCards(lastFilterQuery);
+  }
+
+  return { init, filter, refresh };
 }

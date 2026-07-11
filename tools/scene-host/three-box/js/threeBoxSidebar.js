@@ -1,13 +1,16 @@
 import { showToast } from "./threeBoxUiFeedback.js";
+import { putConversation, getAllConversations, putProject, getAllProjects } from "./threeBoxSessionStore.js";
+import { t } from "../../shared/i18n/index.js";
 
 /**
  * ThreeBox keeps its own conversation/project history, entirely independent from the Scene
  * Editor's session storage (different localStorage/IndexedDB namespace — see
  * threeBoxSessionStore.js). A fresh ThreeBox session therefore starts with a genuinely empty
- * history list (no seeded placeholder conversations) until the user actually creates chats;
- * the interaction logic below (sort/pin/archive/move-to-project/search) is real against this
- * in-memory array and keeps working unchanged once a persistent IndexedDB-backed store is
- * swapped in.
+ * history list (no seeded placeholder conversations) until the user actually creates chats.
+ * `conversations`/`projects` are hydrated from IndexedDB on init() and every mutation site below
+ * calls putConversation/putProject to persist it — the underlying turn data was always cached,
+ * but this metadata (title, pin/archive state, project grouping) previously lived in memory only
+ * and vanished on every page refresh.
  */
 const TEMPLATE_GALLERY_EXPANDED_KEY = "threejson.threebox.templateGallery.expanded";
 
@@ -17,15 +20,15 @@ function formatRelativeTime(ts) {
   const hour = 60 * minute;
   const day = 24 * hour;
   if (diffMs < minute) {
-    return "刚刚";
+    return t("threebox.sidebar.timeJustNow", "刚刚");
   }
   if (diffMs < hour) {
-    return `${Math.floor(diffMs / minute)} 分钟前`;
+    return t("threebox.sidebar.timeMinutesAgo", "{n} 分钟前", { n: Math.floor(diffMs / minute) });
   }
   if (diffMs < day) {
-    return `${Math.floor(diffMs / hour)} 小时前`;
+    return t("threebox.sidebar.timeHoursAgo", "{n} 小时前", { n: Math.floor(diffMs / hour) });
   }
-  return `${Math.floor(diffMs / day)} 天前`;
+  return t("threebox.sidebar.timeDaysAgo", "{n} 天前", { n: Math.floor(diffMs / day) });
 }
 
 /**
@@ -74,7 +77,7 @@ export function createThreeBoxSidebar(host = {}) {
     if (projects.length === 0) {
       const hint = document.createElement("div");
       hint.className = "sidebarStubHint";
-      hint.textContent = "暂无项目。";
+      hint.textContent = t("threebox.sidebar.projectsEmpty", "暂无项目。");
       projectListEl.appendChild(hint);
     }
     for (const project of projects) {
@@ -82,7 +85,7 @@ export function createThreeBoxSidebar(host = {}) {
       el.className = "projectItem";
       el.textContent = project.name;
       el.addEventListener("click", () => {
-        showToast(`项目「${project.name}」的会话列表将在后续里程碑接入。`, "info");
+        showToast(t("threebox.sidebar.toastProjectComingSoon", "项目「{name}」的会话列表将在后续里程碑接入。", { name: project.name }), "info");
       });
       projectListEl.appendChild(el);
     }
@@ -145,7 +148,7 @@ export function createThreeBoxSidebar(host = {}) {
       if (active.length === 0) {
         const hint = document.createElement("div");
         hint.className = "sidebarStubHint";
-        hint.textContent = "暂无聊天记录，点击「新聊天」开始。";
+        hint.textContent = t("threebox.sidebar.historyEmpty", "暂无聊天记录，点击「新聊天」开始。");
         historyListEl.appendChild(hint);
       }
       for (const conv of active) {
@@ -179,26 +182,29 @@ export function createThreeBoxSidebar(host = {}) {
     contextMenuTargetId = conv.id;
     const pinBtn = historyContextMenu.querySelector('[data-action="pin"]');
     if (pinBtn) {
-      pinBtn.textContent = conv.pinned ? "取消置顶" : "置顶";
+      pinBtn.textContent = conv.pinned ? t("threebox.sidebar.unpin", "取消置顶") : t("threebox.shell.pin", "置顶");
     }
     const archiveBtn = historyContextMenu.querySelector('[data-action="archive"]');
     if (archiveBtn) {
-      archiveBtn.textContent = conv.archived ? "取消归档" : "归档";
+      archiveBtn.textContent = conv.archived
+        ? t("threebox.sidebar.unarchive", "取消归档")
+        : t("threebox.shell.archive", "归档");
     }
     if (moveToProjectList) {
       moveToProjectList.innerHTML = "";
       if (projects.length === 0) {
         const hint = document.createElement("div");
         hint.className = "contextMenuEmptyHint";
-        hint.textContent = "暂无项目，请先在「项目」区新建。";
+        hint.textContent = t("threebox.sidebar.noProjectsHint", "暂无项目，请先在「项目」区新建。");
         moveToProjectList.appendChild(hint);
       } else {
         if (conv.projectId) {
           const clearBtn = document.createElement("button");
           clearBtn.type = "button";
-          clearBtn.textContent = "移出项目";
+          clearBtn.textContent = t("threebox.sidebar.moveOutOfProject", "移出项目");
           clearBtn.addEventListener("click", () => {
             conv.projectId = null;
+            void putConversation(conv);
             closeHistoryContextMenu();
             renderHistoryList();
           });
@@ -210,6 +216,7 @@ export function createThreeBoxSidebar(host = {}) {
           btn.textContent = project.name + (project.id === conv.projectId ? " ✓" : "");
           btn.addEventListener("click", () => {
             conv.projectId = project.id;
+            void putConversation(conv);
             closeHistoryContextMenu();
             renderHistoryList();
           });
@@ -235,8 +242,12 @@ export function createThreeBoxSidebar(host = {}) {
       const conv = findConversation(contextMenuTargetId);
       if (conv) {
         conv.pinned = !conv.pinned;
+        void putConversation(conv);
         renderHistoryList();
-        showToast(conv.pinned ? "已置顶" : "已取消置顶", "success");
+        showToast(
+          conv.pinned ? t("threebox.sidebar.toastPinned", "已置顶") : t("threebox.sidebar.toastUnpinned", "已取消置顶"),
+          "success"
+        );
       }
       closeHistoryContextMenu();
     });
@@ -244,8 +255,12 @@ export function createThreeBoxSidebar(host = {}) {
       const conv = findConversation(contextMenuTargetId);
       if (conv) {
         conv.archived = !conv.archived;
+        void putConversation(conv);
         renderHistoryList();
-        showToast(conv.archived ? "已归档" : "已取消归档", "success");
+        showToast(
+          conv.archived ? t("threebox.sidebar.toastArchived", "已归档") : t("threebox.sidebar.toastUnarchived", "已取消归档"),
+          "success"
+        );
       }
       closeHistoryContextMenu();
     });
@@ -268,7 +283,7 @@ export function createThreeBoxSidebar(host = {}) {
     if (matches.length === 0) {
       const hint = document.createElement("div");
       hint.className = "searchChatEmptyHint";
-      hint.textContent = "未找到匹配的聊天。";
+      hint.textContent = t("threebox.sidebar.searchNoResults", "未找到匹配的聊天。");
       searchChatResults.appendChild(hint);
       return;
     }
@@ -280,7 +295,7 @@ export function createThreeBoxSidebar(host = {}) {
       title.textContent = conv.title;
       const meta = document.createElement("div");
       meta.className = "searchChatResultMeta";
-      meta.textContent = `${formatRelativeTime(conv.updatedAt)}${conv.archived ? " · 已归档" : ""}`;
+      meta.textContent = `${formatRelativeTime(conv.updatedAt)}${conv.archived ? t("threebox.sidebar.archivedSuffix", " · 已归档") : ""}`;
       el.appendChild(title);
       el.appendChild(meta);
       el.addEventListener("click", () => {
@@ -313,9 +328,17 @@ export function createThreeBoxSidebar(host = {}) {
 
   function createConversationRecord() {
     const id = `conv-${Date.now().toString(36)}`;
-    const conv = { id, title: "新聊天", updatedAt: Date.now(), pinned: false, archived: false, projectId: null };
+    const conv = {
+      id,
+      title: t("threebox.shell.newChat", "新聊天"),
+      updatedAt: Date.now(),
+      pinned: false,
+      archived: false,
+      projectId: null
+    };
     conversations.unshift(conv);
     activeConversationId = id;
+    void putConversation(conv);
     renderHistoryList();
     return conv;
   }
@@ -344,9 +367,10 @@ export function createThreeBoxSidebar(host = {}) {
       return;
     }
     conv.updatedAt = Date.now();
-    if (conv.title === "新聊天" && titleHint) {
+    if (conv.title === t("threebox.shell.newChat", "新聊天") && titleHint) {
       conv.title = titleHint.length > 24 ? `${titleHint.slice(0, 24)}…` : titleHint;
     }
+    void putConversation(conv);
     renderHistoryList();
   }
 
@@ -355,12 +379,12 @@ export function createThreeBoxSidebar(host = {}) {
       if (host.openAiConfig) {
         host.openAiConfig();
       } else {
-        showToast("AI 配置面板将在后续里程碑接入。", "info");
+        showToast(t("threebox.sidebar.toastAiConfigComingSoon", "AI 配置面板将在后续里程碑接入。"), "info");
       }
     });
     navNewChatBtn?.addEventListener("click", () => {
       createNewChat();
-      showToast("已新建聊天。", "success");
+      showToast(t("threebox.sidebar.toastNewChat", "已新建聊天。"), "success");
     });
     navSearchChatBtn?.addEventListener("click", openSearchChatModal);
     searchChatCloseBtn?.addEventListener("click", closeSearchChatModal);
@@ -372,14 +396,16 @@ export function createThreeBoxSidebar(host = {}) {
     searchChatInput?.addEventListener("input", () => renderSearchChatResults(searchChatInput.value));
 
     newProjectBtn?.addEventListener("click", () => {
-      const name = window.prompt("新建项目名称：", "");
+      const name = window.prompt(t("threebox.sidebar.newProjectPrompt", "新建项目名称："), "");
       const trimmed = (name || "").trim();
       if (!trimmed) {
         return;
       }
-      projects.push({ id: `proj-${Date.now().toString(36)}`, name: trimmed });
+      const project = { id: `proj-${Date.now().toString(36)}`, name: trimmed };
+      projects.push(project);
+      void putProject(project);
       renderProjects();
-      showToast(`已新建项目「${trimmed}」。`, "success");
+      showToast(t("threebox.sidebar.toastNewProject", "已新建项目「{name}」。", { name: trimmed }), "success");
     });
 
     templateSearchInput?.addEventListener("input", () => {
@@ -408,11 +434,11 @@ export function createThreeBoxSidebar(host = {}) {
           if (host.openSettings) {
             host.openSettings();
           } else {
-            showToast("设置面板将在后续里程碑接入。", "info");
+            showToast(t("threebox.sidebar.toastSettingsComingSoon", "设置面板将在后续里程碑接入。"), "info");
           }
           return;
         }
-        showToast("该功能将在后续里程碑接入。", "info");
+        showToast(t("threebox.sidebar.toastFeatureComingSoon", "该功能将在后续里程碑接入。"), "info");
       });
     });
   }
@@ -439,7 +465,13 @@ export function createThreeBoxSidebar(host = {}) {
     });
   }
 
-  function init() {
+  async function init() {
+    const [loadedConversations, loadedProjects] = await Promise.all([
+      getAllConversations().catch(() => []),
+      getAllProjects().catch(() => [])
+    ]);
+    conversations = loadedConversations;
+    projects = loadedProjects;
     renderProjects();
     renderHistoryList();
     wireHistoryContextMenu();
@@ -448,8 +480,16 @@ export function createThreeBoxSidebar(host = {}) {
     wireTemplateGalleryMemory();
   }
 
+  /** Re-renders every dynamic (non data-i18n-attributed) list after a locale switch, so labels
+   * like relative-time strings and empty-state hints pick up the new language immediately. */
+  function refresh() {
+    renderProjects();
+    renderHistoryList();
+  }
+
   return {
     init,
+    refresh,
     getActiveConversationId: () => activeConversationId,
     createNewChat,
     ensureActiveConversation,

@@ -141,3 +141,7 @@ After starting a static server, open [`index.html`](index.html) at the repo root
 ## License
 
 [MIT](./LICENSE)
+
+## Trademark
+
+"ThreeJSON" and the ThreeJSON logo are trademarks of the ThreeJSON project. The MIT license covers the source code only and does not grant rights to the ThreeJSON name/logo. See [TRADEMARK.md](./TRADEMARK.md) (中文版：[TRADEMARK.zh-CN.md](./TRADEMARK.zh-CN.md)) for usage guidelines and how to report impersonation.

@@ -11,9 +11,30 @@ import {
   persistThreeBoxSettings
 } from "./threeBoxSettingsStore.js";
 import { showToast } from "./threeBoxUiFeedback.js";
+import { t } from "../../shared/i18n/index.js";
 
 function createProviderId() {
   return `provider-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+/** Derives a stable i18n key from a field's storage path (e.g. "general.locale" ->
+ * "threebox.settings.field.general_locale") rather than storing the key in the schema itself —
+ * keeps threeBoxSettingsSchema.js as plain zh-CN data (used as the `t()` fallback) while this
+ * module owns the translation lookup. */
+function fieldLabelKey(field) {
+  return `threebox.settings.field.${field.path.replace(/\./g, "_")}`;
+}
+
+function fieldPlaceholderKey(field) {
+  return `threebox.settings.fieldPlaceholder.${field.path.replace(/\./g, "_")}`;
+}
+
+function optionLabelKey(field, value) {
+  return `threebox.settings.option.${field.path.replace(/\./g, "_")}.${value}`;
+}
+
+function sectionTitleKey(section) {
+  return `threebox.settings.section.${section.id}`;
 }
 
 /**
@@ -39,7 +60,7 @@ export function createThreeBoxSettingsModal(host = {}) {
     row.className = "settingsField";
     const label = document.createElement("label");
     label.className = "settingsFieldLabel";
-    label.textContent = field.label;
+    label.textContent = t(fieldLabelKey(field), field.label);
     row.appendChild(label);
 
     const controlWrap = document.createElement("div");
@@ -57,7 +78,7 @@ export function createThreeBoxSettingsModal(host = {}) {
       for (const [optValue, optLabel] of field.options || []) {
         const opt = document.createElement("option");
         opt.value = optValue;
-        opt.textContent = optLabel;
+        opt.textContent = t(optionLabelKey(field, optValue), optLabel);
         input.appendChild(opt);
       }
       input.value = value ?? "";
@@ -69,6 +90,12 @@ export function createThreeBoxSettingsModal(host = {}) {
       if (field.max != null) input.max = field.max;
       input.value = value ?? 0;
       input.addEventListener("change", () => setSettingsByPath(draft, field.path, Number(input.value)));
+    } else if (field.type === "textarea") {
+      input = document.createElement("textarea");
+      input.rows = field.rows || 3;
+      input.placeholder = field.placeholder ? t(fieldPlaceholderKey(field), field.placeholder) : "";
+      input.value = value ?? "";
+      input.addEventListener("change", () => setSettingsByPath(draft, field.path, input.value));
     } else {
       input = document.createElement("input");
       input.type = "text";
@@ -87,11 +114,11 @@ export function createThreeBoxSettingsModal(host = {}) {
     const labelRow = document.createElement("div");
     labelRow.className = "providerCardRow";
     const labelLabel = document.createElement("label");
-    labelLabel.textContent = "名称";
+    labelLabel.textContent = t("threebox.settings.provider.nameLabel", "名称");
     const labelInput = document.createElement("input");
     labelInput.type = "text";
     labelInput.value = provider.label || "";
-    labelInput.placeholder = "例如：我的 OpenAI";
+    labelInput.placeholder = t("threebox.settings.provider.namePlaceholder", "例如：我的 OpenAI");
     labelInput.addEventListener("input", () => {
       provider.label = labelInput.value;
     });
@@ -102,12 +129,12 @@ export function createThreeBoxSettingsModal(host = {}) {
     const typeRow = document.createElement("div");
     typeRow.className = "providerCardRow";
     const typeLabel = document.createElement("label");
-    typeLabel.textContent = "供应商";
+    typeLabel.textContent = t("threebox.settings.provider.typeLabel", "供应商");
     const typeSelect = document.createElement("select");
     for (const [val, text] of THREEBOX_PROVIDER_TYPES) {
       const opt = document.createElement("option");
       opt.value = val;
-      opt.textContent = text;
+      opt.textContent = t(`threebox.settings.providerType.${val}`, text);
       typeSelect.appendChild(opt);
     }
     typeSelect.value = provider.provider || "chatgpt";
@@ -123,7 +150,7 @@ export function createThreeBoxSettingsModal(host = {}) {
       const baseUrlRow = document.createElement("div");
       baseUrlRow.className = "providerCardRow";
       const baseUrlLabel = document.createElement("label");
-      baseUrlLabel.textContent = "Base URL";
+      baseUrlLabel.textContent = t("threebox.settings.provider.baseUrlLabel", "Base URL");
       const baseUrlInput = document.createElement("input");
       baseUrlInput.type = "text";
       baseUrlInput.value = provider.baseUrl || "";
@@ -139,11 +166,11 @@ export function createThreeBoxSettingsModal(host = {}) {
     const modelRow = document.createElement("div");
     modelRow.className = "providerCardRow";
     const modelLabel = document.createElement("label");
-    modelLabel.textContent = "模型";
+    modelLabel.textContent = t("threebox.settings.provider.modelLabel", "模型");
     const modelInput = document.createElement("input");
     modelInput.type = "text";
     modelInput.value = provider.model || "";
-    modelInput.placeholder = "留空使用默认模型";
+    modelInput.placeholder = t("threebox.settings.provider.modelPlaceholder", "留空使用默认模型");
     modelInput.addEventListener("input", () => {
       provider.model = modelInput.value;
     });
@@ -154,7 +181,7 @@ export function createThreeBoxSettingsModal(host = {}) {
     const keyRow = document.createElement("div");
     keyRow.className = "providerCardRow";
     const keyLabel = document.createElement("label");
-    keyLabel.textContent = "API Key";
+    keyLabel.textContent = t("threebox.settings.provider.apiKeyLabel", "API Key");
     const keyInput = document.createElement("input");
     keyInput.type = "password";
     keyInput.value = provider.apiKey || "";
@@ -169,7 +196,7 @@ export function createThreeBoxSettingsModal(host = {}) {
     const deleteBtn = document.createElement("button");
     deleteBtn.type = "button";
     deleteBtn.className = "providerCardDeleteBtn";
-    deleteBtn.textContent = "删除此供应商";
+    deleteBtn.textContent = t("threebox.settings.provider.deleteBtn", "删除此供应商");
     deleteBtn.addEventListener("click", () => {
       draft.ai.providers = draft.ai.providers.filter((p) => p.id !== provider.id);
       if (draft.ai.defaultProviderId === provider.id) {
@@ -188,7 +215,7 @@ export function createThreeBoxSettingsModal(host = {}) {
 
     const heading = document.createElement("div");
     heading.className = "settingsSectionHeading";
-    heading.textContent = "模型供应商";
+    heading.textContent = t("threebox.settings.providersHeading", "模型供应商");
     wrap.appendChild(heading);
 
     const providerList = document.createElement("div");
@@ -196,7 +223,7 @@ export function createThreeBoxSettingsModal(host = {}) {
     if (!draft.ai.providers?.length) {
       const hint = document.createElement("div");
       hint.className = "settingsEmptyHint";
-      hint.textContent = "尚未添加任何供应商，添加后可在聊天输入框选择使用的模型。";
+      hint.textContent = t("threebox.settings.providersEmptyHint", "尚未添加任何供应商，添加后可在聊天输入框选择使用的模型。");
       providerList.appendChild(hint);
     } else {
       for (const provider of draft.ai.providers) {
@@ -208,13 +235,20 @@ export function createThreeBoxSettingsModal(host = {}) {
     const addBtn = document.createElement("button");
     addBtn.type = "button";
     addBtn.className = "addProviderBtn";
-    addBtn.textContent = "+ 添加供应商";
+    addBtn.textContent = t("threebox.settings.addProviderBtn", "+ 添加供应商");
     addBtn.addEventListener("click", () => {
       if (!Array.isArray(draft.ai.providers)) {
         draft.ai.providers = [];
       }
       const id = createProviderId();
-      draft.ai.providers.push({ id, label: `供应商 ${draft.ai.providers.length + 1}`, provider: "chatgpt", model: "", apiKey: "", baseUrl: "" });
+      draft.ai.providers.push({
+        id,
+        label: t("threebox.settings.defaultProviderName", "供应商 {n}", { n: draft.ai.providers.length + 1 }),
+        provider: "chatgpt",
+        model: "",
+        apiKey: "",
+        baseUrl: ""
+      });
       if (!draft.ai.defaultProviderId) {
         draft.ai.defaultProviderId = id;
       }
@@ -227,7 +261,7 @@ export function createThreeBoxSettingsModal(host = {}) {
       defaultRow.className = "settingsField";
       const defaultLabel = document.createElement("label");
       defaultLabel.className = "settingsFieldLabel";
-      defaultLabel.textContent = "默认模型供应商";
+      defaultLabel.textContent = t("threebox.settings.defaultProviderLabel", "默认模型供应商");
       const defaultControl = document.createElement("div");
       defaultControl.className = "settingsFieldControl";
       const defaultSelect = document.createElement("select");
@@ -249,7 +283,7 @@ export function createThreeBoxSettingsModal(host = {}) {
 
     const behaviorHeading = document.createElement("div");
     behaviorHeading.className = "settingsSectionHeading";
-    behaviorHeading.textContent = "生成与调整行为";
+    behaviorHeading.textContent = t("threebox.settings.behaviorHeading", "生成与调整行为");
     wrap.appendChild(behaviorHeading);
 
     for (const field of fieldsForSection("ai")) {
@@ -286,7 +320,7 @@ export function createThreeBoxSettingsModal(host = {}) {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "settingsNavBtn";
-      btn.textContent = section.title;
+      btn.textContent = t(sectionTitleKey(section), section.title);
       btn.classList.toggle("active", section.id === activeSectionId);
       btn.addEventListener("click", () => {
         activeSectionId = section.id;
@@ -319,7 +353,7 @@ export function createThreeBoxSettingsModal(host = {}) {
     settings = cloneThreeBoxSettings(draft);
     persistThreeBoxSettings(settings);
     host.onSave?.(settings);
-    showToast("设置已保存。", "success");
+    showToast(t("threebox.settings.savedToast", "设置已保存。"), "success");
     close();
   }
 

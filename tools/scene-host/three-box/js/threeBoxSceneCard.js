@@ -1,25 +1,84 @@
 import { sceneHostAssetUrl } from "../../shared/js/sceneHostPaths.js";
+import { showToast } from "./threeBoxUiFeedback.js";
+import { t } from "../../shared/i18n/index.js";
+
+const EDITOR_OPEN_SCENE_BRIDGE_PREFIX = "threejson.editor.openScene.";
+const SCENE_PREVIEW_CHANNEL = "threejson:scene-preview";
+const SCENE_PREVIEW_VERSION = 1;
+
+function isScenePreviewMessageEvent(event) {
+  if (!event || typeof event.data !== "object" || event.data === null) {
+    return false;
+  }
+  if (event.origin && event.origin !== window.location.origin) {
+    return false;
+  }
+  const data = event.data;
+  return data.channel === SCENE_PREVIEW_CHANNEL && data.version === SCENE_PREVIEW_VERSION;
+}
+
+function postScenePreviewMessage(target, message) {
+  if (!target || target.closed) {
+    return false;
+  }
+  target.postMessage({ channel: SCENE_PREVIEW_CHANNEL, version: SCENE_PREVIEW_VERSION, ...message }, window.location.origin);
+  return true;
+}
+
+function downloadBlob(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function actionBtnHtml(title, glyph) {
+  return `<button type="button" class="sceneCardActionBtn" title="${title}" aria-label="${title}">${glyph}</button>`;
+}
 
 /**
- * Inline scene canvas embedded at the top of an AI-generated chat reply. Minimal render/dispose
- * for now (the hover action bar — copy JSON / export / open-in-editor / open-in-player /
- * fullscreen / JSON-canvas toggle — lands in a later milestone); this establishes the
- * create→dispose lifecycle pattern (mirrors shower's runScene: dispose the previous runtime
- * before creating the next one on the same canvas) that the action bar will build on.
+ * Inline scene canvas embedded at the end of an AI-generated chat reply, with an always-visible
+ * action bar below the canvas (download JSON / export .tjz / open in editor / open in player /
+ * fullscreen). Placed below rather than as a canvas hover overlay so it stays reliably reachable
+ * regardless of pointer/touch input and doesn't compete with orbit-control drag gestures on the
+ * canvas itself.
  */
 export function createThreeBoxSceneCard() {
   const el = document.createElement("div");
   el.className = "sceneCard";
+  const canvasWrap = document.createElement("div");
+  canvasWrap.className = "sceneCardCanvasWrap";
+  el.appendChild(canvasWrap);
   const canvas = document.createElement("canvas");
   canvas.className = "sceneCardCanvas";
-  el.appendChild(canvas);
+  canvasWrap.appendChild(canvas);
   const loadingMask = document.createElement("div");
   loadingMask.className = "sceneCardLoadingMask";
-  loadingMask.textContent = "正在渲染场景…";
-  el.appendChild(loadingMask);
+  loadingMask.textContent = t("threebox.sceneCard.rendering", "正在渲染场景…");
+  canvasWrap.appendChild(loadingMask);
+
+  const actionBar = document.createElement("div");
+  actionBar.className = "sceneCardActionBar";
+  actionBar.innerHTML = [
+    actionBtnHtml(t("threebox.sceneCard.downloadJson", "下载 JSON"), "&#8681;"),
+    actionBtnHtml(t("threebox.sceneCard.exportTjz", "导出 .tjz 场景包"), "&#128230;"),
+    actionBtnHtml(t("threebox.sceneCard.openInEditor", "在编辑器内打开"), "&#9998;"),
+    actionBtnHtml(t("threebox.sceneCard.openInPlayer", "在播放器内打开"), "&#9654;"),
+    actionBtnHtml(t("threebox.sceneCard.refresh", "刷新画布"), "&#8635;"),
+    actionBtnHtml(t("threebox.sceneCard.fullscreen", "全屏"), "&#10021;")
+  ].join("");
+  el.appendChild(actionBar);
+  const [downloadBtn, exportBtn, openEditorBtn, openPlayerBtn, refreshBtn, fullscreenBtn] =
+    actionBar.querySelectorAll(".sceneCardActionBtn");
 
   let runtime = null;
   let liveResizeObserver = null;
+  let currentSceneJson = null;
+  let currentLabel = t("threebox.sceneCard.defaultLabel", "ThreeBox 场景");
 
   /** Keeps the canvas in sync with its container's actual size after first paint (e.g. the left
    * dock being pinned/unpinned reflows the message column width) — createJsonScene's own
@@ -39,7 +98,7 @@ export function createThreeBoxSceneCard() {
       canvas.style.height = `${height}px`;
       runtime.resize?.({ width, height });
     });
-    liveResizeObserver.observe(el);
+    liveResizeObserver.observe(canvasWrap);
   }
 
   /** Resolves with the element's actual laid-out content-box size. More reliable than
@@ -60,10 +119,14 @@ export function createThreeBoxSceneCard() {
     });
   }
 
-  async function render(sceneJsonPayload) {
+  async function render(sceneJsonPayload, options = {}) {
     const { createJsonScene } = await import("threejson/core");
     runtime?.dispose?.();
-    const { width, height } = await waitForStableSize(el);
+    currentSceneJson = sceneJsonPayload;
+    currentLabel =
+      options.label || sceneJsonPayload?.label || sceneJsonPayload?.name || t("threebox.sceneCard.defaultLabel", "ThreeBox 场景");
+    loadingMask.hidden = false;
+    const { width, height } = await waitForStableSize(canvasWrap);
     // Pin the canvas's own CSS box explicitly: core's render loop resizes against
     // canvas.clientWidth/clientHeight on its first frame regardless of payload.canvasWidth/Height
     // (see core/handler/frameLoopHandler.js), so a canvas that merely inherits width:100% from an
@@ -107,6 +170,122 @@ export function createThreeBoxSceneCard() {
     runtime?.dispose?.();
     runtime = null;
   }
+
+  function requireSceneJson() {
+    if (!currentSceneJson) {
+      showToast(t("threebox.sceneCard.notReady", "场景尚未生成完成。"), "warning");
+      return null;
+    }
+    return currentSceneJson;
+  }
+
+  downloadBtn.addEventListener("click", () => {
+    const sceneJson = requireSceneJson();
+    if (!sceneJson) {
+      return;
+    }
+    const blob = new Blob([JSON.stringify(sceneJson, null, 2)], { type: "application/json" });
+    downloadBlob(blob, `${currentLabel}.json`);
+  });
+
+  exportBtn.addEventListener("click", async () => {
+    const sceneJson = requireSceneJson();
+    if (!sceneJson) {
+      return;
+    }
+    exportBtn.disabled = true;
+    try {
+      const { packJsonSceneArchive } = await import("threejson/core");
+      const blob = await packJsonSceneArchive(sceneJson, { outputType: "blob" });
+      downloadBlob(blob, `${currentLabel}.tjz`);
+    } catch (error) {
+      showToast(t("threebox.sceneCard.exportFailed", "导出失败：{error}", { error: error?.message || error }), "error");
+    } finally {
+      exportBtn.disabled = false;
+    }
+  });
+
+  openEditorBtn.addEventListener("click", () => {
+    const sceneJson = requireSceneJson();
+    if (!sceneJson) {
+      return;
+    }
+    try {
+      const bridgeId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem(
+        `${EDITOR_OPEN_SCENE_BRIDGE_PREFIX}${bridgeId}`,
+        JSON.stringify({ source: "threebox", createdAt: Date.now(), label: currentLabel, sceneJson })
+      );
+      const url = `../editor/index.html?openFrom=threebox&sceneKey=${encodeURIComponent(bridgeId)}`;
+      window.open(url, "_blank", "noopener");
+    } catch (error) {
+      showToast(
+        t("threebox.sceneCard.openInEditorFailed", "在编辑器内打开失败：{error}", { error: error?.message || error }),
+        "error"
+      );
+    }
+  });
+
+  openPlayerBtn.addEventListener("click", () => {
+    const sceneJson = requireSceneJson();
+    if (!sceneJson) {
+      return;
+    }
+    const win = window.open("../player/index.html?editorPreview=1", "_blank");
+    if (!win) {
+      showToast(t("threebox.sceneCard.popupBlocked", "无法打开新窗口，请检查浏览器弹窗拦截设置。"), "warning");
+      return;
+    }
+    let sent = false;
+    const onMessage = (event) => {
+      if (!isScenePreviewMessageEvent(event) || event.source !== win) {
+        return;
+      }
+      if (event.data?.action === "ready" && !sent) {
+        sent = true;
+        postScenePreviewMessage(win, { action: "load", payload: sceneJson, label: currentLabel, bindSceneEvents: false });
+      }
+      if (event.data?.action === "loaded") {
+        window.removeEventListener("message", onMessage);
+        if (!event.data.ok) {
+          showToast(
+            t("threebox.sceneCard.openInPlayerFailed", "在播放器内打开失败：{error}", { error: event.data.error || "" }),
+            "error"
+          );
+        }
+      }
+    };
+    window.addEventListener("message", onMessage);
+    setTimeout(() => window.removeEventListener("message", onMessage), 15000);
+  });
+
+  /** Reloads the SAME JSON this card currently holds back into the canvas, from scratch. This is
+   * a plain re-render of `currentSceneJson` (whatever this card instance was last rendered with) —
+   * not a re-fetch of anything — so a card showing a live turn's freshly-adjusted result reloads
+   * that result, and a card showing a past conversation's history (rendered by switchToConversation
+   * from cached/reconstructed JSON) reloads that same historical JSON, never today's latest turn. */
+  refreshBtn.addEventListener("click", async () => {
+    const sceneJson = requireSceneJson();
+    if (!sceneJson) {
+      return;
+    }
+    refreshBtn.disabled = true;
+    try {
+      await render(sceneJson, { label: currentLabel });
+    } finally {
+      refreshBtn.disabled = false;
+    }
+  });
+
+  fullscreenBtn.addEventListener("click", () => {
+    if (document.fullscreenElement === canvasWrap) {
+      void document.exitFullscreen();
+      return;
+    }
+    canvasWrap.requestFullscreen?.().catch((error) => {
+      showToast(t("threebox.sceneCard.fullscreenFailed", "进入全屏失败：{error}", { error: error?.message || error }), "warning");
+    });
+  });
 
   return { el, canvas, render, dispose, getRuntime: () => runtime };
 }

@@ -13,12 +13,21 @@ import {
   runThreeBoxSummary,
   classifyThreeBoxTurnIntent,
   resolveAdjustContextPayload,
-  exportRuntimeSceneJsonString,
-  isProviderVisionCapable
+  isProviderVisionCapable,
+  resolveTurnSceneJsonString
 } from "./threeBoxOrchestrator.js";
 import { createThreeBoxAttachedContext } from "./threeBoxAttachedContext.js";
 import { wireThreeBoxComposerStub } from "./threeBoxComposerStub.js";
+import { createThreeBoxResourceLibrary } from "./threeBoxResourceLibrary.js";
 import { buildStructuredTurnEnvelope } from "threejson/core";
+import { initHostI18n, applyShellI18n, getHostLocale, t } from "../../shared/i18n/index.js";
+
+/** Human-readable language name for the AI recap prompt (see core/ai/sceneChatSession.js's
+ * `responseLanguage`) — keeps the "简短总结" text following the current UI locale setting instead
+ * of whatever language the user happened to type their request in. */
+function resolveSummaryResponseLanguage() {
+  return getHostLocale() === "zh-CN" ? "Simplified Chinese" : "English";
+}
 
 function populateComposerModelSelect(settings) {
   const select = document.getElementById("composerModelSelect");
@@ -31,7 +40,7 @@ function populateComposerModelSelect(settings) {
   if (providers.length === 0) {
     const opt = document.createElement("option");
     opt.value = "";
-    opt.textContent = "未配置模型";
+    opt.textContent = t("threebox.app.noModelConfigured", "未配置模型");
     select.appendChild(opt);
     return;
   }
@@ -46,6 +55,37 @@ function populateComposerModelSelect(settings) {
 }
 
 async function main() {
+  // `createThreeBoxSettingsModal` reads persisted settings synchronously (no `.init()` needed to
+  // call `.getSettings()`), so it's constructed first purely to read `general.locale` for the
+  // locale bootstrap below — nothing about it renders yet.
+  const settingsModal = createThreeBoxSettingsModal({
+    onSave: (settings) => {
+      populateComposerModelSelect(settings);
+      void applyHostLocaleFromSettings(settings);
+    }
+  });
+
+  /** Applies the "界面语言" (general.locale) setting to every data-i18n-tagged element in the
+   * shell (sidebar, composer, hero, modals) plus every module that renders dynamic, non-attribute
+   * content (sidebar history/relative time, template cards, resource list, pin-button tooltip) —
+   * previously this setting was saved but never actually applied anywhere, so switching languages
+   * had no visible effect. `viewChrome`/`sidebar`/`templateGallery`/`resourceLibrary` are declared
+   * with `let`/`const` further down in `main()`; this function is only ever *invoked* after
+   * they've been assigned (once eagerly right below their declarations, and again later from
+   * `onSave`), so the closure over them here is safe despite the temporal-dead-zone-looking
+   * forward reference. */
+  async function applyHostLocaleFromSettings(settings) {
+    await initHostI18n(settings?.general?.locale);
+    applyShellI18n(document);
+    viewChrome?.refresh();
+    resourceLibrary?.refresh();
+    sidebar?.refresh();
+    templateGallery?.refresh();
+  }
+  // Bootstrap the locale before any dynamic content renders for the first time.
+  await initHostI18n(settingsModal.getSettings()?.general?.locale);
+  applyShellI18n(document);
+
   const viewChrome = createThreeBoxViewChrome();
   viewChrome.init();
 
@@ -53,16 +93,16 @@ async function main() {
   const templateGallery = createThreeBoxTemplateGallery({
     onSelectTemplate: (item, payload) => attachedContext.setTemplate(item, payload)
   });
-  const settingsModal = createThreeBoxSettingsModal({
-    onSave: (settings) => populateComposerModelSelect(settings)
-  });
+  const resourceLibrary = createThreeBoxResourceLibrary({ attachedContext });
+  resourceLibrary.init();
   settingsModal.init();
   populateComposerModelSelect(settingsModal.getSettings());
 
   let sidebar;
   // Each rendered scene card stays live in the DOM for the lifetime of the conversation (turns
-  // are never disposed until "新聊天"/clear), so a later adjust turn can mutate an EARLIER turn's
-  // still-live runtime directly via commands, rather than only ever regenerating full JSON.
+  // are never disposed until "新聊天"/clear). History is immutable: an adjust turn always builds
+  // its own private offscreen runtime (see threeBoxOrchestrator.js) and renders the result into a
+  // brand-new scene card for the NEW turn — an earlier turn's card is never touched.
   const sceneCardsByTurnId = new Map();
 
   function getVisionCapable() {
@@ -72,9 +112,21 @@ async function main() {
   }
 
   function stageResultLabel(stage) {
-    if (stage === "commands") return "操作命令";
-    if (stage === "json-incremental") return "JSON Patch";
-    return "完整 JSON";
+    if (stage === "commands") return t("threebox.app.stageCommands", "操作命令");
+    if (stage === "json-incremental") return t("threebox.app.stageJsonPatch", "JSON Patch");
+    return t("threebox.app.stageFullJson", "完整 JSON");
+  }
+
+  /** Resolves a turn's full scene JSON string, reconstructing it via command replay when the turn
+   * was diff-cached (io.turnCacheMode "diff" — see threeBoxSettingsSchema.js and
+   * threeBoxOrchestrator.js's resolveTurnSceneJsonString). Turns cached in "full" mode (the
+   * default) always have sceneJson already, so this is a no-op fast path for them. */
+  async function resolveSceneJsonStringForTurn(turn, conversationId) {
+    if (turn.sceneJson) {
+      return turn.sceneJson;
+    }
+    const orderedTurns = await getTurnsForConversation(conversationId);
+    return resolveTurnSceneJsonString(orderedTurns, turn.id);
   }
 
   async function handleGenerateTurn(text, api, { conversationId, turnId }) {
@@ -91,30 +143,38 @@ async function main() {
       const { sceneJson, sceneJsonString } = await runThreeBoxGenerateTurn({
         userPrompt: text,
         providerOptions,
+        globalPromptPrefix: settings.ai?.globalPromptPrefix,
         onDelta: (delta) => {
           streamBuffer += delta;
           streaming.update(streamBuffer);
         }
       });
 
-      const digest = buildResultDigest(sceneJson);
-      const recap =
-        (await runThreeBoxSummary({
-          userPrompt: text,
-          mode: "generate",
-          turnId,
-          resultDigest: digest,
-          providerOptions
-        }).catch(() => "")) || "已根据您的描述生成场景。";
-
       streaming.remove();
-      api.updateAssistantMessage(textEl, recap);
       api.appendToBody(textEl, api.buildJsonCollapse(sceneJsonString));
       const sceneCard = createThreeBoxSceneCard();
       api.appendToBody(textEl, sceneCard.el);
-      await sceneCard.render(sceneJson);
+      await sceneCard.render(sceneJson, { label: text });
       sceneCardsByTurnId.set(turnId, sceneCard);
 
+      let recap = "";
+      if (settings.ai?.includeTurnSummary !== false) {
+        const digest = buildResultDigest(sceneJson);
+        recap =
+          (await runThreeBoxSummary({
+            userPrompt: text,
+            mode: "generate",
+            turnId,
+            resultDigest: digest,
+            providerOptions,
+            responseLanguage: resolveSummaryResponseLanguage()
+          }).catch(() => "")) || t("threebox.app.defaultGenerateRecap", "已根据您的描述生成场景。");
+        api.appendToBody(textEl, api.buildSummaryBlock(recap));
+      }
+
+      // The first turn of a conversation is always the reconstruction anchor for any later
+      // diff-cached ("commands"-only) turns, so it always keeps a full sceneJson regardless of
+      // io.turnCacheMode.
       await putTurn({
         id: turnId,
         conversationId,
@@ -122,7 +182,9 @@ async function main() {
         userPrompt: text,
         mode: "generate",
         targetTurnId: null,
+        stage: "generate",
         sceneJson: sceneJsonString,
+        commands: null,
         spatialSummary: "",
         recapSummary: recap,
         createdAt: Date.now()
@@ -131,7 +193,7 @@ async function main() {
     } catch (error) {
       console.error("[three-box] generate turn failed:", error);
       streaming.remove();
-      api.updateAssistantMessage(textEl, `生成失败：${error?.message || error}`);
+      api.updateAssistantMessage(textEl, t("threebox.app.generateFailed", "生成失败：{error}", { error: error?.message || error }));
     }
   }
 
@@ -141,12 +203,18 @@ async function main() {
     const providerOptions = resolveProviderOptions(settings, selectedProviderId);
 
     const targetTurn = await getTurn(targetTurnId);
-    if (!targetTurn?.sceneJson) {
+    if (!targetTurn) {
       // Safe fallback: target turn vanished from cache (e.g. cleared) — treat as a fresh generate.
       return handleGenerateTurn(text, api, { conversationId, turnId });
     }
-    const targetSceneJson = JSON.parse(targetTurn.sceneJson);
-    const targetSceneCard = sceneCardsByTurnId.get(targetTurnId);
+    let targetSceneJsonString;
+    try {
+      targetSceneJsonString = await resolveSceneJsonStringForTurn(targetTurn, conversationId);
+    } catch (error) {
+      console.error("[three-box] failed to resolve target scene JSON:", error);
+      return handleGenerateTurn(text, api, { conversationId, turnId });
+    }
+    const targetSceneJson = JSON.parse(targetSceneJsonString);
 
     const textEl = api.appendAssistantMessage("");
     const streaming = api.createStreamingBlock();
@@ -159,14 +227,14 @@ async function main() {
         userPrompt: text,
         intent: "adjust",
         targetTurnId,
-        contextPayload
+        contextPayload,
+        globalPromptPrefix: settings.ai?.globalPromptPrefix
       });
 
       const result = await runThreeBoxAdjustTurn({
         userPrompt: text,
         envelope,
-        targetSceneJsonString: targetTurn.sceneJson,
-        runtime: targetSceneCard?.getRuntime?.(),
+        targetSceneJsonString,
         providerOptions,
         onDelta: (delta) => {
           streamBuffer += delta;
@@ -174,32 +242,52 @@ async function main() {
         }
       });
 
-      let sceneJson = result.sceneJson;
-      let sceneJsonString = result.sceneJsonString;
-      if (result.stage === "commands") {
-        sceneJsonString = exportRuntimeSceneJsonString(targetSceneCard.getRuntime());
-        sceneJson = JSON.parse(sceneJsonString);
-      }
-
-      const digest = buildResultDigest(sceneJson);
-      const recap =
-        (await runThreeBoxSummary({
-          userPrompt: text,
-          mode: "adjust",
-          targetTurnId,
-          turnId,
-          resultDigest: digest,
-          providerOptions
-        }).catch(() => "")) || `已通过${stageResultLabel(result.stage)}调整了场景。`;
+      const sceneJson = result.sceneJson;
+      const sceneJsonString = result.sceneJsonString;
 
       streaming.remove();
-      api.updateAssistantMessage(textEl, `${recap}（方式：${stageResultLabel(result.stage)}）`);
+      // Show what the AI actually produced (commands / JSON Patch) above the merged final JSON,
+      // so the user can see the diff the model generated instead of only the end result.
+      if (result.stage === "commands" && result.commands?.length) {
+        api.appendToBody(textEl, api.buildDiffCollapse("commands", JSON.stringify(result.commands, null, 2)));
+      } else if (result.stage === "json-incremental" && result.patch) {
+        api.appendToBody(textEl, api.buildDiffCollapse("patch", JSON.stringify(result.patch, null, 2)));
+      }
       api.appendToBody(textEl, api.buildJsonCollapse(sceneJsonString));
       const sceneCard = createThreeBoxSceneCard();
       api.appendToBody(textEl, sceneCard.el);
-      await sceneCard.render(sceneJson);
+      await sceneCard.render(sceneJson, { label: text });
       sceneCardsByTurnId.set(turnId, sceneCard);
 
+      let recap = "";
+      if (settings.ai?.includeTurnSummary !== false) {
+        const digest = buildResultDigest(sceneJson);
+        recap =
+          (await runThreeBoxSummary({
+            userPrompt: text,
+            mode: "adjust",
+            targetTurnId,
+            turnId,
+            resultDigest: digest,
+            providerOptions,
+            responseLanguage: resolveSummaryResponseLanguage()
+          }).catch(() => "")) ||
+          t("threebox.app.defaultAdjustRecap", "已通过{stage}调整了场景。", { stage: stageResultLabel(result.stage) });
+        api.appendToBody(
+          textEl,
+          api.buildSummaryBlock(
+            t("threebox.app.adjustRecapWithMethod", "{recap}（方式：{stage}）", { recap, stage: stageResultLabel(result.stage) })
+          )
+        );
+      }
+
+      // `commands`/`patch` are stored for display (item ④'s "查看调整命令/JSON Patch" collapse)
+      // regardless of cache mode. Only whether sceneJson itself is also stored is gated by
+      // io.turnCacheMode — diff mode drops it for "commands"-stage turns (the only stage with a
+      // replayable delta; json-incremental/json-full always keep the full JSON since there's no
+      // cheaper way to reconstruct them).
+      const diffCacheEligible = result.stage === "commands" && result.commands?.length;
+      const useDiffCache = settings.io?.turnCacheMode === "diff" && diffCacheEligible;
       await putTurn({
         id: turnId,
         conversationId,
@@ -207,7 +295,10 @@ async function main() {
         userPrompt: text,
         mode: "adjust",
         targetTurnId,
-        sceneJson: sceneJsonString,
+        stage: result.stage,
+        sceneJson: useDiffCache ? null : sceneJsonString,
+        commands: result.stage === "commands" ? result.commands || null : null,
+        patch: result.stage === "json-incremental" ? result.patch || null : null,
         spatialSummary: "",
         recapSummary: recap,
         createdAt: Date.now()
@@ -216,15 +307,15 @@ async function main() {
     } catch (error) {
       console.error("[three-box] adjust turn failed:", error);
       streaming.remove();
-      api.updateAssistantMessage(textEl, `调整失败：${error?.message || error}`);
+      api.updateAssistantMessage(textEl, t("threebox.app.adjustFailed", "调整失败：{error}", { error: error?.message || error }));
     }
   }
 
   /** Consumes a sidebar-attached template (if any) as a "seed" turn: cached + rendered exactly
    * like a real turn, but with no AI call — it's the attached JSON verbatim. The user's actual
    * typed message is then handled as an adjust of this seed turn (see handleUserMessage), so it
-   * flows through the same commands→patch→full fallback chain as any other adjustment, with a
-   * live runtime available for the commands stage. Returns null if nothing was attached. */
+   * flows through the same commands→patch→full fallback chain as any other adjustment. Returns
+   * null if nothing was attached. */
   async function consumeAttachedContextAsSeedTurn(api) {
     const attached = attachedContext.get();
     if (!attached) {
@@ -236,40 +327,71 @@ async function main() {
     const seedTurnId = createTurnId();
     const sceneJsonString = JSON.stringify(attached.sceneJson, null, 2);
 
-    const textEl = api.appendAssistantMessage(`已应用模板「${attached.label}」作为上下文。`);
+    const textEl = api.appendAssistantMessage(
+      t("threebox.app.templateAppliedMessage", "已应用模板「{label}」作为上下文。", { label: attached.label })
+    );
     const sceneCard = createThreeBoxSceneCard();
     api.appendToBody(textEl, sceneCard.el);
-    await sceneCard.render(attached.sceneJson);
+    await sceneCard.render(attached.sceneJson, { label: attached.label });
     sceneCardsByTurnId.set(seedTurnId, sceneCard);
 
+    // A seed turn is a reconstruction anchor for anything adjusted from it, exactly like a
+    // "generate" turn, so it always keeps a full sceneJson regardless of io.turnCacheMode.
     await putTurn({
       id: seedTurnId,
       conversationId,
       seq: Date.now(),
-      userPrompt: `(模板) ${attached.label}`,
+      userPrompt: t("threebox.app.templateUserPromptPrefix", "(模板) {label}", { label: attached.label }),
       mode: "template",
       targetTurnId: null,
+      stage: "template",
       sceneJson: sceneJsonString,
+      commands: null,
       spatialSummary: "",
-      recapSummary: `已应用模板「${attached.label}」。`,
+      recapSummary: t("threebox.app.templateAppliedRecap", "已应用模板「{label}」。", { label: attached.label }),
       createdAt: Date.now()
     });
-    sidebar.touchActiveConversation(`模板：${attached.label}`);
+    sidebar.touchActiveConversation(t("threebox.app.templateTouchLabel", "模板：{label}", { label: attached.label }));
     return { conversationId, seedTurnId };
   }
 
   async function handleUserMessage(text, api) {
+    try {
+      await handleUserMessageUnsafe(text, api);
+    } catch (error) {
+      // Last-resort safety net: any uncaught error in the routing logic above (e.g. a malformed
+      // attached template/upload throwing inside sceneCard.render()) must still surface to the
+      // user instead of vanishing — an unhandled rejection here would otherwise leave the chat
+      // looking like it did nothing at all after Send was clicked.
+      console.error("[three-box] handleUserMessage failed:", error);
+      api.appendAssistantMessage(t("threebox.app.processingFailed", "处理失败：{error}", { error: error?.message || error }));
+    }
+  }
+
+  async function handleUserMessageUnsafe(text, api) {
     const settings = settingsModal.getSettings();
     const selectedProviderId = document.getElementById("composerModelSelect")?.value;
     const providerOptions = resolveProviderOptions(settings, selectedProviderId);
     if (!providerOptions || !providerOptions.apiKey) {
       api.appendAssistantMessage(
-        "尚未配置可用的 AI 供应商。请点击左侧「AI 配置」，添加一个供应商并填写 API Key 后再试。"
+        t(
+          "threebox.app.noProviderConfigured",
+          "尚未配置可用的 AI 供应商。请点击左侧「AI 配置」，添加一个供应商并填写 API Key 后再试。"
+        )
       );
       return;
     }
 
-    const seed = await consumeAttachedContextAsSeedTurn(api);
+    let seed;
+    try {
+      seed = await consumeAttachedContextAsSeedTurn(api);
+    } catch (error) {
+      console.error("[three-box] consumeAttachedContextAsSeedTurn failed:", error);
+      api.appendAssistantMessage(
+        t("threebox.app.loadAttachedFailed", "加载已附加的场景失败：{error}", { error: error?.message || error })
+      );
+      return;
+    }
     if (seed) {
       const turnId = createTurnId();
       await handleAdjustTurn(text, api, { conversationId: seed.conversationId, turnId, targetTurnId: seed.seedTurnId });
@@ -321,12 +443,34 @@ async function main() {
     chatPanel.showMessagesView();
     for (const turn of turns) {
       chatPanel.appendMessage("user", turn.userPrompt);
-      const textEl = chatPanel.appendMessage("assistant", turn.recapSummary || "");
-      chatPanel.appendToBody(textEl, chatPanel.buildJsonCollapse(turn.sceneJson));
+      const textEl = chatPanel.appendMessage("assistant", "");
+      let sceneJsonString;
+      try {
+        // Diff-cached ("commands"-only) turns have no sceneJson of their own — reconstruct it by
+        // replaying commands from the nearest earlier full-JSON turn (see
+        // threeBoxOrchestrator.js's resolveTurnSceneJsonString).
+        sceneJsonString = await resolveSceneJsonStringForTurn(turn, conversationId);
+      } catch (error) {
+        console.error("[three-box] failed to reconstruct turn scene JSON:", turn.id, error);
+        chatPanel.updateAssistantMessage(
+          textEl,
+          t("threebox.app.replayFailed", "该轮场景重放失败：{error}", { error: error?.message || error })
+        );
+        continue;
+      }
+      if (turn.commands?.length) {
+        chatPanel.appendToBody(textEl, chatPanel.buildDiffCollapse("commands", JSON.stringify(turn.commands, null, 2)));
+      } else if (turn.patch) {
+        chatPanel.appendToBody(textEl, chatPanel.buildDiffCollapse("patch", JSON.stringify(turn.patch, null, 2)));
+      }
+      chatPanel.appendToBody(textEl, chatPanel.buildJsonCollapse(sceneJsonString));
       const sceneCard = createThreeBoxSceneCard();
       chatPanel.appendToBody(textEl, sceneCard.el);
-      await sceneCard.render(JSON.parse(turn.sceneJson));
+      await sceneCard.render(JSON.parse(sceneJsonString), { label: turn.userPrompt });
       sceneCardsByTurnId.set(turn.id, sceneCard);
+      if (turn.recapSummary) {
+        chatPanel.appendToBody(textEl, chatPanel.buildSummaryBlock(turn.recapSummary));
+      }
     }
   }
 
@@ -343,10 +487,14 @@ async function main() {
       void switchToConversation(conversationId);
     }
   });
-  sidebar.init();
+  await sidebar.init();
   await templateGallery.init();
 
-  wireThreeBoxComposerStub({ getVisionCapable });
+  wireThreeBoxComposerStub({
+    getVisionCapable,
+    attachedContext,
+    onResourceAdded: () => resourceLibrary.refresh()
+  });
 }
 
 main();
