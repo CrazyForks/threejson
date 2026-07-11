@@ -349,12 +349,36 @@ export function createThreeBoxSettingsModal(host = {}) {
     }
   }
 
-  function save() {
-    settings = cloneThreeBoxSettings(draft);
+  function commitSettings(nextSettings, { notify = true, toast = true, closeModal = true } = {}) {
+    settings = cloneThreeBoxSettings(nextSettings);
+    draft = cloneThreeBoxSettings(settings);
     persistThreeBoxSettings(settings);
-    host.onSave?.(settings);
-    showToast(t("threebox.settings.savedToast", "设置已保存。"), "success");
-    close();
+    if (notify) {
+      host.onSave?.(settings);
+    }
+    if (toast) {
+      showToast(t("threebox.settings.savedToast", "设置已保存。"), "success");
+    }
+    if (closeModal) {
+      close();
+    }
+    if (modal && !modal.hidden) {
+      renderNav();
+      renderActiveSection();
+    }
+  }
+
+  function save() {
+    commitSettings(draft);
+  }
+
+  function updateSettings(updater, options = {}) {
+    const next = cloneThreeBoxSettings(settings);
+    if (typeof updater === "function") {
+      updater(next);
+    }
+    commitSettings(next, options);
+    return settings;
   }
 
   function init() {
@@ -371,6 +395,7 @@ export function createThreeBoxSettingsModal(host = {}) {
     init,
     open,
     close,
+    updateSettings,
     getSettings: () => settings
   };
 }

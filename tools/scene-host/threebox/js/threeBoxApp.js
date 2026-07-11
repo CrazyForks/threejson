@@ -21,7 +21,43 @@ import { createThreeBoxAttachedContext } from "./threeBoxAttachedContext.js";
 import { wireThreeBoxComposerStub } from "./threeBoxComposerStub.js";
 import { createThreeBoxResourceLibrary } from "./threeBoxResourceLibrary.js";
 import { buildStructuredTurnEnvelope } from "threejson/core";
-import { initHostI18n, applyShellI18n, getHostLocale, t } from "../../shared/i18n/index.js";
+import { initHostI18n, applyShellI18n, getHostLocale, normalizeLocale, t } from "../../shared/i18n/index.js";
+
+function readRequestedLocaleFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location.search || "");
+    const raw = params.get("lang") || params.get("locale") || "";
+    return raw ? normalizeLocale(raw) : "";
+  } catch (_error) {
+    return "";
+  }
+}
+
+function localeDisplayName(locale, displayLocale) {
+  if (locale === "zh-CN") {
+    return displayLocale === "zh-CN" ? "中文" : "Chinese";
+  }
+  return displayLocale === "zh-CN" ? "英文" : "English";
+}
+
+function shouldPromptLocaleSwitch(settingsLocale, requestedLocale) {
+  const current = String(settingsLocale || "auto").trim();
+  return (current === "zh-CN" || current === "en-US")
+    && (requestedLocale === "zh-CN" || requestedLocale === "en-US")
+    && current !== requestedLocale;
+}
+
+function confirmLocaleSwitch(settingsLocale, requestedLocale) {
+  const zhRequested = localeDisplayName(requestedLocale, "zh-CN");
+  const zhCurrent = localeDisplayName(settingsLocale, "zh-CN");
+  const enRequested = localeDisplayName(requestedLocale, "en-US");
+  const enCurrent = localeDisplayName(settingsLocale, "en-US");
+  return window.confirm([
+    `官网当前为${zhRequested}，但 ThreeBox 当前为${zhCurrent}。是否将 ThreeBox 切换为${zhRequested}？`,
+    "",
+    `The website is currently in ${enRequested}, but ThreeBox is currently in ${enCurrent}. Switch ThreeBox to ${enRequested}?`
+  ].join("\n"));
+}
 
 /** Human-readable language name for the AI recap prompt (see core/ai/sceneChatSession.js's
  * `responseLanguage`) — keeps the "简短总结" text following the current UI locale setting instead
@@ -65,6 +101,13 @@ async function main() {
       void applyHostLocaleFromSettings(settings);
     }
   });
+  const requestedLocale = readRequestedLocaleFromUrl();
+  const currentSettingsLocale = settingsModal.getSettings()?.general?.locale || "auto";
+  if (shouldPromptLocaleSwitch(currentSettingsLocale, requestedLocale) && confirmLocaleSwitch(currentSettingsLocale, requestedLocale)) {
+    settingsModal.updateSettings((next) => {
+      next.general = { ...(next.general || {}), locale: requestedLocale };
+    }, { notify: false, toast: false, closeModal: false });
+  }
 
   /** Applies the "界面语言" (general.locale) setting to every data-i18n-tagged element in the
    * shell (sidebar, composer, hero, modals) plus every module that renders dynamic, non-attribute

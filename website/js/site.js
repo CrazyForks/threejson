@@ -1,6 +1,7 @@
 const ROOT = new URL("../../", import.meta.url);
 const READER = new URL("../../tools/reader/reader.html", import.meta.url);
 const MANIFEST_URL = new URL("../../assets/json/demo-show/manifest.json", import.meta.url);
+const DEFAULT_SHOWER_JSON = "assets/json/demo-show/minimal-scene/friendly-json.json";
 const PLACEHOLDER_IMG = new URL("../../assets/img/ThreeJSON.png", import.meta.url).href;
 const STORAGE = {
   lang: "threejson.site.lang",
@@ -40,6 +41,8 @@ const I18N = {
     "download.scenes": "下载模板",
     "tools.editor": "场景编辑器",
     "tools.player": "场景播放器",
+    "tools.shower": "场景展示器",
+    "tools.threebox": "ThreeBox",
     "tools.glossary": "术语手册",
     "tools.more": "案例展示",
     "community.contributors": "贡献者列表",
@@ -95,6 +98,8 @@ const I18N = {
     "download.scenes": "Download Templates",
     "tools.editor": "Scene Editor",
     "tools.player": "Scene Player",
+    "tools.shower": "Scene Shower",
+    "tools.threebox": "ThreeBox",
     "tools.glossary": "Glossary",
     "tools.more": "Case Gallery",
     "community.contributors": "Contributors",
@@ -194,6 +199,8 @@ function init() {
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
   document.getElementById("openEditorTool").addEventListener("click", openEditorTool);
   document.getElementById("openPlayerTool").addEventListener("click", openPlayerTool);
+  document.getElementById("openShowerTool").addEventListener("click", openShowerTool);
+  document.getElementById("openThreeBoxTool").addEventListener("click", openThreeBoxTool);
   document.getElementById("downloadSceneJsons").addEventListener("click", downloadSceneJsons);
   renderRoute();
 }
@@ -826,9 +833,19 @@ function openPlayerTool(event) {
   window.open(new URL("../../tools/scene-host/player/index.html", import.meta.url), "_blank", "noreferrer");
 }
 
+function openShowerTool(event) {
+  event.preventDefault();
+  const shower = new URL("../../tools/scene-host/shower/index.html", import.meta.url);
+  shower.searchParams.set("json", DEFAULT_SHOWER_JSON);
+  shower.searchParams.set("lang", lang);
+  window.open(shower.href, "_blank", "noreferrer");
+}
+
 function openThreeBoxTool(event) {
   event.preventDefault();
-  window.open(new URL("../../tools/scene-host/threebox/index.html", import.meta.url), "_blank", "noreferrer");
+  const threebox = new URL("../../tools/scene-host/threebox/index.html", import.meta.url);
+  threebox.searchParams.set("lang", lang);
+  window.open(threebox.href, "_blank", "noreferrer");
 }
 
 async function downloadSceneJsons(event) {
