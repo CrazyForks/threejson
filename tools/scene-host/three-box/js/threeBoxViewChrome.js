@@ -42,15 +42,21 @@ export function createThreeBoxViewChrome() {
   const leftFlyoutHost = document.getElementById("leftFlyoutHost");
   const leftDock = document.getElementById("leftDock");
   const leftDockPinBtn = document.getElementById("leftDockPinBtn");
+  const mobileMenuBtn = document.getElementById("mobileMenuBtn");
+  const mobileQuery = window.matchMedia(MOBILE_MEDIA_QUERY);
 
   let leftDockPinned = readPinnedFromStorage();
   let leftDockPeek = false;
   let peekHideTimer = null;
 
   function syncClasses() {
+    if (isMobileViewport()) {
+      leftDockPinned = false;
+    }
     rootContainer?.classList.toggle("leftDockPinned", leftDockPinned);
     rootContainer?.classList.toggle("leftDockPeek", leftDockPeek);
     leftDock?.setAttribute("aria-hidden", leftDockPinned || leftDockPeek ? "false" : "true");
+    mobileMenuBtn?.setAttribute("aria-expanded", leftDockPeek ? "true" : "false");
     if (leftDockPinBtn) {
       leftDockPinBtn.setAttribute("aria-pressed", leftDockPinned ? "true" : "false");
       leftDockPinBtn.title = leftDockPinned
@@ -91,14 +97,46 @@ export function createThreeBoxViewChrome() {
     syncClasses();
   }
 
+  function closeLeftDock() {
+    if (leftDockPinned && !isMobileViewport()) {
+      return;
+    }
+    clearTimeout(peekHideTimer);
+    leftDockPeek = false;
+    syncClasses();
+  }
+
+  function toggleMobilePeek() {
+    if (leftDockPeek) {
+      closeLeftDock();
+      return;
+    }
+    openMobilePeek();
+  }
+
+  function handleViewportChange() {
+    clearTimeout(peekHideTimer);
+    if (isMobileViewport()) {
+      leftDockPinned = false;
+      leftDockPeek = false;
+    } else {
+      leftDockPinned = readPinnedFromStorage();
+      leftDockPeek = leftDockPinned;
+    }
+    syncClasses();
+  }
+
   function init() {
     leftFlyoutHost?.addEventListener("mouseenter", () => {
+      if (isMobileViewport()) {
+        return;
+      }
       clearTimeout(peekHideTimer);
       leftDockPeek = true;
       syncClasses();
     });
     leftFlyoutHost?.addEventListener("mouseleave", () => {
-      if (!leftDockPinned) {
+      if (!leftDockPinned && !isMobileViewport()) {
         scheduleHide();
       }
     });
@@ -117,12 +155,18 @@ export function createThreeBoxViewChrome() {
       event.stopPropagation();
       togglePinned();
     });
-    document.getElementById("mobileMenuBtn")?.addEventListener("click", (event) => {
+    mobileMenuBtn?.addEventListener("click", (event) => {
       event.stopPropagation();
-      openMobilePeek();
+      toggleMobilePeek();
     });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeLeftDock();
+      }
+    });
+    mobileQuery.addEventListener?.("change", handleViewportChange);
     syncClasses();
   }
 
-  return { init, refresh: syncClasses };
+  return { init, refresh: syncClasses, closeLeftDock };
 }

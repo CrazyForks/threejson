@@ -476,8 +476,15 @@ async function main() {
 
   sidebar = createThreeBoxSidebar({
     onTemplateSearch: (query) => templateGallery.filter(query),
-    openAiConfig: () => settingsModal.open("ai"),
-    openSettings: () => settingsModal.open("general"),
+    openAiConfig: () => {
+      settingsModal.open("ai");
+      viewChrome.closeLeftDock();
+    },
+    openSettings: () => {
+      settingsModal.open("general");
+      viewChrome.closeLeftDock();
+    },
+    closeLeftDock: () => viewChrome.closeLeftDock(),
     onNewChat: () => {
       disposeAllSceneCards();
       attachedContext.clear();

@@ -574,18 +574,184 @@ details[open] > .sidebarSectionTitle::before { transform: rotate(90deg); }
    so the pin row is hidden and threeBoxViewChrome.js forces leftDockPinned=false on this
    viewport regardless of the desktop-persisted preference. ---- */
 @media (max-width: 720px) {
+  html, body { height: 100dvh; }
+  #rootContainer { height: 100dvh; }
   .mobileMenuBtn { display: flex; }
+  #rootContainer.leftDockPeek .mobileMenuBtn {
+    left: calc(min(88vw, 360px) + 8px);
+    background: var(--panel2);
+  }
   #rootContainer.leftDockPinned .mainArea { margin-left: 0; }
   .sidebarPinRow { display: none; }
   .flyoutHostLeft { width: var(--peekStripWidth); }
   #rootContainer.leftDockPinned .flyoutHostLeft,
   #rootContainer.leftDockPeek .flyoutHostLeft { width: 100vw; }
-  .leftDock { width: min(86vw, 340px); transform: translateX(-100%); }
+  .leftDock {
+    width: min(88vw, 360px);
+    transform: translateX(-100%);
+    border-right-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 16px 0 42px rgba(0, 0, 0, 0.42);
+  }
   #rootContainer.leftDockPinned .leftDock { transform: translateX(-100%); }
   #rootContainer.leftDockPeek .leftDock { transform: translateX(0); }
   #rootContainer.leftDockPeek .flyoutHostLeft::after {
-    content: ""; position: absolute; inset: 0; left: min(86vw, 340px);
+    content: ""; position: absolute; inset: 0; left: min(88vw, 360px);
     background: rgba(0, 0, 0, 0.4); pointer-events: none;
   }
+  .sidebarHeaderRow { padding: calc(14px + env(safe-area-inset-top, 0px)) 14px 10px; }
+  .sidebarBody { padding-bottom: 14px; }
+  .sidebarNavBtn { min-height: 44px; }
+  .historyItem { min-height: 44px; }
+  .historyItemMenuBtn { opacity: 1; }
+  .resourceList { max-height: 220px; }
+
+  .chatHero {
+    align-items: flex-start;
+    padding: calc(72px + env(safe-area-inset-top, 0px)) 16px 18px;
+  }
+  .chatHeroInner { gap: 10px; }
+  .chatHeroLogo { width: 44px; height: 44px; border-radius: 12px; }
+  .chatHeroTitle { font-size: 23px; line-height: 1.25; }
+  .chatHeroSubtitle { font-size: 14px; line-height: 1.45; }
+  .chatHeroSuggestions { width: 100%; justify-content: stretch; }
+  .chatSuggestionChip {
+    flex: 1 1 100%;
+    min-height: 40px;
+    border-radius: 12px;
+    padding: 9px 12px;
+    text-align: left;
+  }
+
+  .chatMessages { padding-top: calc(54px + env(safe-area-inset-top, 0px)); }
+  .chatMessage {
+    max-width: none;
+    gap: 10px;
+    padding: 14px 12px;
+  }
+  .chatMessageAvatar { width: 28px; height: 28px; }
+  .chatMessageUser .chatMessageBody { max-width: min(82vw, 520px); }
+  .chatMessageUser .chatMessageText,
+  .chatMessageAssistant .chatMessageText {
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  .sceneCardCanvasWrap {
+    aspect-ratio: 4 / 3;
+    max-height: min(58vh, 360px);
+    border-radius: 12px 12px 0 0;
+  }
+  .sceneCardActionBar {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .sceneCardActionBar::-webkit-scrollbar { display: none; }
+  .sceneCardActionBtn {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+  }
+  .jsonCollapse pre { max-height: 280px; }
+
+  .chatComposerBar {
+    padding: 0 10px calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  .chatComposer {
+    max-width: none;
+    border-radius: 20px;
+  }
+  .composerInputRow {
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 7px;
+    padding: 8px;
+  }
+  .composerIconBtn,
+  .composerSendBtn {
+    width: 38px;
+    height: 38px;
+  }
+  .composerInput {
+    flex-basis: calc(100% - 45px);
+    min-height: 38px;
+    max-height: 132px;
+    font-size: 15px;
+  }
+  .composerActions {
+    width: 100%;
+    justify-content: space-between;
+    padding: 0 0 1px 45px;
+  }
+  .composerModelSelect {
+    max-width: calc(100vw - 118px);
+    min-width: 0;
+    flex: 1;
+  }
   .composerHint { display: none; }
+
+  .scrollToBottomBtn { bottom: 116px; }
+
+  .modalOverlay {
+    align-items: stretch;
+    justify-content: stretch;
+    padding: max(10px, env(safe-area-inset-top, 0px)) 10px max(10px, env(safe-area-inset-bottom, 0px));
+  }
+  .modalDialog {
+    width: 100%;
+    max-height: none;
+    border-radius: 12px;
+  }
+  .settingsDialog {
+    height: auto;
+    min-height: 0;
+  }
+  .settingsBody {
+    flex-direction: column;
+    min-height: 0;
+  }
+  .settingsNav {
+    flex: 0 0 auto;
+    flex-direction: row;
+    gap: 6px;
+    padding: 8px 10px;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+  }
+  .settingsNavBtn {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 34px;
+    white-space: nowrap;
+  }
+  .settingsScroll {
+    padding: 14px;
+    gap: 14px;
+  }
+  .settingsField {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .settingsFieldControl,
+  .settingsFieldControl select,
+  .settingsFieldControl input[type="text"],
+  .settingsFieldControl input[type="number"],
+  .settingsFieldControl input[type="password"] {
+    width: 100%;
+    min-width: 0;
+  }
+  .providerCard { padding: 10px; }
+  .providerCardRow {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .providerCardRow label { flex: 0 0 auto; }
+  .modalFooter {
+    padding: 10px 14px 14px;
+  }
+  .modalFooter button {
+    flex: 1;
+    min-height: 38px;
+  }
 }

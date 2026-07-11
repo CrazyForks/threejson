@@ -32,7 +32,7 @@ function formatRelativeTime(ts) {
 }
 
 /**
- * @param {{ openAiConfig?: () => void, openSettings?: () => void, onNewChat?: (conv: object) => void, onSelectConversation?: (id: string) => void }} [host]
+ * @param {{ openAiConfig?: () => void, openSettings?: () => void, closeLeftDock?: () => void, onNewChat?: (conv: object) => void, onSelectConversation?: (id: string) => void }} [host]
  */
 export function createThreeBoxSidebar(host = {}) {
   const templateSearchInput = document.getElementById("templateSearchInput");
@@ -136,6 +136,7 @@ export function createThreeBoxSidebar(host = {}) {
       activeConversationId = conv.id;
       renderHistoryList();
       host.onSelectConversation?.(conv.id);
+      host.closeLeftDock?.();
     });
 
     return el;
@@ -303,6 +304,7 @@ export function createThreeBoxSidebar(host = {}) {
         renderHistoryList();
         host.onSelectConversation?.(conv.id);
         closeSearchChatModal();
+        host.closeLeftDock?.();
       });
       searchChatResults.appendChild(el);
     }
@@ -381,12 +383,17 @@ export function createThreeBoxSidebar(host = {}) {
       } else {
         showToast(t("threebox.sidebar.toastAiConfigComingSoon", "AI 配置面板将在后续里程碑接入。"), "info");
       }
+      host.closeLeftDock?.();
     });
     navNewChatBtn?.addEventListener("click", () => {
       createNewChat();
       showToast(t("threebox.sidebar.toastNewChat", "已新建聊天。"), "success");
+      host.closeLeftDock?.();
     });
-    navSearchChatBtn?.addEventListener("click", openSearchChatModal);
+    navSearchChatBtn?.addEventListener("click", () => {
+      openSearchChatModal();
+      host.closeLeftDock?.();
+    });
     searchChatCloseBtn?.addEventListener("click", closeSearchChatModal);
     searchChatModal?.addEventListener("click", (event) => {
       if (event.target === searchChatModal) {
@@ -406,6 +413,7 @@ export function createThreeBoxSidebar(host = {}) {
       void putProject(project);
       renderProjects();
       showToast(t("threebox.sidebar.toastNewProject", "已新建项目「{name}」。", { name: trimmed }), "success");
+      host.closeLeftDock?.();
     });
 
     templateSearchInput?.addEventListener("input", () => {

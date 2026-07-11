@@ -12,7 +12,7 @@ const THUMB_CACHE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 const THUMB_WIDTH = 320;
 const THUMB_HEIGHT = 200;
 const THUMB_LOAD_TIMEOUT_MS = 8000;
-const MANIFEST_REPO_RELATIVE_PATH = "assets/json/other/three-box/manifest.json";
+const MANIFEST_REPO_RELATIVE_PATH = "assets/json/other/threebox/manifest.json";
 
 let thumbCanvas = null;
 let thumbObserver = null;

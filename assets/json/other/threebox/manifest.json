@@ -4,19 +4,19 @@
       "id": "cube",
       "title": "立方体",
       "titleEn": "Cube",
-      "json": "assets/json/other/three-box/cube.json"
+      "json": "assets/json/other/threebox/cube.json"
     },
     {
       "id": "sphere",
       "title": "球体",
       "titleEn": "Sphere",
-      "json": "assets/json/other/three-box/sphere.json"
+      "json": "assets/json/other/threebox/sphere.json"
     },
     {
       "id": "floor",
       "title": "地板",
       "titleEn": "Floor",
-      "json": "assets/json/other/three-box/floor.json"
+      "json": "assets/json/other/threebox/floor.json"
     },
     {
       "id": "room",
