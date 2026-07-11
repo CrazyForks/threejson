@@ -2,6 +2,10 @@
  * ThreeJSON scene AI prompt assembly. English constants below are sent to LLMs to keep JSON field compatibility;
  * do not switch them to Chinese without re-validating model output quality.
  */
+import {
+  THREE_JSON_AGENT_CAPABILITY_INDEX,
+  THREE_JSON_AGENT_EXAMPLE_INDEX
+} from "./sceneCapabilityIndex.js";
 
 const THREE_JSON_LIST_PLACEMENT = `
 Where to put objects (friendly worldInfo lists — pick the list that matches the shape/role):
@@ -97,6 +101,33 @@ Example (objectList or modelList item):
 
 domainModelList for full subgraph JSON:
 { "objType": "domain", "domain": "nativeThree", "handler": "loadFromUrl", "modelPath": "/assets/json/three_native.json" }
+`;
+
+const THREE_JSON_DOMAIN_USAGE = `
+Domain records (business objects; use these instead of hand-building boxes when the user asks for a built-in domain object):
+
+Where:
+- Friendly JSON: worldInfo.domainModelList: [{ "objType": "domain", "domain": string, "handler": string, ... }]
+- Standard JSON: objectList: [{ "objType": "domain", "domain": string, "handler": string, ... }]
+
+Rules:
+- A domain record is a dispatcher input. It should name the domain and handler, then pass domain-specific payload/items/options/geometry/material fields.
+- Do NOT put plain objType "box" records in domainModelList. Boxes belong in boxModelList/objectList; domainModelList records use objType "domain" (or omit objType in friendly form).
+- For business concepts, prefer the domain factory/preset over approximating everything with boxes.
+- Keep domain ids qualified when needed: weather.rain, nature.sky, nature.water, stat.bar, stat.grid, stat.panel, stat.line, stat.pie, stat.ring, device.cabinet, port.
+
+Common patterns:
+- Device cabinet/rack:
+  { "objType":"domain", "domain":"device.cabinet", "handler":"createCabinet", "payload": { "name":"rack-a", "label":"Rack A", "position": { "x":0, "y":0, "z":0 } } }
+- Stat bars/dashboard:
+  { "objType":"domain", "domain":"stat.bar", "handler":"createStatBars", "items":[ { "name":"cpu", "value":72, "max":100, "label":"CPU", "position":{ "x":-10, "y":0, "z":0 } } ] }
+- Nature sky/water:
+  { "domain":"nature.sky", "handler":"sunset", "geometry": { "radius":350 }, "uniforms": { "sunDirection":[-0.62,0.32,-0.68] } }
+  { "domain":"nature.water", "handler":"ocean", "geometry": { "width":400, "height":400 }, "position": { "x":0, "y":0, "z":0 } }
+- Weather:
+  { "objType":"domain", "domain":"weather", "handler":"rain", "name":"rain-zone", "position": { "x":0, "y":8, "z":0 }, "count":1200 }
+- Port:
+  { "objType":"domain", "domain":"port", "handler":"dockCrane", "name":"dock-crane", "geometry": { "width":70, "length":90, "height":280, "depth":90 }, "position": { "x":-80, "y":2, "z":-250 } }
 `;
 
 const THREE_JSON_INTENT_GUIDE = `
@@ -285,11 +316,14 @@ Keep the same JSON compatibility rules; output only the full scene object.
 /** @returns {string} Shared catalog block for scene prompts. */
 function buildSceneCapabilityCatalog() {
   return [
+    THREE_JSON_AGENT_CAPABILITY_INDEX.trim(),
     THREE_JSON_LIST_PLACEMENT.trim(),
     THREE_JSON_PRIMITIVE_GEOMETRY.trim(),
     THREE_JSON_NATIVE_THREE.trim(),
+    THREE_JSON_DOMAIN_USAGE.trim(),
     THREE_JSON_INTENT_GUIDE.trim(),
     THREE_JSON_CORE_CAPABILITIES.trim(),
+    THREE_JSON_AGENT_EXAMPLE_INDEX.trim(),
     THREE_JSON_FEW_SHOT_EXAMPLES.trim()
   ].join("\n\n");
 }
@@ -354,6 +388,7 @@ function buildSceneIncrementalUpdateSystemPrompt() {
     "Allowed path prefixes: /worldInfo, /threeJsonId, /sceneConfig, /controlsConfig, /businessInfo, /objectList, /extensions.",
     "Use slash-separated JSON Pointer paths only (not dots). Example: [{\"op\":\"add\",\"path\":\"/worldInfo/sphereModelList/-\",\"value\":{...}}]",
     "Do NOT return the full scene object. No markdown fences unless wrapping the array.",
+    THREE_JSON_AGENT_CAPABILITY_INDEX.trim(),
     THREE_JSON_LIST_PLACEMENT.trim(),
     THREE_JSON_PRIMITIVE_GEOMETRY.trim(),
     THREE_JSON_SCENE_AUTHORING_RULES.trim()
@@ -375,12 +410,15 @@ export {
   THREE_JSON_LIST_PLACEMENT,
   THREE_JSON_PRIMITIVE_GEOMETRY,
   THREE_JSON_NATIVE_THREE,
+  THREE_JSON_DOMAIN_USAGE,
   THREE_JSON_INTENT_GUIDE,
   THREE_JSON_SCENE_AUTHORING_RULES,
   THREE_JSON_SCENE_SCHEMA_DESCRIPTION,
   THREE_JSON_CORE_CAPABILITIES,
   THREE_JSON_FEW_SHOT_EXAMPLES,
   THREE_JSON_OUTPUT_REQUIREMENT,
+  THREE_JSON_AGENT_CAPABILITY_INDEX,
+  THREE_JSON_AGENT_EXAMPLE_INDEX,
   buildSceneCapabilityCatalog,
   buildSceneOutlineSystemPrompt,
   buildSceneGenerationSystemPrompt,

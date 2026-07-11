@@ -196,6 +196,53 @@ const INTENT_SIGNALS = [
     note: "Use audioList with audioUrl and mode positional|ambient."
   },
   {
+    id: "events",
+    patterns: [/click|double.?click|dblclick|hover|pointer|interactive behavior|event script|EventScript|on ready|on dispose|interaction|event|script/i],
+    objTypes: ["event"],
+    note: "Use object events with action(s) or short EventScript DSL for click/dblclick/pointer/lifecycle behavior."
+  },
+  {
+    id: "lifecycle",
+    patterns: [/lifecycle|object\.ready|object\.dispose|scene\.ready|scene\.dispose|spawn intro|load intro|postLoad|intro/i],
+    objTypes: ["event", "intro"],
+    note: "Use sceneConfig.intro.postLoad and/or events object.ready/object.dispose when lifecycle behavior is requested."
+  },
+  {
+    id: "postProcess",
+    patterns: [/post.?process|bloom|outline pass|FXAA|SMAA|pass list|passList/i],
+    lists: ["passList"],
+    objTypes: ["pass"],
+    note: "Use passList or sceneConfig pass records for requested post-processing effects."
+  },
+  {
+    id: "statDomain",
+    patterns: [/stat|chart|dashboard|gauge|pie chart|ring chart|bar chart|line chart|ECharts/i],
+    lists: ["domainModelList"],
+    objTypes: ["domain", "statBar", "statPanel", "statPie", "statRing", "statLine"],
+    note: "Use stat domain records (stat.bar/grid/panel/chart/line/pie/ring) for dashboards and charts."
+  },
+  {
+    id: "deviceDomain",
+    patterns: [/cabinet|rack|server|UPS|switch|air conditioner|data center/i],
+    lists: ["domainModelList"],
+    objTypes: ["domain", "deviceCabinet", "server", "ups", "switch"],
+    note: "Use device domain records for cabinets, servers, UPS, switches, and data-center equipment."
+  },
+  {
+    id: "natureDomain",
+    patterns: [/sky|water|ocean|atmosphere|sunset|dawn|nature/i],
+    lists: ["domainModelList", "shaderSurfaceList"],
+    objTypes: ["domain", "shaderSurface"],
+    note: "Use nature.sky / nature.water domains or shaderSurface for sky, water, ocean, and atmosphere scenes."
+  },
+  {
+    id: "portDomain",
+    patterns: [/port|harbor|dock crane|container yard|quay crane/i],
+    lists: ["domainModelList"],
+    objTypes: ["domain"],
+    note: "Use port domain records such as handler dockCrane for port/logistics scenes."
+  },
+  {
     id: "blockout",
     patterns: [/blockout|placeholder|abstract block|灰盒|体块|全是盒|only box|boxes only|方块/i],
     boxFriendly: true,
@@ -270,6 +317,18 @@ function analyzeSceneUsage(sceneObj) {
   const objTypes = new Set();
   let totalItems = 0;
 
+  if (sceneObj?.sceneConfig?.intro) {
+    objTypes.add("intro");
+  }
+  const scenePassList = sceneObj?.sceneConfig?.passList || sceneObj?.passList;
+  if (Array.isArray(scenePassList) && scenePassList.length > 0) {
+    if (!listsUsed.includes("passList")) {
+      listsUsed.push("passList");
+    }
+    objTypes.add("pass");
+    totalItems += scenePassList.length;
+  }
+
   const wi = sceneObj?.worldInfo;
   if (wi && typeof wi === "object") {
     for (let i = 0; i < DEFAULT_FRIENDLY_SCENE_LIST_ORDER.length; i += 1) {
@@ -309,6 +368,20 @@ function collectObjTypes(record, objTypes) {
   }
   if (typeof record.objType === "string" && record.objType.trim()) {
     objTypes.add(record.objType.trim());
+  }
+  if (record.events && typeof record.events === "object") {
+    objTypes.add("event");
+  }
+  if (record.animationGraph && typeof record.animationGraph === "object") {
+    objTypes.add("animationGraph");
+  }
+  if (record.domain && typeof record.domain === "string") {
+    objTypes.add("domain");
+    objTypes.add(`domain:${record.domain}`);
+    const leaf = record.domain.split(".").pop();
+    if (leaf) {
+      objTypes.add(leaf);
+    }
   }
   if (record.geometry?.type && typeof record.geometry.type === "string") {
     objTypes.add("native");

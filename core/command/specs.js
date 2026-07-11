@@ -108,7 +108,7 @@ export const CORE_COMMAND_SPECS = [
     summary: "Patch an object descriptor (partial) or set a JSON path.",
     args: {
       id: "threeJsonId.",
-      partial: "Top-level partial descriptor object.",
+      partial: "Nested partial descriptor object; omitted nested fields are preserved.",
       path: "Dot-path for applyObjectChange.",
       value: "Value for applyObjectChange path.",
       options: "Optional mutation options."
@@ -118,7 +118,7 @@ export const CORE_COMMAND_SPECS = [
       op: "object.patch",
       args: { id: "obj-1", partial: { position: { x: 2, y: 0, z: 0 } } }
     },
-    microDslExample: 'object.patch id=obj-1 partial={"position":{"x":2,"y":0,"z":0}}'
+    microDslExample: 'object.patch id=obj-1 partial={"geometry":{"height":12}}'
   },
   {
     op: "object.get",

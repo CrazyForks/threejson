@@ -265,6 +265,19 @@ function maybeAutoRedeploy(base, needsRedeploy, options = {}) {
   return redeployObject(options.scene, base.descriptor);
 }
 
+function mergeDescriptorPartial(target, partial) {
+  const keys = Object.keys(partial);
+  for (let i = 0; i < keys.length; i += 1) {
+    const key = keys[i];
+    const value = partial[key];
+    if (isObjectRecord(value) && isObjectRecord(target[key])) {
+      mergeDescriptorPartial(target[key], value);
+    } else {
+      target[key] = value;
+    }
+  }
+}
+
 function applyObjectPartial(threeJsonId, partial, options = {}) {
   const base = resolveById(threeJsonId);
   if (!base.ok) {
@@ -275,9 +288,7 @@ function applyObjectPartial(threeJsonId, partial, options = {}) {
   }
   const descriptor = base.descriptor;
   const keys = Object.keys(partial);
-  for (let i = 0; i < keys.length; i += 1) {
-    descriptor[keys[i]] = partial[keys[i]];
-  }
+  mergeDescriptorPartial(descriptor, partial);
   maybeMarkDirty(descriptor, options);
   const needsRedeploy = keys.some((k) => isRedeployTopLevelKey(k));
   const { pending } = syncObjectFromDescriptor(base.object3D, descriptor, {
@@ -300,9 +311,7 @@ async function applyObjectPartialAsync(threeJsonId, partial, options = {}) {
   }
   const descriptor = base.descriptor;
   const keys = Object.keys(partial);
-  for (let i = 0; i < keys.length; i += 1) {
-    descriptor[keys[i]] = partial[keys[i]];
-  }
+  mergeDescriptorPartial(descriptor, partial);
   maybeMarkDirty(descriptor, options);
   const needsRedeploy = keys.some((k) => isRedeployTopLevelKey(k));
   const { pending } = syncObjectFromDescriptor(base.object3D, descriptor, {

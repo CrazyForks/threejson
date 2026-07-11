@@ -20,8 +20,10 @@ function createRegisteredMesh(threeJsonId = "obj-1") {
       position: { x: 0, y: 0, z: 0 },
       rotation: { rotationX: 0, rotationY: 0, rotationZ: 0 },
       scale: { scaleX: 1, scaleY: 1, scaleZ: 1 },
+      geometry: { width: 10, height: 20, depth: 30 },
       material: {
-        color: "#ffffff"
+        color: "#ffffff",
+        roughness: 0.8
       }
     }
   };
@@ -65,6 +67,23 @@ test("applyObjectPartial syncs transform/name/visible to object", () => {
   assert.equal(mesh.position.x, 4);
   assert.equal(mesh.position.y, 5);
   assert.equal(mesh.position.z, 6);
+  unregisterObject(mesh, { recursive: false });
+  clearObjectRegistry();
+});
+
+test("applyObjectPartial deep-merges nested descriptor fields", () => {
+  clearObjectRegistry();
+  const mesh = createRegisteredMesh("partial-merge");
+  const res = applyObjectPartial("partial-merge", {
+    geometry: { height: 42 },
+    material: { color: "#336699" },
+    position: { y: 21 }
+  });
+  assert.equal(res.ok, true);
+  assert.deepEqual(mesh.userData.objJson.geometry, { width: 10, height: 42, depth: 30 });
+  assert.equal(mesh.userData.objJson.material.color, "#336699");
+  assert.equal(mesh.userData.objJson.material.roughness, 0.8);
+  assert.deepEqual(mesh.userData.objJson.position, { x: 0, y: 21, z: 0 });
   unregisterObject(mesh, { recursive: false });
   clearObjectRegistry();
 });

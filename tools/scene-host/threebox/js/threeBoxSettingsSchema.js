@@ -19,13 +19,17 @@ export const THREEBOX_SETTINGS_DEFAULTS = {
     providers: [],
     defaultProviderId: "",
     rememberKeys: false,
-    agentDepth: "medium",
     updateOutputMode: "commands",
     includeSpatialSummary: true,
     includeFullJson: false,
     defaultImageModel: "dall-e-3",
     globalPromptPrefix: "",
     includeTurnSummary: true
+  },
+  agent: {
+    enabled: false,
+    depth: "medium",
+    iterativeAdjust: true
   },
   io: {
     exportJsonIndent: 2,
@@ -38,6 +42,7 @@ export const THREEBOX_SETTINGS_DEFAULTS = {
 export const THREEBOX_SETTINGS_SECTIONS = [
   { id: "general", title: "通用" },
   { id: "ai", title: "AI 配置" },
+  { id: "agent", title: "Agent" },
   { id: "io", title: "导入导出" }
 ];
 
@@ -47,7 +52,6 @@ export const THREEBOX_SETTINGS_FIELDS = [
   { section: "general", path: "general.theme", type: "select", label: "主题", options: [["dark", "深色"], ["light", "浅色"]] },
 
   { section: "ai", path: "ai.rememberKeys", type: "checkbox", label: "记住 API Key 到本地" },
-  { section: "ai", path: "ai.agentDepth", type: "select", label: "生成深度", options: [["simple", "简单"], ["medium", "中等"], ["deep", "深入"], ["auto", "自动"]] },
   { section: "ai", path: "ai.updateOutputMode", type: "select", label: "调整优先方式", options: [["commands", "操作命令"], ["json-incremental", "JSON Patch"], ["json-full", "完整 JSON"]] },
   { section: "ai", path: "ai.includeSpatialSummary", type: "checkbox", label: "调整时附带空间摘要" },
   { section: "ai", path: "ai.includeFullJson", type: "checkbox", label: "调整时附带完整 JSON（更耗费 Token）" },
@@ -61,6 +65,10 @@ export const THREEBOX_SETTINGS_FIELDS = [
     rows: 4
   },
   { section: "ai", path: "ai.includeTurnSummary", type: "checkbox", label: "场景生成后输出简短总结" },
+
+  { section: "agent", path: "agent.enabled", type: "checkbox", label: "开启多轮 Agent" },
+  { section: "agent", path: "agent.depth", type: "select", label: "Agent 深度", options: [["simple", "简单"], ["medium", "中等"], ["deep", "深入"], ["auto", "自动"]] },
+  { section: "agent", path: "agent.iterativeAdjust", type: "checkbox", label: "调整时逐轮应用到离屏场景" },
 
   { section: "io", path: "io.exportJsonIndent", type: "number", label: "导出 JSON 缩进", min: 0, max: 4 },
   { section: "io", path: "io.copyFriendlyJson", type: "checkbox", label: "复制 JSON 时使用友好格式" },

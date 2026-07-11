@@ -27,7 +27,9 @@ Use this skill when the request includes one of these intents:
 
 ## Capability catalog (runtime prompts)
 
-Generation/update prompts (`threeJsonCoreSkill.js`) include: primitives, native Three.js, lines, **infoPanel** vs **css3dPanel**, **shaderSurface**, **particleEmitter**, domains, wind/heat, `sceneConfig` (incl. optional `textureQuality`, `extensions` container), CSG, scene text. Host-only wiring (PluginHost, extension bootstrap) is **not** auto-generated — see [`docs/zh/extensions.md`](../../docs/zh/extensions.md). Business objects use [`docs/zh/domains.md`](../../docs/zh/domains.md) — see [`docs/zh/glossary.md`](../../docs/zh/glossary.md).
+Generation/update prompts (`threeJsonCoreSkill.js`) include the compact runtime index from `sceneCapabilityIndex.js`, then focused schema/few-shot blocks. The index covers primitives, complex/native geometry, CSG, assetLibrary, materials/texture sampling, post-processing passes, built-in domains, events/EventScript, object/scene lifecycle, audio, animationGraph, scene intro, shader/particles/weather/nature/stat/device/port capabilities, and command/Patch editing. Host-only wiring (PluginHost, extension bootstrap) is **not** auto-generated — see [`docs/zh/extensions.md`](../../docs/zh/extensions.md). Business objects use [`docs/zh/domains.md`](../../docs/zh/domains.md) — see [`docs/zh/glossary.md`](../../docs/zh/glossary.md).
+
+Use `THREE_JSON_AGENT_CAPABILITY_INDEX` as the token-cheap multi-turn lookup surface. Do not paste all docs into every turn; use the index first, then retrieve docs/examples only for a specific capability.
 
 ## Core Interfaces
 
@@ -50,7 +52,7 @@ From **`threejson`** / **`threejson/core`** / **`core/index.js`** (ESM named exp
 13. `runSceneAgent(input, options?)` — optional multi-step agent; **requires `options.agent.enabled === true`**; default is single-shot. Depth: `simple` | `medium` | `deep` | `auto`. Browser agent does not persist textures to disk.
 14. Scene generation prompts describe full engine capabilities; `sceneCapability.js` infers intent hints and optional capability-fit review.
 15. `generateSceneJsonString` options: `planFirst`, `capabilityReview` (default on), `maxCapabilityReviewAttempts`, `maxTokens` (**default 6000** for generation).
-16. Agent depth presets (`agentDepth.js`): `simple` runs structural repair + capability review; `medium`/`deep`/`auto` add outline/layout review.
+16. Agent depth presets (`agentDepth.js`): `simple` runs structural repair + capability review; `medium`/`deep`/`auto` add outline/layout review. This is **business Agent depth**, not a provider/model reasoning-depth parameter.
 
 Browser global `window.ThreeJsonAI` exposes `createSceneAiClient`, `generateSceneJsonString`, `generateSceneJsonFromImage`, `updateSceneJsonString`, `resolveVisionImageUrl`, `planTextures`, `fillTextureUrls`, `createOpenAiImageProvider`, `normalizeImageRawToBlob`, `listTextureUrlPointers`, and **`runSceneAgent`** (no `updateSceneJsonFile`; avoid shipping secrets in public bundles).
 

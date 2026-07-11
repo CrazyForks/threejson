@@ -1,6 +1,7 @@
 import {
   generateSceneJsonString,
   parseSceneJsonString,
+  runSceneAgent,
   classifyTurnIntent,
   summarizeSceneTurn,
   buildStructuredTurnEnvelope,
@@ -56,6 +57,15 @@ export function isProviderVisionCapable(provider) {
   return provider.provider !== "deepseek";
 }
 
+export function resolveThreeBoxAgentOptions(settings = {}) {
+  const agent = settings?.agent || {};
+  return {
+    enabled: agent.enabled === true,
+    depth: agent.depth || settings?.ai?.agentDepth || "medium",
+    iterativeApply: agent.iterativeAdjust !== false
+  };
+}
+
 /** Compact, token-cheap description of a generated scene (object-type counts), for the summary call. */
 export function buildResultDigest(sceneJson) {
   try {
@@ -80,10 +90,26 @@ export function buildResultDigest(sceneJson) {
 /**
  * First-turn (no prior context) generation: builds the structured JSON envelope and calls
  * core/ai's generateSceneJsonString with streaming enabled.
- * @param {{ userPrompt: string, providerOptions: object, onDelta?: (delta:string)=>void, signal?: AbortSignal, globalPromptPrefix?: string }} input
+ * @param {{ userPrompt: string, providerOptions: object, onDelta?: (delta:string)=>void, signal?: AbortSignal, globalPromptPrefix?: string, agentOptions?: object, onAgentProgress?: (p: object)=>void }} input
  */
-export async function runThreeBoxGenerateTurn({ userPrompt, providerOptions, onDelta, signal, globalPromptPrefix }) {
+export async function runThreeBoxGenerateTurn({ userPrompt, providerOptions, onDelta, signal, globalPromptPrefix, agentOptions, onAgentProgress }) {
   const envelope = buildStructuredTurnEnvelope({ userPrompt, intent: "generate", globalPromptPrefix });
+  if (agentOptions?.enabled) {
+    const result = await runSceneAgent(
+      { mode: "generate", prompt: envelope },
+      {
+        ...providerOptions,
+        signal,
+        agent: {
+          enabled: true,
+          depth: agentOptions.depth || "medium"
+        },
+        onProgress: onAgentProgress
+      }
+    );
+    const sceneJson = parseSceneJsonString(result.sceneJsonString);
+    return { sceneJson, sceneJsonString: result.sceneJsonString, agentResult: result };
+  }
   const sceneJsonString = await generateSceneJsonString(envelope, {
     ...providerOptions,
     stream: true,
@@ -167,6 +193,138 @@ async function createOffscreenRuntimeFromSceneJsonString(sceneJsonString) {
   });
 }
 
+function mapThreeBoxUpdateModeToAgentInput(updateOutputMode) {
+  if (updateOutputMode === "json-full") {
+    return { outputMode: "json", updateMode: "full", stage: "json-full" };
+  }
+  if (updateOutputMode === "json-incremental") {
+    return { outputMode: "json", updateMode: "incremental", stage: "json-incremental" };
+  }
+  return { outputMode: "commands", updateMode: undefined, stage: "commands" };
+}
+
+function createCommandContextForRuntime(runtime) {
+  return createCommandContext({
+    scene: runtime.scene,
+    camera: runtime.camera,
+    renderer: runtime.renderer,
+    controls: runtime.controls
+  });
+}
+
+async function runThreeBoxAgentAdjustTurn({
+  userPrompt,
+  envelope,
+  targetSceneJsonString,
+  providerOptions,
+  agentOptions,
+  updateOutputMode,
+  resolveContextPayload,
+  onAgentProgress
+}) {
+  const mode = mapThreeBoxUpdateModeToAgentInput(updateOutputMode);
+  const baseSceneJson = parseSceneJsonString(targetSceneJsonString);
+  const baseContextPayload = resolveContextPayload?.(baseSceneJson) || {};
+  const updateContext = {
+    ...baseContextPayload,
+    userMessage: envelope,
+    currentSceneJsonString: targetSceneJsonString,
+    fullSceneJson: targetSceneJsonString
+  };
+
+  if (mode.outputMode !== "commands") {
+    const result = await runSceneAgent(
+      {
+        mode: "update",
+        prompt: envelope,
+        currentSceneJsonString: targetSceneJsonString,
+        outputMode: mode.outputMode
+      },
+      {
+        ...providerOptions,
+        updateMode: mode.updateMode,
+        agent: { enabled: true, depth: agentOptions.depth || "medium" },
+        onProgress: onAgentProgress
+      }
+    );
+    return {
+      stage: mode.stage,
+      patch: null,
+      sceneJson: parseSceneJsonString(result.sceneJsonString),
+      sceneJsonString: result.sceneJsonString,
+      agentResult: result
+    };
+  }
+
+  const offscreenRuntime = await createOffscreenRuntimeFromSceneJsonString(targetSceneJsonString);
+  try {
+    let latestSceneJsonString = targetSceneJsonString;
+    const refreshContext = async () => {
+      latestSceneJsonString = exportRuntimeSceneJsonString(offscreenRuntime);
+      const latestSceneJson = parseSceneJsonString(latestSceneJsonString);
+      const contextPayload = resolveContextPayload?.(latestSceneJson) || {};
+      return {
+        ...contextPayload,
+        currentSceneJsonString: latestSceneJsonString,
+        fullSceneJson: latestSceneJsonString
+      };
+    };
+    const applyCommands = async (commands) => {
+      const ctx = createCommandContextForRuntime(offscreenRuntime);
+      const execResult = await executeCommands(ctx, commands);
+      const results = Array.isArray(execResult.results) ? execResult.results : [];
+      const ok = results.length ? results.every((r) => r.ok !== false) : execResult.ok !== false;
+      const sceneMutated = results.some((r) => r.ok);
+      return { ok, sceneMutated, execResult, error: results.find((r) => !r.ok)?.error };
+    };
+    const result = await runSceneAgent(
+      {
+        mode: "update",
+        prompt: envelope,
+        currentSceneJsonString: targetSceneJsonString,
+        outputMode: "commands",
+        updateContext
+      },
+      {
+        ...providerOptions,
+        agent: {
+          enabled: true,
+          depth: agentOptions.depth || "medium",
+          iterativeApply: agentOptions.iterativeApply !== false
+        },
+        applyCommands,
+        refreshContext,
+        onProgress: onAgentProgress
+      }
+    );
+    if (result.outputMode === "json") {
+      return {
+        stage: "json-full",
+        sceneJson: parseSceneJsonString(result.sceneJsonString),
+        sceneJsonString: result.sceneJsonString,
+        agentResult: result
+      };
+    }
+    if (!result.skipFinalExec && Array.isArray(result.commands) && result.commands.length) {
+      const applied = await applyCommands(result.commands);
+      if (!applied.ok) {
+        throw new Error(applied.error || "Agent command apply failed.");
+      }
+    }
+    const sceneJsonString = exportRuntimeSceneJsonString(offscreenRuntime);
+    return {
+      stage: "commands",
+      commands: result.commands || [],
+      execResult: { ok: result.execOk !== false },
+      sceneJson: parseSceneJsonString(sceneJsonString),
+      sceneJsonString,
+      agentResult: result
+    };
+  } finally {
+    offscreenRuntime.dispose?.();
+  }
+}
+
 /**
  * Three-stage adjust fallback chain, mirroring the editor's AI-adjust panel
  * (tools/scene-host/editor/lib/ai/runEditorAiUpdate.js): try operation commands against a
@@ -181,7 +339,11 @@ async function createOffscreenRuntimeFromSceneJsonString(sceneJsonString) {
  *   envelope: string,
  *   targetSceneJsonString: string,
  *   providerOptions: object,
- *   onDelta?: (delta: string) => void
+ *   onDelta?: (delta: string) => void,
+ *   agentOptions?: object,
+ *   updateOutputMode?: string,
+ *   resolveContextPayload?: (sceneJson: object) => object,
+ *   onAgentProgress?: (p: object) => void
  * }} input
  * @returns {Promise<
  *   | { stage: "commands", commands: object[], execResult: object, sceneJson: object, sceneJsonString: string }
@@ -189,7 +351,30 @@ async function createOffscreenRuntimeFromSceneJsonString(sceneJsonString) {
  *   | { stage: "json-full", sceneJson: object, sceneJsonString: string }
  * >}
  */
-export async function runThreeBoxAdjustTurn({ userPrompt, envelope, targetSceneJsonString, providerOptions, onDelta }) {
+export async function runThreeBoxAdjustTurn({
+  userPrompt,
+  envelope,
+  targetSceneJsonString,
+  providerOptions,
+  onDelta,
+  agentOptions,
+  updateOutputMode = "commands",
+  resolveContextPayload,
+  onAgentProgress
+}) {
+  if (agentOptions?.enabled) {
+    return runThreeBoxAgentAdjustTurn({
+      userPrompt,
+      envelope,
+      targetSceneJsonString,
+      providerOptions,
+      agentOptions,
+      updateOutputMode,
+      resolveContextPayload,
+      onAgentProgress
+    });
+  }
+
   try {
     const cmdResult = await requestUpdatedSceneEditCommands(
       userPrompt,

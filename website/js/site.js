@@ -682,7 +682,24 @@ function withReducedQuality(payload) {
       imageMap: { generateMipmaps: false, anisotropy: 1, ...clone.sceneConfig?.textureDefaults?.imageMap }
     }
   };
+  disableAudioAutoplayForThumbnail(clone);
   return clone;
+}
+
+function disableAudioAutoplayForThumbnail(value) {
+  if (!value || typeof value !== "object") return;
+  if (Array.isArray(value)) {
+    value.forEach(disableAudioAutoplayForThumbnail);
+    return;
+  }
+  const objType = String(value.objType || "").trim().toLowerCase();
+  const hasAudioUrl = typeof value.audioUrl === "string" || typeof value.url === "string";
+  if (objType === "audio" || hasAudioUrl) {
+    value.autoplay = false;
+  }
+  for (const child of Object.values(value)) {
+    disableAudioAutoplayForThumbnail(child);
+  }
 }
 
 function resolveRepoRelativeUrl(value, baseUrl = ROOT) {

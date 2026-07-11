@@ -6,6 +6,7 @@ import {
   THREE_JSON_NATIVE_THREE,
   THREE_JSON_PRIMITIVE_GEOMETRY,
   THREE_JSON_LIST_PLACEMENT,
+  THREE_JSON_DOMAIN_USAGE,
   THREE_JSON_FEW_SHOT_EXAMPLES
 } from "../core/ai/threeJsonCoreSkill.js";
 import {
@@ -25,10 +26,14 @@ test("generation system prompt covers core ThreeJSON capabilities", () => {
   assert.match(prompt, /particleEmitter/);
   assert.match(prompt, /textureQuality/);
   assert.match(prompt, /TorusKnotGeometry/);
+  assert.match(prompt, /device\.cabinet/);
+  assert.match(prompt, /createStatBars/);
+  assert.match(prompt, /Do NOT put plain objType "box" records in domainModelList/);
   assert.match(prompt, /sceneConfig/);
   assert.match(THREE_JSON_LIST_PLACEMENT, /nativeThree/);
   assert.match(THREE_JSON_PRIMITIVE_GEOMETRY, /radiusTop/);
   assert.match(THREE_JSON_NATIVE_THREE, /parseMode/);
+  assert.match(THREE_JSON_DOMAIN_USAGE, /dockCrane/);
   assert.match(THREE_JSON_FEW_SHOT_EXAMPLES, /demo-css3d-particles/);
 });
 

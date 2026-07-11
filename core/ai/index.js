@@ -49,6 +49,10 @@ import {
   matchIntentSignals
 } from "./sceneCapability.js";
 import {
+  THREE_JSON_AGENT_CAPABILITY_INDEX,
+  THREE_JSON_AGENT_EXAMPLE_INDEX
+} from "./sceneCapabilityIndex.js";
+import {
   buildObjectSpatialCardsFromScene,
   buildObjectSpatialCardsFromSceneJson,
   buildSceneScaleProfile,
@@ -113,6 +117,8 @@ if (typeof window !== "undefined") {
     planTexturesDry,
     evaluateSceneCapabilityFit,
     buildIntentHints,
+    THREE_JSON_AGENT_CAPABILITY_INDEX,
+    THREE_JSON_AGENT_EXAMPLE_INDEX,
     analyzeSceneUsage,
     evaluateCapabilityFit,
     matchIntentSignals,
@@ -161,6 +167,8 @@ export {
   planTexturesDry,
   evaluateSceneCapabilityFit,
   buildIntentHints,
+  THREE_JSON_AGENT_CAPABILITY_INDEX,
+  THREE_JSON_AGENT_EXAMPLE_INDEX,
   analyzeSceneUsage,
   evaluateCapabilityFit,
   matchIntentSignals,

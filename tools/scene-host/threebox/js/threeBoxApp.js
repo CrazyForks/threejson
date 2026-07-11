@@ -14,7 +14,8 @@ import {
   classifyThreeBoxTurnIntent,
   resolveAdjustContextPayload,
   isProviderVisionCapable,
-  resolveTurnSceneJsonString
+  resolveTurnSceneJsonString,
+  resolveThreeBoxAgentOptions
 } from "./threeBoxOrchestrator.js";
 import { createThreeBoxAttachedContext } from "./threeBoxAttachedContext.js";
 import { wireThreeBoxComposerStub } from "./threeBoxComposerStub.js";
@@ -117,6 +118,41 @@ async function main() {
     return t("threebox.app.stageFullJson", "完整 JSON");
   }
 
+  function createAgentProgressUpdater(streaming) {
+    const lines = [];
+    let streamBuffer = "";
+    return (progress) => {
+      if (!progress) {
+        return;
+      }
+      if (progress.kind === "stream" && progress.previewDelta) {
+        streamBuffer += progress.previewDelta;
+        streaming.update(streamBuffer);
+        return;
+      }
+      const label = progress.message || progress.kind || "";
+      if (!label) {
+        return;
+      }
+      lines.push(`${lines.length + 1}. ${label}`);
+      streaming.update(lines.slice(-12).join("\n"));
+    };
+  }
+
+  function buildAgentProcessSummary(agentResult) {
+    if (!agentResult?.agentUsed || !Array.isArray(agentResult.steps)) {
+      return "";
+    }
+    const lines = agentResult.steps.slice(0, 10).map((step, index) => {
+      const kind = step.kind || "step";
+      const state = step.ok === false ? "failed" : "ok";
+      const extra = step.error ? `: ${step.error}` : step.count != null ? ` (${step.count})` : "";
+      return `${index + 1}. ${kind} - ${state}${extra}`;
+    });
+    const more = agentResult.steps.length > lines.length ? `\n... ${agentResult.steps.length - lines.length} more step(s)` : "";
+    return [`**Agent process**`, ...lines, more].filter(Boolean).join("\n");
+  }
+
   /** Resolves a turn's full scene JSON string, reconstructing it via command replay when the turn
    * was diff-cached (io.turnCacheMode "diff" — see threeBoxSettingsSchema.js and
    * threeBoxOrchestrator.js's resolveTurnSceneJsonString). Turns cached in "full" mode (the
@@ -138,19 +174,27 @@ async function main() {
     const streaming = api.createStreamingBlock();
     api.appendToBody(textEl, streaming.el);
     let streamBuffer = "";
+    const agentOptions = resolveThreeBoxAgentOptions(settings);
+    const updateAgentProgress = createAgentProgressUpdater(streaming);
 
     try {
-      const { sceneJson, sceneJsonString } = await runThreeBoxGenerateTurn({
+      const { sceneJson, sceneJsonString, agentResult } = await runThreeBoxGenerateTurn({
         userPrompt: text,
         providerOptions,
         globalPromptPrefix: settings.ai?.globalPromptPrefix,
         onDelta: (delta) => {
           streamBuffer += delta;
           streaming.update(streamBuffer);
-        }
+        },
+        agentOptions,
+        onAgentProgress: updateAgentProgress
       });
 
       streaming.remove();
+      const agentSummary = buildAgentProcessSummary(agentResult);
+      if (agentSummary) {
+        api.appendToBody(textEl, api.buildSummaryBlock(agentSummary));
+      }
       api.appendToBody(textEl, api.buildJsonCollapse(sceneJsonString));
       const sceneCard = createThreeBoxSceneCard();
       api.appendToBody(textEl, sceneCard.el);
@@ -220,6 +264,8 @@ async function main() {
     const streaming = api.createStreamingBlock();
     api.appendToBody(textEl, streaming.el);
     let streamBuffer = "";
+    const agentOptions = resolveThreeBoxAgentOptions(settings);
+    const updateAgentProgress = createAgentProgressUpdater(streaming);
 
     try {
       const contextPayload = resolveAdjustContextPayload(targetSceneJson, settings.ai);
@@ -236,6 +282,10 @@ async function main() {
         envelope,
         targetSceneJsonString,
         providerOptions,
+        agentOptions,
+        updateOutputMode: settings.ai?.updateOutputMode || "commands",
+        resolveContextPayload: (sceneJson) => resolveAdjustContextPayload(sceneJson, settings.ai),
+        onAgentProgress: updateAgentProgress,
         onDelta: (delta) => {
           streamBuffer += delta;
           streaming.update(streamBuffer);
@@ -246,6 +296,10 @@ async function main() {
       const sceneJsonString = result.sceneJsonString;
 
       streaming.remove();
+      const agentSummary = buildAgentProcessSummary(result.agentResult);
+      if (agentSummary) {
+        api.appendToBody(textEl, api.buildSummaryBlock(agentSummary));
+      }
       // Show what the AI actually produced (commands / JSON Patch) above the merged final JSON,
       // so the user can see the diff the model generated instead of only the end result.
       if (result.stage === "commands" && result.commands?.length) {

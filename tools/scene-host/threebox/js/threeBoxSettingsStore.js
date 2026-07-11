@@ -82,7 +82,13 @@ export function saveThreeBoxSettingsCache(settings) {
 
 export function loadThreeBoxSettingsBundle() {
   const cached = readThreeBoxSettingsCache();
-  return deepMergeThreeBoxSettings(THREEBOX_SETTINGS_DEFAULTS, cached || {});
+  const merged = deepMergeThreeBoxSettings(THREEBOX_SETTINGS_DEFAULTS, cached || {});
+  if (!cached?.agent && cached?.ai?.agentDepth && !merged.agent?.depth) {
+    merged.agent = { ...(merged.agent || {}), depth: cached.ai.agentDepth };
+  } else if (!cached?.agent && cached?.ai?.agentDepth) {
+    merged.agent.depth = cached.ai.agentDepth;
+  }
+  return merged;
 }
 
 /** Strips provider API keys before persisting, unless ai.rememberKeys is true. */
