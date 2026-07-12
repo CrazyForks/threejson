@@ -18,6 +18,16 @@ import {
 } from "../../../../core/util/util.js";
 import { resolveSceneHostUrl, sceneHostAssetUrl } from "../../shared/js/sceneHostPaths.js";
 import {
+  createShowerHelperOverlay,
+  setShowerAxesVisible,
+  setShowerGridVisible
+} from "./showerHelperOverlay.js";
+import {
+  createViewportGizmoOverlay,
+  disposeViewportGizmoOverlay,
+  renderViewportGizmoOverlay
+} from "../../shared/js/viewportGizmoOverlay.js";
+import {
   jsonStringForScript,
   buildHtmlTemplate,
   buildPackageJson,
@@ -31,7 +41,10 @@ const STORAGE = {
   tab: "threejson.shower.tab",
   lang: "threejson.site.lang",
   theme: "threejson.site.theme",
-  tutorialVisible: "threejson.shower.tutorialVisible"
+  tutorialVisible: "threejson.shower.tutorialVisible",
+  showAxes: "threejson.shower.showAxes",
+  showGrid: "threejson.shower.showGrid",
+  showViewGizmo: "threejson.shower.showViewGizmo"
 };
 const STORAGE_EDITOR_BRIDGE_PREFIX = "threejson.editor.openScene.";
 const AUTO_RENDER_DELAY_MS = 700;
@@ -84,6 +97,9 @@ const labels = {
     templateExportHint: "HTML + 内置 JSON 会直接下载单个 HTML；其他情况导出 zip 模板包。",
     templateExportDone: "模板已导出。",
     catalog: "目录",
+    showAxes: "坐标轴",
+    showGrid: "网格",
+    showViewGizmo: "视角指示器",
     openInEditor: "在编辑器内打开",
     editorOpenFailed: "打开编辑器失败：",
     themeLabel: "主题",
@@ -138,6 +154,9 @@ const labels = {
     templateExportHint: "HTML + inline JSON downloads a single HTML file; other combinations download a zip template.",
     templateExportDone: "Template exported.",
     catalog: "Catalog",
+    showAxes: "Axes",
+    showGrid: "Grid",
+    showViewGizmo: "View Gizmo",
     openInEditor: "Open In Editor",
     editorOpenFailed: "Failed to open editor: ",
     themeLabel: "Theme",
@@ -169,6 +188,9 @@ const els = {
   tutorialDocLinks: document.getElementById("tutorialDocLinks"),
   currentExampleLabel: document.getElementById("currentExampleLabel"),
   audioMuteBtn: document.getElementById("audioMuteBtn"),
+  showAxesCheckbox: document.getElementById("showAxesCheckbox"),
+  showGridCheckbox: document.getElementById("showGridCheckbox"),
+  showViewGizmoCheckbox: document.getElementById("showViewGizmoCheckbox"),
   canvas: document.getElementById("canvasContainer"),
   canvasWrap: document.getElementById("canvasWrap"),
   loading: document.getElementById("loadingMask"),
@@ -230,6 +252,27 @@ async function init() {
     els.tutorialCheckbox.addEventListener("change", () => {
       localStorage.setItem(STORAGE.tutorialVisible, els.tutorialCheckbox.checked ? "1" : "0");
       applyTutorialVisibility();
+    });
+  }
+  if (els.showAxesCheckbox) {
+    els.showAxesCheckbox.checked = localStorage.getItem(STORAGE.showAxes) !== "0";
+    els.showAxesCheckbox.addEventListener("change", () => {
+      localStorage.setItem(STORAGE.showAxes, els.showAxesCheckbox.checked ? "1" : "0");
+      setShowerAxesVisible(els.showAxesCheckbox.checked);
+    });
+  }
+  if (els.showGridCheckbox) {
+    els.showGridCheckbox.checked = localStorage.getItem(STORAGE.showGrid) !== "0";
+    els.showGridCheckbox.addEventListener("change", () => {
+      localStorage.setItem(STORAGE.showGrid, els.showGridCheckbox.checked ? "1" : "0");
+      setShowerGridVisible(els.showGridCheckbox.checked);
+    });
+  }
+  if (els.showViewGizmoCheckbox) {
+    els.showViewGizmoCheckbox.checked = localStorage.getItem(STORAGE.showViewGizmo) !== "0";
+    els.showViewGizmoCheckbox.addEventListener("change", () => {
+      localStorage.setItem(STORAGE.showViewGizmo, els.showViewGizmoCheckbox.checked ? "1" : "0");
+      syncViewportGizmoFromCheckbox();
     });
   }
   els.langSelect.addEventListener("change", () => {
@@ -653,6 +696,14 @@ function updateContextPanels() {
   }
 }
 
+function syncViewportGizmoFromCheckbox() {
+  disposeViewportGizmoOverlay();
+  if (els.showViewGizmoCheckbox?.checked === false || !runtime) {
+    return;
+  }
+  createViewportGizmoOverlay(runtime, els.canvasWrap);
+}
+
 async function runExampleBootstrap(kind, ctx) {
   try {
     if (kind === "fps-walk") {
@@ -686,6 +737,7 @@ async function runScene(sceneJson) {
   clearHighlight();
   teardownThreeJsonSceneAudioFromRuntime(runtime);
   runtime?.dispose?.();
+  disposeViewportGizmoOverlay();
   audioMuted = false;
   fullJson = structuredClone(sceneJson);
   currentJsonFormat = detectCurrentJsonFormat(fullJson);
@@ -697,7 +749,8 @@ async function runScene(sceneJson) {
   const createOptions = {
     canvas: els.canvas,
     assetsBase: sceneHostAssetUrl("assets/"),
-    resetScene: true
+    resetScene: true,
+    afterRender: renderViewportGizmoOverlay
   };
   if (bootstrapKind) {
     createOptions.onSceneReady = (ctx) => runExampleBootstrap(bootstrapKind, ctx);
@@ -708,6 +761,11 @@ async function runScene(sceneJson) {
   try {
     runtime = await createJsonScene(fullJson, createOptions);
     runtime.start?.();
+    createShowerHelperOverlay(runtime.scene, fullJson, {
+      showGrid: els.showGridCheckbox?.checked !== false,
+      showAxes: els.showAxesCheckbox?.checked !== false
+    });
+    syncViewportGizmoFromCheckbox();
     applyRuntimeCanvasThemeBackground();
     resizeRuntime();
     renderTree();

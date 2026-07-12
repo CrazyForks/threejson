@@ -79,7 +79,9 @@ export const EDITOR_SETTINGS_DEFAULTS = {
       historyMaxDepth: 80,
       sceneTreeClickDelayMs: 250,
       boxHelperColor: BOX_EDGE_HELPER_DEFAULT_COLOR,
-      showGridHelper: false,
+      showGridHelper: true,
+      showAxesHelper: true,
+      showViewportGizmo: true,
       highlightChannels: {
         info: "#FFFFFF",
         locate: HIGHLIGHT_LOCATE_AMBER,
@@ -469,7 +471,21 @@ export const EDITOR_SETTINGS_FIELDS = [
       path: "editing.showGridHelper",
       type: "checkbox",
       label: "显示地面网格辅助线",
-      hint: "仅编辑器视口显示，不会写入场景 JSON。"
+      hint: "仅对场景 JSON 未定义网格的场景生效，作为默认显示；若场景 JSON 中已定义网格，以 JSON 为准。不会写入场景 JSON；长度/格数随场景内容自适应，单元格大小不变。状态栏开关独立于此设置，仅影响当前加载场景的运行时显示。"
+    },
+    {
+      section: "editing",
+      path: "editing.showAxesHelper",
+      type: "checkbox",
+      label: "显示坐标轴辅助线",
+      hint: "仅对场景 JSON 未定义坐标轴的场景生效，作为默认显示；若场景 JSON 中已定义坐标轴，以 JSON 为准。不会写入场景 JSON；长度随场景内容自适应。状态栏开关独立于此设置，仅影响当前加载场景的运行时显示。"
+    },
+    {
+      section: "editing",
+      path: "editing.showViewportGizmo",
+      type: "checkbox",
+      label: "显示视角指示器",
+      hint: "画布右上角的坐标轴 Gizmo，点击可切换视角。"
     },
     {
       section: "editing",

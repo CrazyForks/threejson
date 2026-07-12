@@ -86,6 +86,11 @@ import { createEditorChromeUi } from "./editorChromeUi.js";
 import { createEditorViewChrome } from "./editorViewChrome.js";
 import { createEditorSceneReserialize } from "./editorSceneReserialize.js";
 import { createEditorGridHelper } from "./editorGridHelper.js";
+import {
+  createViewportGizmoOverlay,
+  disposeViewportGizmoOverlay,
+  renderViewportGizmoOverlay
+} from "../../shared/js/viewportGizmoOverlay.js";
 import { createEditorViewPreserve } from "./editorViewPreserve.js";
 import {
   formatEditorTopBarSceneTitle,
@@ -567,6 +572,35 @@ export async function bootstrapSceneHostEditor() {
     renderLoop = runtime.renderLoop ?? renderLoop;
   }
 
+  let viewportGizmoContainer = null;
+
+  function ensureViewportGizmoContainer() {
+    if (viewportGizmoContainer) {
+      return viewportGizmoContainer;
+    }
+    if (!stageShell) {
+      return null;
+    }
+    const el = document.createElement("div");
+    el.id = "viewportGizmoOverlayRoot";
+    // Sits above the docked side panels (.flyoutHost is z-index:55) so the gizmo isn't hidden
+    // behind the properties panel's top-right corner; stays below the top chrome bar (z-index:200).
+    el.style.cssText = "position:absolute;inset:0;pointer-events:none;z-index:60;";
+    stageShell.appendChild(el);
+    viewportGizmoContainer = el;
+    return el;
+  }
+
+  function syncViewportGizmoFromSettings() {
+    disposeViewportGizmoOverlay();
+    if (editorSettings?.editing?.showViewportGizmo === false) {
+      return;
+    }
+    createViewportGizmoOverlay({ camera, renderer, controls }, ensureViewportGizmoContainer(), {
+      id: "viewportGizmoOverlay"
+    });
+  }
+
   function clearEditorCanvasSurface() {
     const canvasEl = canvasContainer;
     try {
@@ -603,6 +637,7 @@ export async function bootstrapSceneHostEditor() {
     renderLoop?.stop?.();
     editorInteraction?.dispose();
     gridHelper?.dispose?.();
+    disposeViewportGizmoOverlay();
     try {
       teardownThreeJsonSceneAudioFromRuntime(sceneRuntime);
     } catch {
@@ -693,9 +728,11 @@ export async function bootstrapSceneHostEditor() {
       subSceneNormalizePolicy: editorSettings?.sceneJson?.subSceneNormalizePolicy ?? "warn",
       afterRender: () => {
         editorThreeView?.afterRender?.();
+        renderViewportGizmoOverlay();
       },
       async onRuntimeReady(ctx) {
         assignRuntime(ctx.runtime);
+        syncViewportGizmoFromSettings();
         if (scene?.isScene) {
           trackDisposableResource(scene);
         }
@@ -744,6 +781,7 @@ export async function bootstrapSceneHostEditor() {
     trackDisposableResource(scene);
     editorInteraction?.refreshBoxEdgeColor?.();
     gridHelper?.syncEditorGridHelperFromSettings?.();
+    editorChromeUi?.syncBottomBarHelperToggles?.();
     windowResize();
   }
 
@@ -1633,6 +1671,8 @@ export async function bootstrapSceneHostEditor() {
     editorCapture?.applyCaptureDefaultsFromSettings?.();
     editorInteraction?.syncDragControlsFromSettings?.();
     gridHelper?.syncEditorGridHelperFromSettings?.();
+    editorChromeUi?.syncBottomBarHelperToggles?.();
+    syncViewportGizmoFromSettings();
     editorInteraction?.refreshBoxEdgeColor?.();
     editorTjzExportModal?.applyDefaultsFromSettings?.();
     editorSessionRecovery?.restartAutoSnapshotTimer?.();

@@ -24,7 +24,8 @@
         "gifuct-js": "https://esm.sh/gifuct-js@2.1.2",
         "three-mesh-bvh": "https://esm.sh/three-mesh-bvh@0.9.10?deps=three@0.184.0",
         "three-bvh-csg": "https://esm.sh/three-bvh-csg@0.0.18?deps=three@0.184.0,three-mesh-bvh@0.9.10",
-        "troika-three-text": "https://esm.sh/troika-three-text@0.52.4?deps=three@0.184.0"
+        "troika-three-text": "https://esm.sh/troika-three-text@0.52.4?deps=three@0.184.0",
+        "three-viewport-gizmo": "https://esm.sh/three-viewport-gizmo@2?deps=three@0.184.0"
       }
     }
   </script>
@@ -285,7 +286,7 @@
     <aside id="leftPanel" class="sidePanel leftDockPanel">
       <div class="sidePanelPinRow sidePanelPinRowLeft">
         <button type="button" id="leftPanelPinBtn" class="sidePanelPinBtn" aria-pressed="true"
-          title="已钉住：鼠标移开仍显示" data-i18n-title="editor.shell.leftPanelPinBtn.title"><svg class="sidePanelPinIcon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" stroke="none" d="M8 14.6c0-.01 4.6-5.34 4.6-8.6A4.6 4.6 0 1 0 3.4 6c0 3.26 4.6 8.59 4.6 8.6z"/></svg></button>
+          title="已钉住：鼠标移开仍显示" data-i18n-title="editor.shell.leftPanelPinBtn.title"><svg class="sidePanelPinIcon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 17v5M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg></button>
         <span class="sidePanelChromeTitle" data-i18n="editor.shell.leftPanelTitle">工具面板</span>
       </div>
       <div class="sidePanelStack">
@@ -518,7 +519,7 @@
       <div class="sidePanelPinRow sidePanelPinRowRight">
         <span class="sidePanelChromeTitle" data-i18n="editor.shell.rightPanelTitle">属性面板</span>
         <button type="button" id="rightPanelPinBtn" class="sidePanelPinBtn" aria-pressed="true"
-          title="已钉住：鼠标移开仍显示" data-i18n-title="editor.shell.rightPanelPinBtn.title"><svg class="sidePanelPinIcon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" stroke="none" d="M8 14.6c0-.01 4.6-5.34 4.6-8.6A4.6 4.6 0 1 0 3.4 6c0 3.26 4.6 8.59 4.6 8.6z"/></svg></button>
+          title="已钉住：鼠标移开仍显示" data-i18n-title="editor.shell.rightPanelPinBtn.title"><svg class="sidePanelPinIcon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 17v5M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg></button>
       </div>
       <div class="sidePanelStack">
       <div class="rightSubTabBar" role="tablist" aria-label="右侧功能" aria-orientation="horizontal" data-i18n-aria="editor.shell.rightSubTabBar">
@@ -857,6 +858,15 @@
   <div id="bottomChromeWrap" class="bottomChromeWrap">
     <footer class="bottomBar">
       <span id="eventNotice" data-i18n="editor.shell.eventNotice">操作指南：左键旋转，右键拖动，滚轮缩放；场景树单击高亮，双击高亮+描边+编辑。</span>
+      <div class="bottomBarSpacer"></div>
+      <div class="bottomBarToggles">
+        <button type="button" id="bottomBarToggleAxes" class="bottomBarToggleBtn" aria-pressed="true" data-i18n-title="editor.shell.bottomBarToggleAxes.title" title="显示/隐藏坐标轴辅助线">
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" d="M8 14V2M8 2 5.5 4.5M8 2l2.5 2.5M2 12h9M11 12l-2-1.6M11 12l-2 1.6"/><circle cx="8" cy="14" r="1" fill="currentColor" stroke="none"/></svg>
+        </button>
+        <button type="button" id="bottomBarToggleGrid" class="bottomBarToggleBtn" aria-pressed="true" data-i18n-title="editor.shell.bottomBarToggleGrid.title" title="显示/隐藏地面网格辅助线">
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.1" d="M1.5 1.5h13v13h-13z M1.5 5.83h13 M1.5 10.17h13 M5.83 1.5v13 M10.17 1.5v13"/></svg>
+        </button>
+      </div>
     </footer>
     <div class="chromePeekStrip chromePeekStripBottom" aria-hidden="true"></div>
   </div>

@@ -113,15 +113,15 @@ export function createSceneTreePanel(host) {
       return false;
     }
     const re = redeployObject(host.getScene(), threeJsonId);
-    if (!re?.object3D) {
+    if (!re) {
       if (!silent) {
         host.showMessage("材质已写入，但 redeploy 失败。", "warning");
       }
       return false;
     }
-    host.setSelectedObject(re.object3D);
-    syncPropInputs(re.object3D);
-    host.getEditorInteraction()?.refreshBoxEdge(re.object3D);
+    host.setSelectedObject(re);
+    syncPropInputs(re);
+    host.getEditorInteraction()?.refreshBoxEdge(re);
     host.getEditorInteraction()?.refreshMeshList?.();
     render();
     return true;

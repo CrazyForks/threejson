@@ -6,12 +6,33 @@ export const DEFAULT_EVENT_NOTICE =
 export function createEditorChromeUi(host) {
   const rootContainer = document.getElementById("rootContainer");
   const eventNoticeEl = document.getElementById("eventNotice");
+  const bottomBarToggleAxesBtn = document.getElementById("bottomBarToggleAxes");
+  const bottomBarToggleGridBtn = document.getElementById("bottomBarToggleGrid");
 
   function setEventNotice(message) {
     if (eventNoticeEl) {
       eventNoticeEl.textContent = message;
     }
   }
+
+  function syncBottomBarHelperToggles() {
+    const gridHelper = host.getGridHelper?.();
+    if (bottomBarToggleAxesBtn) {
+      bottomBarToggleAxesBtn.setAttribute("aria-pressed", gridHelper?.isHelperVisible?.("axes") ? "true" : "false");
+    }
+    if (bottomBarToggleGridBtn) {
+      bottomBarToggleGridBtn.setAttribute("aria-pressed", gridHelper?.isHelperVisible?.("grid") ? "true" : "false");
+    }
+  }
+
+  /** Runtime-only visibility flip for the current scene load; does not touch settings or scene JSON. */
+  function toggleBottomBarHelper(kind) {
+    host.getGridHelper?.()?.toggleRuntimeHelperVisible?.(kind);
+    syncBottomBarHelperToggles();
+  }
+
+  bottomBarToggleAxesBtn?.addEventListener("click", () => toggleBottomBarHelper("axes"));
+  bottomBarToggleGridBtn?.addEventListener("click", () => toggleBottomBarHelper("grid"));
 
   function syncEditorMuteUi() {
     const muted = host.getAudioMuted?.() ?? false;
@@ -80,6 +101,7 @@ export function createEditorChromeUi(host) {
     applyStatusBarHintFromSettings(host.getEditorSettings?.());
     syncEditorMuteUi();
     syncFullscreenToggleLabels();
+    syncBottomBarHelperToggles();
     document.addEventListener("fullscreenchange", syncFullscreenToggleLabels);
   }
 
@@ -97,6 +119,7 @@ export function createEditorChromeUi(host) {
     syncEditorMuteUi,
     toggleEditorSceneAudioMute,
     syncFullscreenToggleLabels,
-    toggleFullscreen
+    toggleFullscreen,
+    syncBottomBarHelperToggles
   };
 }

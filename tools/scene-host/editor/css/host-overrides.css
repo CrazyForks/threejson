@@ -57,3 +57,42 @@
   background: rgba(0, 0, 0, 0.45);
 }
 
+/* #viewportGizmoOverlayRoot wrapper is pointer-events:none (spans the whole stage so it never
+   blocks clicks); the gizmo's own small corner div needs pointer-events re-enabled to be clickable. */
+#viewportGizmoOverlay {
+  pointer-events: auto;
+}
+
+.bottomBarSpacer {
+  flex: 1 1 auto;
+}
+
+.bottomBarToggles {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bottomBarToggleBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: #9a9a9a;
+  cursor: pointer;
+}
+
+.bottomBarToggleBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e4e4e4;
+}
+
+.bottomBarToggleBtn[aria-pressed="true"] {
+  color: #6db8ff;
+}
+

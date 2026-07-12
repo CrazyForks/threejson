@@ -60,7 +60,8 @@ function walkBoxModelsForMaterialSlots(models, basePointer, out) {
         out.push({
           pointer: matPtr.startsWith("/") ? matPtr : `/${matPtr}`,
           label: `${prefix}material（六面共用）`,
-          slotKind: "material"
+          slotKind: "material",
+          prefix
         });
       }
     }
@@ -75,7 +76,8 @@ function walkBoxModelsForMaterialSlots(models, basePointer, out) {
           pointer: slotPtr.startsWith("/") ? slotPtr : `/${slotPtr}`,
           label: `${prefix}materials[${j}]（${faceLabel}）`,
           slotKind: "materials",
-          faceIndex: j
+          faceIndex: j,
+          prefix
         });
       });
     }
@@ -96,9 +98,10 @@ function walkBoxModelsForMaterialSlots(models, basePointer, out) {
 /**
  * @typedef {object} MaterialSlot
  * @property {string} pointer RFC6901 to material object
- * @property {string} label
+ * @property {string} label Chinese default label; UI layers should build a localized label from slotKind/faceIndex/prefix instead of displaying this directly.
  * @property {"material"|"materials"} [slotKind]
  * @property {number} [faceIndex]
+ * @property {string} [prefix] Nested path prefix (e.g. "joins[0] · "), already appended to label.
  */
 
 /**

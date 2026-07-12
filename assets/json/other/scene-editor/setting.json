@@ -56,7 +56,8 @@
     "historyMaxDepth": 80,
     "sceneTreeClickDelayMs": 250,
     "boxHelperColor": "#DE982F",
-    "showGridHelper": false,
+    "showGridHelper": true,
+    "showAxesHelper": true,
     "highlightChannels": {
       "info": "#ffffff",
       "locate": "#E6A800",

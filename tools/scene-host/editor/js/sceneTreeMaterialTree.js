@@ -1,4 +1,4 @@
-import { listMaterialSlotsForDescriptor } from "../../../../core/util/materialDescriptorWalk.js";
+import { listMaterialSlotsForDescriptor, BOX_FACE_LABELS } from "../../../../core/util/materialDescriptorWalk.js";
 import { getByPointer, setByPointer } from "../../../../core/util/jsonPointer.js";
 import { applyTextureRepeatToMap } from "../../../../core/util/loadTextureFromMaterialJson.js";
 import {
@@ -56,6 +56,15 @@ function ensureSceneAssetLibraryArray(host) {
 
 function isTextureAssetKind(kind) {
   return String(kind ?? "texture").trim().toLowerCase() === "texture";
+}
+
+function formatMaterialSlotLabel(slot) {
+  const prefix = slot.prefix || "";
+  if (slot.slotKind === "materials") {
+    const faceLabel = BOX_FACE_LABELS[slot.faceIndex] ?? `${t("editor.material.faceFallback", "Face")} ${slot.faceIndex}`;
+    return `${prefix}${t("editor.material.slotFace", "materials[{index}] ({face})", { index: slot.faceIndex, face: faceLabel })}`;
+  }
+  return `${prefix}${t("editor.material.slotShared", "material (shared across 6 faces)")}`;
 }
 
 function buildAssetLibSelectOptions(host, selectedId) {
@@ -221,7 +230,7 @@ export function createSceneTreeMaterialTree(host, { isPropSyncing }) {
       details.open = openAll;
       details.dataset.pointer = slot.pointer;
       const summary = document.createElement("summary");
-      summary.textContent = slot.label;
+      summary.textContent = formatMaterialSlotLabel(slot);
       details.appendChild(summary);
       const grid = document.createElement("div");
       grid.className = "sceneTreeMaterialSlotGrid";
@@ -306,7 +315,7 @@ export function createSceneTreeMaterialTree(host, { isPropSyncing }) {
         samplingModal.openModal({
           pointer: slot.pointer,
           profileName: "imageMap",
-          slotLabel: slot.label,
+          slotLabel: formatMaterialSlotLabel(slot),
           rootData: data,
           mesh: host.getSelectedObject(),
           onCommitted: () => render(host.getSelectedObject())

@@ -4,6 +4,11 @@
 import * as THREE from "three";
 import { trackDisposableResource } from "../handler/trackedResourceRegistry.js";
 import { registerObject, unregisterObject } from "../handler/objectRegistry.js";
+import { estimateSceneExtentFromPayload } from "../util/sceneRuntimeDefaults.js";
+
+/** Grid cell size in scene units, kept fixed regardless of scene extent (only the count of cells changes). */
+const DEFAULT_HELPER_CELL_SIZE = 5;
+const DEFAULT_HELPER_MIN_DIVISIONS = 20;
 
 const ASSIST_HELPER_OBJ_TYPES = new Set(["gridhelper", "axeshelper", "boxhelper"]);
 
@@ -95,6 +100,57 @@ export function normalizeHelpersConfig(sceneConfig = {}, worldInfo = {}) {
     return null;
   }
   return out;
+}
+
+/**
+ * Compute a grid/axes size that comfortably contains the scene's estimated extent, keeping the
+ * grid's per-cell size fixed (DEFAULT_HELPER_CELL_SIZE) and only scaling the cell count.
+ * @param {object} payload scene JSON payload (worldInfo / objectList), pre-normalize
+ * @returns {{ size: number, divisions: number }}
+ */
+function computeDefaultHelperExtent(payload) {
+  const extentGuess = estimateSceneExtentFromPayload(payload);
+  const maxDim = extentGuess?.maxDim;
+  let divisions = DEFAULT_HELPER_MIN_DIVISIONS;
+  if (Number.isFinite(maxDim) && maxDim > 0) {
+    const needed = Math.ceil((maxDim * 1.6) / DEFAULT_HELPER_CELL_SIZE / 2) * 2;
+    divisions = Math.max(DEFAULT_HELPER_MIN_DIVISIONS, needed);
+  }
+  return { size: divisions * DEFAULT_HELPER_CELL_SIZE, divisions };
+}
+
+/**
+ * Inject default grid/axes helpers into a scene payload when it doesn't already specify any
+ * (via sceneConfig.helpers / worldInfo.helpers / the legacy gridHelper/axesHelper aliases).
+ * Sizes the grid/axes to comfortably contain the scene's estimated extent, keeping the grid's
+ * per-cell size fixed. Mutates and returns `payload`; a no-op when helpers are already present,
+ * so an explicit user-authored helpers config always wins.
+ * @param {object} payload
+ * @returns {object} same payload reference
+ */
+export function ensureDefaultSceneHelpers(payload) {
+  if (!payload || typeof payload !== "object") {
+    return payload;
+  }
+  if (normalizeHelpersConfig(payload.sceneConfig, payload.worldInfo)) {
+    return payload;
+  }
+  const { size, divisions } = computeDefaultHelperExtent(payload);
+  payload.sceneConfig = isPlainObject(payload.sceneConfig) ? payload.sceneConfig : {};
+  payload.sceneConfig.helpers = {
+    grid: {
+      visible: true,
+      size,
+      divisions,
+      colorCenterLine: "#444444",
+      colorGrid: "#888888"
+    },
+    axes: {
+      visible: true,
+      size: Math.max(size / 3, DEFAULT_HELPER_CELL_SIZE * 4)
+    }
+  };
+  return payload;
 }
 
 /**

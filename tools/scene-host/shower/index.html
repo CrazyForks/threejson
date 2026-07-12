@@ -20,7 +20,8 @@
         "three-bvh-csg": "https://esm.sh/three-bvh-csg@0.0.18?deps=three@0.184.0,three-mesh-bvh@0.9.10",
         "troika-three-text": "https://esm.sh/troika-three-text@0.52.4?deps=three@0.184.0",
         "echarts": "https://esm.sh/echarts@5.6.0",
-        "@dimforge/rapier3d-compat": "https://esm.sh/@dimforge/rapier3d-compat@0.19.3"
+        "@dimforge/rapier3d-compat": "https://esm.sh/@dimforge/rapier3d-compat@0.19.3",
+        "three-viewport-gizmo": "https://esm.sh/three-viewport-gizmo@2?deps=three@0.184.0"
       }
     }
   </script>
@@ -99,6 +100,18 @@
           <div id="currentExampleLabel" class="currentExampleLabel"></div>
           <div class="toolbarSpacer"></div>
           <button id="openInEditorBtn" class="linkButton" type="button" data-i18n="openInEditor">在编辑器内打开</button>
+          <label class="autoRunLabel">
+            <input id="showAxesCheckbox" type="checkbox" checked>
+            <span data-i18n="showAxes">坐标轴</span>
+          </label>
+          <label class="autoRunLabel">
+            <input id="showGridCheckbox" type="checkbox" checked>
+            <span data-i18n="showGrid">网格</span>
+          </label>
+          <label class="autoRunLabel">
+            <input id="showViewGizmoCheckbox" type="checkbox" checked>
+            <span data-i18n="showViewGizmo">视角指示器</span>
+          </label>
           <button id="audioMuteBtn" type="button" hidden data-i18n="muteAudio">静音</button>
           <button id="downloadHtmlBtn" type="button" data-i18n="downloadHtml">Download</button>
           <div class="menu">

@@ -222,6 +222,9 @@ export function createEditorInteraction(host) {
         host.getSceneTree()?.syncPropInputs(target);
         host.getSceneReserialize?.()?.markSceneDocumentSynced?.();
         host.getRightSidebarCache?.()?.invalidateRightSidebarSceneJsonTextCache?.();
+        if (host.getCodeEditor()?.isCodeEditMode?.()) {
+          void host.getCodeEditor()?.refreshFromScene?.();
+        }
         if (dragSnapshot?.threeJsonId) {
           const after = snapshotBoxModelTransformFromObject3D(target);
           const beforeJson = JSON.stringify(dragSnapshot.before);

@@ -1002,7 +1002,11 @@ async function runCanonicalObjectDeploy(overlayRoot, normalized, options = {}, r
     await runDeployJobs(jobs, { onProgress });
     return;
   }
-  await runDeployJobsScheduled(jobs, schedulerConfig, { onProgress });
+  // Pass overlayRoot (the scene) as runtimeScope: without it this falls back to
+  // resolveRuntimeContext's lastAttachedContext heuristic, which can resolve to a
+  // sibling scene's deployScheduler store if another createJsonScene call attaches
+  // its own context in between (multi-canvas pages). See core/runtime/runtimeContext.js.
+  await runDeployJobsScheduled(jobs, schedulerConfig, { onProgress }, overlayRoot);
 }
 
 function deployCanonicalObjectList(overlayRoot, normalized, options = {}, runtimeHints = {}) {
