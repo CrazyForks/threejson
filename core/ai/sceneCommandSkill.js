@@ -257,6 +257,22 @@ function buildCommandUtilityFragment() {
   ].join("\n");
 }
 
+function buildCommandOnlineTextureFragment(options = {}) {
+  if (options.onlineTextureHints === false) {
+    return [
+      "Online texture setting:",
+      "- Proactive online texture hints are disabled for this request.",
+      "- Do not add new material.textureUrl fields unless the user explicitly asks for/provides a texture URL.",
+      "- Preserve existing valid textureUrl values."
+    ].join("\n");
+  }
+  return [
+    "Online texture setting:",
+    "- For newly added objects/surfaces that would be incomplete as flat colors (terrain/grass/water, asphalt, brick/concrete/wood/stone/fabric, signs/screens/maps, paintings, labels, carpets, named planets), use material.textureUrl with a suitable reachable online image URL; it may come from any public web source, not only a CDN, and https is preferred.",
+    "- Add textureRepeat for large tiled surfaces. Keep flat colors for generic blockouts and plain colored objects."
+  ].join("\n");
+}
+
 /**
  * @returns {string}
  */
@@ -385,6 +401,8 @@ export function buildSceneCommandAutoUpdateSystemPrompt(options = {}) {
     "",
     buildCommandPromptRulesFragment(),
     "",
+    buildCommandOnlineTextureFragment(options),
+    "",
     ...workflow,
     "",
     buildSceneCommandSkillFragment()
@@ -394,7 +412,7 @@ export function buildSceneCommandAutoUpdateSystemPrompt(options = {}) {
 /**
  * @returns {string}
  */
-export function buildSceneCommandUpdateSystemPrompt() {
+export function buildSceneCommandUpdateSystemPrompt(options = {}) {
   return [
     "You are a ThreeJSON scene editor that outputs executable command scripts.",
     "Apply the user's modification request using ONLY the core commands below.",
@@ -420,6 +438,8 @@ export function buildSceneCommandUpdateSystemPrompt() {
     "- Lines starting with # are comments (optional).",
     "",
     buildCommandPromptRulesFragment(),
+    "",
+    buildCommandOnlineTextureFragment(options),
     "",
     buildSceneCommandSkillFragment()
   ].join("\n");

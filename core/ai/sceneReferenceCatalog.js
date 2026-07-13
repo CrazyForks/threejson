@@ -19,6 +19,11 @@
  */
 const MANIFEST_RELATIVE_PATH = "assets/json/demo-show/manifest.json";
 const DOC_LOCALE_DIR = { "zh-CN": "docs/zh", "en-US": "docs/en" };
+const PUBLIC_REFERENCE_LINKS = {
+  docsIndex: "https://threejson.org/",
+  githubExamples: "https://github.com/nnrj/threejson/tree/master/assets/json",
+  assetsCdnBase: "https://cdn.jsdelivr.net/npm/@threejson/assets@latest/assets/"
+};
 
 /** Curated intent-signal id (see sceneCapability.js's INTENT_SIGNALS) -> demo-show manifest
  * section id(s). Only covers topics the baked-in prompt catalog under-specifies (verified against
@@ -32,6 +37,8 @@ const SIGNAL_TO_SECTIONS = {
   sceneText: ["text-3d"],
   external: ["external-resources"],
   audio: ["external-resources"],
+  lighting: ["materials-lighting"],
+  declarativeAnimation: ["runtime"],
   group: ["composition"],
   instanced: ["object-manager"],
   statDomain: ["business-domains"],
@@ -151,6 +158,9 @@ export async function fetchReferenceMaterial(matchedSignals, options = {}) {
         ? section.items.find((item) => typeof item.json === "string" && item.json)
         : null;
       if (exampleItem) {
+        parts.push(
+          `Example links: GitHub ${PUBLIC_REFERENCE_LINKS.githubExamples}; CDN ${PUBLIC_REFERENCE_LINKS.assetsCdnBase}${exampleItem.json.replace(/^assets\//, "")}`
+        );
         const exampleText = await fetchTextCached(resolveUrl(exampleItem.json));
         if (exampleText) {
           parts.push(`Example JSON (${exampleItem.id}):\n${truncate(exampleText, MAX_EXAMPLE_CHARS)}`);
@@ -166,7 +176,7 @@ export async function fetchReferenceMaterial(matchedSignals, options = {}) {
       return "";
     }
     return [
-      "Reference material retrieved from this project's own docs/examples for capabilities this request needs (follow the syntax shown; do not copy unrelated fields verbatim):",
+      `Reference material retrieved from this project's own docs/examples for capabilities this request needs (follow the syntax shown; do not copy unrelated fields verbatim). Public docs: ${PUBLIC_REFERENCE_LINKS.docsIndex}`,
       ...blocks
     ].join("\n\n");
   } catch (_err) {

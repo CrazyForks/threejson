@@ -100,7 +100,7 @@ export function buildResultDigest(sceneJson) {
 /**
  * First-turn (no prior context) generation: builds the structured JSON envelope and calls
  * core/ai's generateSceneJsonString with streaming enabled.
- * @param {{ userPrompt: string, providerOptions: object, onDelta?: (delta:string)=>void, signal?: AbortSignal, globalPromptPrefix?: string, agentOptions?: object, onAgentProgress?: (p: object)=>void, includeReferenceLinks?: boolean, locale?: string }} input
+ * @param {{ userPrompt: string, providerOptions: object, onDelta?: (delta:string)=>void, signal?: AbortSignal, globalPromptPrefix?: string, agentOptions?: object, onAgentProgress?: (p: object)=>void, includeReferenceLinks?: boolean, locale?: string, onlineTextureHints?: boolean }} input
  *   `includeReferenceLinks`/`locale` are threebox-shell settings (general.locale / ai.attachReferenceLinks)
  *   forwarded into the envelope's referenceLinks block and (for agent mode) into the Agent's
  *   local docs/example retrieval — see core/ai/sceneChatSession.js and sceneReferenceCatalog.js.
@@ -114,7 +114,9 @@ export async function runThreeBoxGenerateTurn({
   agentOptions,
   onAgentProgress,
   includeReferenceLinks,
-  locale
+  locale,
+  capabilityLookup,
+  onlineTextureHints
 }) {
   const envelope = buildStructuredTurnEnvelope({ userPrompt, intent: "generate", globalPromptPrefix, includeReferenceLinks });
   if (agentOptions?.enabled) {
@@ -128,6 +130,8 @@ export async function runThreeBoxGenerateTurn({
           depth: agentOptions.depth || "medium"
         },
         resolveReferenceUrl: resolveThreeBoxReferenceUrl,
+        capabilityLookup,
+        onlineTextureHints,
         locale,
         onProgress: onAgentProgress
       }
@@ -139,7 +143,11 @@ export async function runThreeBoxGenerateTurn({
     ...providerOptions,
     stream: true,
     onDelta,
-    signal
+    signal,
+    resolveReferenceUrl: resolveThreeBoxReferenceUrl,
+    capabilityLookup,
+    onlineTextureHints,
+    locale
   });
   const sceneJson = parseSceneJsonString(sceneJsonString);
   return { sceneJson, sceneJsonString };
@@ -260,6 +268,8 @@ async function runThreeBoxAgentAdjustTurn({
   resolveContextPayload,
   onAgentProgress,
   locale,
+  capabilityLookup,
+  onlineTextureHints,
   signal
 }) {
   const mode = mapThreeBoxUpdateModeToAgentInput(updateOutputMode);
@@ -285,6 +295,7 @@ async function runThreeBoxAgentAdjustTurn({
         updateMode: mode.updateMode,
         agent: { enabled: true, depth: agentOptions.depth || "medium" },
         resolveReferenceUrl: resolveThreeBoxReferenceUrl,
+        capabilityLookup,
         locale,
         signal,
         onProgress: onAgentProgress
@@ -336,6 +347,8 @@ async function runThreeBoxAgentAdjustTurn({
           iterativeApply: agentOptions.iterativeApply !== false
         },
         resolveReferenceUrl: resolveThreeBoxReferenceUrl,
+        capabilityLookup,
+        onlineTextureHints,
         locale,
         signal,
         applyCommands,
@@ -391,6 +404,7 @@ async function runThreeBoxAgentAdjustTurn({
  *   resolveContextPayload?: (sceneJson: object) => object,
  *   onAgentProgress?: (p: object) => void,
  *   locale?: string,
+ *   onlineTextureHints?: boolean,
  *   signal?: AbortSignal
  * }} input
  * @returns {Promise<
@@ -410,6 +424,8 @@ export async function runThreeBoxAdjustTurn({
   resolveContextPayload,
   onAgentProgress,
   locale,
+  capabilityLookup,
+  onlineTextureHints,
   signal
 }) {
   if (agentOptions?.enabled) {
@@ -423,6 +439,8 @@ export async function runThreeBoxAdjustTurn({
       resolveContextPayload,
       onAgentProgress,
       locale,
+      capabilityLookup,
+      onlineTextureHints,
       signal
     });
   }
@@ -431,7 +449,18 @@ export async function runThreeBoxAdjustTurn({
     const cmdResult = await requestUpdatedSceneEditCommands(
       userPrompt,
       { userMessage: envelope, currentSceneJsonString: targetSceneJsonString, fullSceneJson: targetSceneJsonString },
-      { ...providerOptions, outputMode: "commands", fallbackToJson: false, stream: true, onDelta, signal }
+      {
+        ...providerOptions,
+        outputMode: "commands",
+        fallbackToJson: false,
+        stream: true,
+        onDelta,
+        signal,
+        resolveReferenceUrl: resolveThreeBoxReferenceUrl,
+        capabilityLookup,
+        onlineTextureHints,
+        locale
+      }
     );
     if (cmdResult.outputMode === "commands" && cmdResult.commands?.length) {
       const offscreenRuntime = await createOffscreenRuntimeFromSceneJsonString(targetSceneJsonString);
@@ -468,7 +497,10 @@ export async function runThreeBoxAdjustTurn({
       includePatch: true,
       stream: true,
       onDelta,
-      signal
+      signal,
+      resolveReferenceUrl: resolveThreeBoxReferenceUrl,
+      capabilityLookup,
+      locale
     });
     return {
       stage: "json-incremental",
@@ -485,7 +517,10 @@ export async function runThreeBoxAdjustTurn({
     updateMode: "full",
     stream: true,
     onDelta,
-    signal
+    signal,
+    resolveReferenceUrl: resolveThreeBoxReferenceUrl,
+    capabilityLookup,
+    locale
   });
   return { stage: "json-full", sceneJson: parseSceneJsonString(fullJsonString), sceneJsonString: fullJsonString };
 }

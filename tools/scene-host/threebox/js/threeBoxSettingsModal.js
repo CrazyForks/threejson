@@ -192,6 +192,7 @@ export function createThreeBoxSettingsModal(host = {}) {
     keyRow.appendChild(keyLabel);
     keyRow.appendChild(keyInput);
     card.appendChild(keyRow);
+    card.insertBefore(keyRow, modelRow);
 
     const deleteBtn = document.createElement("button");
     deleteBtn.type = "button";

@@ -110,6 +110,12 @@ const INTENT_SIGNALS = [
     note: "Use objType glass with glassKind when needed."
   },
   {
+    id: "lighting",
+    patterns: [/light|lighting|lamp|spotlight|point light|directional light|ambient light|illuminat|bright|dark|shadow|灯光|光照|点光源|平行光|环境光|聚光灯|太暗|黑漆漆/i],
+    objTypes: ["light"],
+    note: "Use sceneConfig.lights with ambient + directional for general light; point/spot only for local lamps with higher intensity."
+  },
+  {
     id: "particles",
     // Word-bounded and specific on purpose: a bare "points" (no boundary) previously matched
     // "waypoints"/"control points"/"data points" in ordinary prompts and forced particleEmitter
@@ -218,6 +224,12 @@ const INTENT_SIGNALS = [
     note: "Use passList or sceneConfig pass records for requested post-processing effects."
   },
   {
+    id: "declarativeAnimation",
+    patterns: [/rotate|rotation|spin|spinning|orbit|animated|animation|转动|旋转|自转|公转|动画/i],
+    objTypes: ["animation"],
+    note: "Use animations:[{type:'rotate',axis,speed}] with sceneConfig.renderLoop.updateAnimations true; make solid-object rotation visually apparent."
+  },
+  {
     id: "statDomain",
     patterns: [/stat|chart|dashboard|gauge|pie chart|ring chart|bar chart|line chart|ECharts/i],
     lists: ["domainModelList"],
@@ -323,6 +335,9 @@ function analyzeSceneUsage(sceneObj) {
   if (sceneObj?.sceneConfig?.intro) {
     objTypes.add("intro");
   }
+  if (Array.isArray(sceneObj?.sceneConfig?.lights) && sceneObj.sceneConfig.lights.length > 0) {
+    objTypes.add("light");
+  }
   const scenePassList = sceneObj?.sceneConfig?.passList || sceneObj?.passList;
   if (Array.isArray(scenePassList) && scenePassList.length > 0) {
     if (!listsUsed.includes("passList")) {
@@ -374,6 +389,9 @@ function collectObjTypes(record, objTypes) {
   }
   if (record.events && typeof record.events === "object") {
     objTypes.add("event");
+  }
+  if (Array.isArray(record.animations) && record.animations.length > 0) {
+    objTypes.add("animation");
   }
   if (record.animationGraph && typeof record.animationGraph === "object") {
     objTypes.add("animationGraph");

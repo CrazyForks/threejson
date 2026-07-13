@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { test, afterEach } from "node:test";
 import {
   extractJsonText,
+  generateSceneJsonString,
   parseSceneJsonString,
+  requestUpdatedSceneJsonString,
   requestChatCompletion
 } from "../core/ai/sceneAiService.js";
 import { sanitizeAiJsonText, isLikelyTruncatedJsonText } from "../core/ai/sceneJsonSanitize.js";
@@ -266,4 +268,204 @@ test("requestChatCompletion respects AbortSignal", async () => {
   });
   ac.abort();
   await assert.rejects(pending, (err) => err.name === "AbortError");
+});
+
+test("generateSceneJsonString injects capability reference material when enabled", async () => {
+  const requestBodies = [];
+  globalThis.fetch = async (url, init = {}) => {
+    const href = String(url);
+    if (href.endsWith("/assets/json/demo-show/manifest.json")) {
+      return {
+        ok: true,
+        async text() {
+          return JSON.stringify([
+            {
+              section: "event-mechanism",
+              sectionTitleEn: "Event Mechanism",
+              docLinks: [{ file: "event-mechanism.md" }],
+              items: [
+                {
+                  id: "declarative-action",
+                  json: "assets/json/demo-show/event-mechanism/declarative-action.json"
+                }
+              ]
+            }
+          ]);
+        }
+      };
+    }
+    if (href.endsWith("/docs/en/event-mechanism.md")) {
+      return {
+        ok: true,
+        async text() {
+          return "Use object events with actions.";
+        }
+      };
+    }
+    if (href.endsWith("/assets/json/demo-show/event-mechanism/declarative-action.json")) {
+      return {
+        ok: true,
+        async text() {
+          return '{"events":{"click":{"actions":[{"type":"setVisible","target":"door"}]}}}';
+        }
+      };
+    }
+    if (href === "https://api.openai.com/v1/chat/completions") {
+      requestBodies.push(JSON.parse(init.body));
+      return {
+        ok: true,
+        async json() {
+          return {
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    threeJsonId: "event-scene",
+                    worldInfo: {
+                      boxModelList: [
+                        {
+                          name: "door",
+                          objType: "box",
+                          geometry: { width: 1, height: 2, depth: 0.2 },
+                          position: { x: 0, y: 1, z: 0 },
+                          material: { color: "#885533" }
+                        }
+                      ]
+                    }
+                  })
+                }
+              }
+            ]
+          };
+        }
+      };
+    }
+    return { ok: false, async text() { return ""; } };
+  };
+
+  const out = await generateSceneJsonString("add a click event to the door", {
+    provider: "chatgpt",
+    apiKey: "test-key",
+    capabilityReview: false,
+    resolveReferenceUrl: (path) => `https://example.test/${path}`,
+    locale: "en-US"
+  });
+
+  assert.ok(out.includes("event-scene"));
+  assert.equal(requestBodies.length, 1);
+  const userContent = requestBodies[0].messages.at(-1).content;
+  assert.ok(userContent.includes("Reference material retrieved"));
+  assert.ok(userContent.includes("Use object events with actions."));
+});
+
+test("generateSceneJsonString skips capability reference material when disabled", async () => {
+  const requestBodies = [];
+  globalThis.fetch = async (url, init = {}) => {
+    if (String(url) === "https://api.openai.com/v1/chat/completions") {
+      requestBodies.push(JSON.parse(init.body));
+      return {
+        ok: true,
+        async json() {
+          return {
+            choices: [
+              {
+                message: {
+                  content: '{"threeJsonId":"plain-scene","worldInfo":{"boxModelList":[{"name":"box","objType":"box","geometry":{"width":1,"height":1,"depth":1},"position":{"x":0,"y":0.5,"z":0},"material":{"color":"#fff"}}]}}'
+                }
+              }
+            ]
+          };
+        }
+      };
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+
+  await generateSceneJsonString("add a click event to the door", {
+    provider: "chatgpt",
+    apiKey: "test-key",
+    capabilityReview: false,
+    capabilityLookup: false,
+    resolveReferenceUrl: (path) => `https://example.test/${path}`,
+    locale: "en-US"
+  });
+
+  assert.equal(requestBodies.length, 1);
+  const userContent = requestBodies[0].messages.at(-1).content;
+  assert.equal(userContent.includes("Reference material retrieved"), false);
+});
+
+test("generateSceneJsonString disables proactive online texture prompt when requested", async () => {
+  const requestBodies = [];
+  globalThis.fetch = async (url, init = {}) => {
+    if (String(url) === "https://api.openai.com/v1/chat/completions") {
+      requestBodies.push(JSON.parse(init.body));
+      return {
+        ok: true,
+        async json() {
+          return {
+            choices: [
+              {
+                message: {
+                  content: '{"threeJsonId":"texture-off","worldInfo":{"boxModelList":[{"name":"floor","objType":"floor","geometry":{"width":4,"height":0.1,"depth":4},"position":{"x":0,"y":0,"z":0},"material":{"color":"#777777"}}]}}'
+                }
+              }
+            ]
+          };
+        }
+      };
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+
+  await generateSceneJsonString("make a room with a wood floor", {
+    provider: "chatgpt",
+    apiKey: "test-key",
+    capabilityReview: false,
+    onlineTextureHints: false
+  });
+
+  assert.equal(requestBodies.length, 1);
+  const systemContent = requestBodies[0].messages[0].content;
+  assert.match(systemContent, /host disabled proactive online texture hints/);
+  assert.doesNotMatch(systemContent, /self-evidently incomplete as a flat color/);
+});
+
+test("requestUpdatedSceneJsonString does not carry proactive online texture prompt", async () => {
+  const requestBodies = [];
+  globalThis.fetch = async (url, init = {}) => {
+    if (String(url) === "https://api.openai.com/v1/chat/completions") {
+      requestBodies.push(JSON.parse(init.body));
+      return {
+        ok: true,
+        async json() {
+          return {
+            choices: [
+              {
+                message: {
+                  content: '{"threeJsonId":"update-no-texture-hint","worldInfo":{"boxModelList":[{"name":"floor","objType":"floor","geometry":{"width":4,"height":0.1,"depth":4},"position":{"x":0,"y":0,"z":0},"material":{"color":"#777777"}}]}}'
+                }
+              }
+            ]
+          };
+        }
+      };
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+
+  await requestUpdatedSceneJsonString(
+    "make the floor wider",
+    '{"threeJsonId":"base","worldInfo":{"boxModelList":[{"name":"floor","objType":"floor","geometry":{"width":2,"height":0.1,"depth":2},"position":{"x":0,"y":0,"z":0},"material":{"color":"#777777"}}]}}',
+    {
+      provider: "chatgpt",
+      apiKey: "test-key",
+      onlineTextureHints: true
+    }
+  );
+
+  assert.equal(requestBodies.length, 1);
+  const systemContent = requestBodies[0].messages[0].content;
+  assert.doesNotMatch(systemContent, /Online texture rule/);
+  assert.doesNotMatch(systemContent, /self-evidently incomplete as a flat color/);
 });

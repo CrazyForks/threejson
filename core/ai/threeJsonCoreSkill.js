@@ -4,7 +4,8 @@
  */
 import {
   THREE_JSON_AGENT_CAPABILITY_INDEX,
-  THREE_JSON_AGENT_EXAMPLE_INDEX
+  THREE_JSON_AGENT_EXAMPLE_INDEX,
+  buildAgentCapabilityIndex
 } from "./sceneCapabilityIndex.js";
 
 const THREE_JSON_LIST_PLACEMENT = `
@@ -159,7 +160,7 @@ Intent → capability:
 - Interactive console / form / iframe overlay → css3dPanelList (objType css3dPanel)
 - Floating 3D labels / floor titles / extruded titles → objectList objType text (mode sdf|texture|mesh)
 - Multi-part buildings / rigs → groupList with subScene[] children (or subSceneList blocks)
-- Particles / stars / dust / sparks → objectList or modelList objType particleEmitter (simulation cpu|gpuCompute)
+- Particles / stars / dust / sparks / visible solar halo → objectList or modelList objType particleEmitter (simulation cpu|gpuCompute). For round halos or star dust around a sun/planet, use distribution {type:"shell"|"halo", radius, thickness}; for volume dust, use {type:"sphere", radius}.
 - Rain / snow → domainModelList domain weather.* or objType particleEmitter with weather-style material
 - Custom animated shader plane → shaderSurfaceList (objType shaderSurface)
 - Pipes along paths → tubeList + path catmullRom
@@ -179,18 +180,27 @@ Scene authoring rules:
 5. Prefer friendly worldInfo + sceneConfig OR standard scheme B (sceneConfig + objectList + threeJsonId). Include reasonable camera, lights, and controls in sceneConfig for standalone scenes.
 6. Always set top-level threeJsonId (stable string or UUID). Do not use worldId or worldInfo.id.
 7. Do not embed page UI or alarmList in scene JSON.
-8. Optional declarative animation on meshes: "animations": [{ "type": "rotate", "axis": "x"|"y"|"z", "speed": number }]
+8. Optional declarative animation on meshes: "animations": [{ "type": "rotate", "axis": "x"|"y"|"z", "speed": number }]. For any scene that relies on these animations, include sceneConfig.renderLoop.updateAnimations: true (or omit renderLoop.updateAnimations, whose runtime default is true). Use a speed and camera distance that make the motion perceptible for the object scale.
 9. Never add decorative lineList, particleEmitter, shaderSurface, native geometry, domains, audio, events, or lifecycle scripts merely to use more capabilities; every non-basic capability must map to a requested or clearly implied scene element.
 10. For edits and patches, preserve unspecified geometry/material/position fields. When changing box height, keep width/depth unchanged and update y only if needed to keep the base on the same ground.
 11. New grounded physical scenes should usually include exactly one unobtrusive support surface (floor/ground/road/slab/plinth) sized to the layout unless the prompt describes a floating, space, abstract, or supportless scene.
 12. URL-bearing fields (material.textureUrl, externalModel modelPath, audioUrl, css3dPanel url, text mesh fontJsonUrl, etc.) may be a full https:// URL — a real public image/model/audio/page online is valid and often exactly what the user wants, not just a repo-local path. When the user gives or implies a specific URL, use it verbatim. During repair/review/patch passes, never replace an existing valid URL (local or remote) with an invented placeholder path just to "normalize" it — only change a URL when the user's request calls for a different one.
-13. When the user names a specific, recognizable real-world object or material — a named celestial body (Moon, Earth, Mars, Sun...), a specific wood/stone/fabric/brand pattern, etc. — as opposed to a generic/abstract shape, actively set material.textureUrl to a real, appropriate public https:// image depicting that specific subject instead of leaving a flat color; this is expected default behavior for well-known named referents, not something to wait for the user to ask for explicitly. Known-good anchors: Moon → https://threejs.org/examples/textures/planets/moon_1024.jpg ; Earth → https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg — use the same reasoning (a real, likely-stable public image URL depicting that exact subject) for other named bodies/materials. Do not force a textureUrl onto generic/abstract shapes (plain boxes, blockouts, furniture placeholders) where a flat color already satisfies the request (see rule 1).
 14. Light intensity is on TWO DIFFERENT SCALES depending on type — using the wrong scale is the single most common cause of "geometry is correct but the scene renders pitch black": intensity values are used exactly as written, with NO automatic rescaling by the engine.
     - ambient/directional lights are NOT distance-attenuated: use small values, typically 0.4-1.3 (e.g. ambient 0.4-0.6, directional 0.8-1.3). This is the range you see in most reference scenes.
     - point/spot lights ARE distance-attenuated by inverse-square falloff ("decay" defaults to 2, i.e. physically correct) — at typical scene distances (a few meters to tens of meters) they need intensity roughly one to two orders of magnitude larger than ambient/directional, e.g. 20-60 for a light a few meters from what it's illuminating; use "unit":"candela" with a value like 2000-20000 if you want it explicitly photometric. NEVER give a point/spot light an intensity in the 0.4-1.3 range meant for ambient/directional — it will be effectively invisible.
     - Default to ambient + directional for a scene's general illumination (reliable, simple); only add point/spot lights for localized effects (a lamp, a glowing object, a spotlight beam), and always give them intensity in the tens-or-higher range above, never the ambient/directional range.
     - Every standalone/new scene should include at least one ambient and one directional light unless the user's request clearly implies otherwise (e.g. "in total darkness except for one lamp"). A good default is ambient 0.45-0.65 plus directional 0.9-1.2 from above/front/side.
 15. Particle emitters are opt-in effects, not default scene dressing. Do not include particleEmitter/particleList unless the prompt or reference clearly calls for particles/weather/smoke/magic/dust/sparks/starfield.
+`;
+
+const THREE_JSON_ONLINE_TEXTURE_RULE = `
+Online texture rule:
+Use online image textures when the object's identity or material would be self-evidently incomplete as a flat color. If the user names a specific, recognizable real-world object or surface — a named celestial body (Moon, Earth, Mars, Sun...), terrain, grass, water, asphalt, brick, concrete, wood, stone, fabric, printed signage, maps/screens, food labels, paintings, carpets, or a recognizable brand/pattern — actively set material.textureUrl to a real, appropriate reachable online image URL depicting that subject/material; this is expected default behavior and does not require the user to explicitly ask for "texture". Online resources are not limited to CDNs: any suitable public web image URL may be used, with https preferred when available. Keep material.color as a tint/fallback only. Known-good anchors: Moon → https://threejs.org/examples/textures/planets/moon_1024.jpg ; Earth → https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg — use the same reasoning for other named bodies/materials. For tiled surfaces such as floors, walls, roads, grass, water, wood, stone, concrete, brick, and fabric, include sensible textureRepeat when the surface is large. Do not force a textureUrl onto generic/abstract shapes, blockouts, simple colored primitives, placeholder furniture, or UI-like objects where a flat color already satisfies the request (see rule 1).
+`;
+
+const THREE_JSON_ONLINE_TEXTURE_DISABLED_RULE = `
+Online texture rule:
+The host disabled proactive online texture hints for this request. Do not add new material.textureUrl fields merely because an object or surface could benefit from a photographic/pattern texture. Preserve existing valid textureUrl values, and still use a URL verbatim when the user explicitly provides or asks for a specific online texture/resource.
 `;
 
 const THREE_JSON_SCENE_SCHEMA_DESCRIPTION = `
@@ -262,7 +272,7 @@ MeshRecord:
 GroupRecord, LineRecord, InfoPanelRecord, Css3dPanelRecord, ShaderSurfaceRecord, PointsItem, AudioItem — same shapes as before.
 Css3dPanelRecord: { "objType": "css3dPanel", "html": string or "url": string, "panel": { "position", "geometry": { width, height, depth } } } — host must enable CSS3D rendering.
 ShaderSurfaceRecord: { "objType": "shaderSurface", "shaderSource" or material with ShaderMaterial, "geometry": plane/box dims, "position": {...} }
-ParticleEmitterItem: { "objType": "particleEmitter", "simulation": "cpu"|"gpuCompute", "material": { "size", "opacity", "color" }, "position": {...} }
+ParticleEmitterItem: { "objType": "particleEmitter", "simulation": "cpu"|"gpuCompute", "count": number, "distribution": { "type": "box"|"sphere"|"shell"|"halo", "radius": number, "thickness": number }, "bounds": { "width", "height", "depth" }, "material": { "size", "opacity", "color", "blending": "additive", "depthWrite": false }, "position": {...} }
 TextItem (objectList only): { "objType": "text", "content": string, "mode": "sdf"|"texture"|"mesh", "fontSize": number, "color": "#RRGGBB", "align": "left"|"center"|"right", "billboard": boolean, "position": {x,y,z}, "mesh": { "fontJsonUrl": string } when mode is mesh }
 TubeItem: { "objType": "tube", "path": { "type": "catmullRom", "points": [{x,y,z},...] }, "geometry": { "radius", "tubularSegments" }, "material": {...} }
 InstancedItem: { "objType": "instanced", "geometry": { "width", "height", "depth" }, "transforms": [{ "position", "rotation", "scale" }] }
@@ -290,14 +300,14 @@ Engine capabilities summary:
 - JSM geometry/material registry: RoundedBoxGeometry, LineGeometry, LineMaterial, and assetLibrary geometryRef/materialRef expansion
 - Groups, lines, info panels, css3d panels, shader surfaces, planes, extrude, buffer/irregular meshes
 - Particles (prefer particleEmitter only when requested/implied), weather domains, wind, heat, sprites, tubes, instanced meshes, scene text (objType text)
-- particleEmitter: unified objType with simulation cpu|gpuCompute (gpuCompute uses GPUComputationRenderer + ShaderMaterial points); use only for explicit particle/weather/atmospheric effects
+- particleEmitter: unified objType with simulation cpu|gpuCompute (gpuCompute uses GPUComputationRenderer + ShaderMaterial points); supports box bounds plus spherical distribution {type:"sphere"|"shell"|"halo", radius, thickness}; use only for explicit particle/weather/atmospheric effects
 - css3dPanel: interactive DOM overlay (distinct from static infoPanel textures)
 - sceneConfig.textureQuality optional tier; sceneConfig.extensions container (nativeGeometries, assetLibrary.textureUrlCache)
 - Optional customBucket string on descriptors for host batch visibility queries
 - ShaderMaterial inline / lib://shaderSource via assetLibrary on native materials
 - External GLTF/OBJ, audio, CSG holes/joins/inters
 - glTF animationGraph state machine (opt-in): parameters, transitions, crossFade; runtime setAnimationParameter / fireAnimationEvent
-- sceneConfig runtime block, declarative rotate animations, PBR metalness/roughness, textures
+- sceneConfig runtime block with renderLoop.updateAnimations true for visible motion, declarative rotate animations, PBR metalness/roughness, textures
 `;
 
 const THREE_JSON_FEW_SHOT_EXAMPLES = `
@@ -337,10 +347,18 @@ Use it as the primary spatial/visual reference alongside the user's text prompt:
 Keep the same JSON compatibility rules; output only the full scene object.
 `;
 
+function onlineTextureHintsEnabled(options = {}) {
+  return options.onlineTextureHints !== false;
+}
+
+function onlineTextureHintsExplicitlyEnabled(options = {}) {
+  return options.onlineTextureHints === true;
+}
+
 /** @returns {string} Shared catalog block for scene prompts. */
-function buildSceneCapabilityCatalog() {
+function buildSceneCapabilityCatalog(options = {}) {
   return [
-    THREE_JSON_AGENT_CAPABILITY_INDEX.trim(),
+    buildAgentCapabilityIndex({ onlineTextureHints: onlineTextureHintsExplicitlyEnabled(options) }).trim(),
     THREE_JSON_LIST_PLACEMENT.trim(),
     THREE_JSON_PRIMITIVE_GEOMETRY.trim(),
     THREE_JSON_NATIVE_THREE.trim(),
@@ -352,12 +370,23 @@ function buildSceneCapabilityCatalog() {
   ].join("\n\n");
 }
 
+/** @returns {string} Scene authoring rules plus optional host-configured online texture guidance. */
+function buildSceneAuthoringRules(options = {}) {
+  const blocks = [THREE_JSON_SCENE_AUTHORING_RULES.trim()];
+  if (options.onlineTextureHints === true) {
+    blocks.push(THREE_JSON_ONLINE_TEXTURE_RULE.trim());
+  } else if (options.onlineTextureHints === false && options.includeOnlineTextureDisabledRule === true) {
+    blocks.push(THREE_JSON_ONLINE_TEXTURE_DISABLED_RULE.trim());
+  }
+  return blocks.join("\n\n");
+}
+
 /** @returns {string} System prompt for scene outline / planning step. */
-function buildSceneOutlineSystemPrompt() {
+function buildSceneOutlineSystemPrompt(options = {}) {
   return [
     "You are a ThreeJSON scene planner. The ThreeJSON engine supports basic primitives plus optional advanced features; plan only the capabilities needed for the requested scene.",
     buildSceneCapabilityCatalog(),
-    THREE_JSON_SCENE_AUTHORING_RULES.trim(),
+    buildSceneAuthoringRules(),
     "",
     "Output a concise bullet outline (English or Chinese) listing:",
     "- Major objects and spatial layout",
@@ -369,22 +398,32 @@ function buildSceneOutlineSystemPrompt() {
 }
 
 /** @returns {string} English system prompt for generating a new scene. */
-function buildSceneGenerationSystemPrompt() {
+function buildSceneGenerationSystemPrompt(options = {}) {
+  const promptOptions = {
+    ...options,
+    onlineTextureHints: onlineTextureHintsEnabled(options),
+    includeOnlineTextureDisabledRule: true
+  };
   return [
     "You are an expert ThreeJSON scene JSON generator. ThreeJSON deploys scenes from friendly worldInfo + sceneConfig, or standard JSON (threeJsonId + sceneConfig + objectList), or all-in-objectList standard.",
-    buildSceneCapabilityCatalog(),
-    THREE_JSON_SCENE_AUTHORING_RULES.trim(),
+    buildSceneCapabilityCatalog(promptOptions),
+    buildSceneAuthoringRules(promptOptions),
     THREE_JSON_SCENE_SCHEMA_DESCRIPTION.trim(),
     THREE_JSON_OUTPUT_REQUIREMENT.trim()
   ].join("\n\n");
 }
 
 /** @returns {string} English system prompt for generating a new scene from a reference image. */
-function buildSceneImageGenerationSystemPrompt() {
+function buildSceneImageGenerationSystemPrompt(options = {}) {
+  const promptOptions = {
+    ...options,
+    onlineTextureHints: onlineTextureHintsEnabled(options),
+    includeOnlineTextureDisabledRule: true
+  };
   return [
     "You are an expert ThreeJSON scene JSON generator. Combine the user's text prompt with the embedded reference image.",
-    buildSceneCapabilityCatalog(),
-    THREE_JSON_SCENE_AUTHORING_RULES.trim(),
+    buildSceneCapabilityCatalog(promptOptions),
+    buildSceneAuthoringRules(promptOptions),
     THREE_JSON_SCENE_SCHEMA_DESCRIPTION.trim(),
     THREE_JSON_IMAGE_REFERENCE_INSTRUCTION.trim(),
     THREE_JSON_OUTPUT_REQUIREMENT.trim()
@@ -392,7 +431,7 @@ function buildSceneImageGenerationSystemPrompt() {
 }
 
 /** @returns {string} English system prompt for editing an existing scene. */
-function buildSceneUpdateSystemPrompt() {
+function buildSceneUpdateSystemPrompt(options = {}) {
   return [
     "You are a ThreeJSON scene JSON editor.",
     "You will receive an existing JSON scene and a user modification request.",
@@ -400,14 +439,14 @@ function buildSceneUpdateSystemPrompt() {
     "When adding objects, use the most appropriate list/objType/geometry fields from the capability catalog.",
     "When editing existing objects, preserve every unrelated property. Size edits should change only the requested dimension(s); for a box height change, keep width/depth and material unchanged unless requested.",
     buildSceneCapabilityCatalog(),
-    THREE_JSON_SCENE_AUTHORING_RULES.trim(),
+    buildSceneAuthoringRules(),
     THREE_JSON_SCENE_SCHEMA_DESCRIPTION.trim(),
     THREE_JSON_OUTPUT_REQUIREMENT.trim()
   ].join("\n\n");
 }
 
 /** @returns {string} RFC 6902 patch output for incremental updates (smaller diffs). */
-function buildSceneIncrementalUpdateSystemPrompt() {
+function buildSceneIncrementalUpdateSystemPrompt(options = {}) {
   return [
     "You are a ThreeJSON scene editor. Apply the user request with minimal changes.",
     "Output ONLY a JSON array of RFC 6902 operations (add | replace | remove) against the scene root.",
@@ -415,21 +454,21 @@ function buildSceneIncrementalUpdateSystemPrompt() {
     "Allowed path prefixes: /worldInfo, /threeJsonId, /sceneConfig, /controlsConfig, /businessInfo, /objectList, /extensions.",
     "Use slash-separated JSON Pointer paths only (not dots). Example: [{\"op\":\"add\",\"path\":\"/worldInfo/sphereModelList/-\",\"value\":{...}}]",
     "Do NOT return the full scene object. No markdown fences unless wrapping the array.",
-    THREE_JSON_AGENT_CAPABILITY_INDEX.trim(),
+    buildAgentCapabilityIndex().trim(),
     THREE_JSON_LIST_PLACEMENT.trim(),
     THREE_JSON_PRIMITIVE_GEOMETRY.trim(),
-    THREE_JSON_SCENE_AUTHORING_RULES.trim()
+    buildSceneAuthoringRules()
   ].join("\n\n");
 }
 
 /** @returns {string} System prompt fragment for capability/layout review passes. */
-function buildSceneReviewSystemPrompt() {
+function buildSceneReviewSystemPrompt(options = {}) {
   return [
     "You are a ThreeJSON scene reviewer. Improve layout, scale, material consistency, and capability fit.",
     "Use appropriate lists and objTypes when the user intent calls for non-box shapes; keep box-based content when it fits the prompt.",
     "Do not add complexity during review unless it fixes a real user-intent or capability gap.",
     buildSceneCapabilityCatalog(),
-    THREE_JSON_SCENE_AUTHORING_RULES.trim(),
+    buildSceneAuthoringRules(),
     THREE_JSON_OUTPUT_REQUIREMENT.trim()
   ].join("\n\n");
 }
@@ -441,6 +480,8 @@ export {
   THREE_JSON_DOMAIN_USAGE,
   THREE_JSON_INTENT_GUIDE,
   THREE_JSON_SCENE_AUTHORING_RULES,
+  THREE_JSON_ONLINE_TEXTURE_RULE,
+  THREE_JSON_ONLINE_TEXTURE_DISABLED_RULE,
   THREE_JSON_SCENE_SCHEMA_DESCRIPTION,
   THREE_JSON_CORE_CAPABILITIES,
   THREE_JSON_FEW_SHOT_EXAMPLES,
@@ -448,6 +489,7 @@ export {
   THREE_JSON_AGENT_CAPABILITY_INDEX,
   THREE_JSON_AGENT_EXAMPLE_INDEX,
   buildSceneCapabilityCatalog,
+  buildSceneAuthoringRules,
   buildSceneOutlineSystemPrompt,
   buildSceneGenerationSystemPrompt,
   buildSceneImageGenerationSystemPrompt,

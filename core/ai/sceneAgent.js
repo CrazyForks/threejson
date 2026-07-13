@@ -88,7 +88,7 @@ function emitStagePreview({ sceneJsonString, onProgress, getStepIndex, setStepIn
  * unless the host opted in by passing `chatOptions.resolveReferenceUrl`; never throws, so a
  * fetch failure never blocks the agent turn it was meant to help. */
 async function resolveAgentReferenceMaterial(userPrompt, chatOptions) {
-  if (typeof chatOptions?.resolveReferenceUrl !== "function") {
+  if (chatOptions?.capabilityLookup === false || typeof chatOptions?.resolveReferenceUrl !== "function") {
     return "";
   }
   try {

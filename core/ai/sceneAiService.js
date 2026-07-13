@@ -26,9 +26,11 @@ import {
 import { extractPatchOperations, applySceneJsonPatch } from "./scenePatch.js";
 import {
   buildIntentHints,
+  matchIntentSignals,
   evaluateCapabilityFit,
   buildCapabilityFixPrompt
 } from "./sceneCapability.js";
+import { fetchReferenceMaterial } from "./sceneReferenceCatalog.js";
 import { requestSceneOutline } from "./agentTools.js";
 import { buildSanitizedJsonParseErrorMessage, sanitizeAiJsonText } from "./sceneJsonSanitize.js";
 import { isLoadableScenePayload } from "../handler/sceneFriendlyNormalizer.js";
@@ -344,6 +346,21 @@ function buildGenerateUserMessage(prompt, outline = "") {
   return parts.join("\n\n");
 }
 
+async function resolveReferenceMaterialForPrompt(prompt, options = {}) {
+  if (options.capabilityLookup === false || typeof options.resolveReferenceUrl !== "function") {
+    return "";
+  }
+  try {
+    const signals = matchIntentSignals(prompt);
+    return await fetchReferenceMaterial(signals, {
+      resolveUrl: options.resolveReferenceUrl,
+      locale: options.locale
+    });
+  } catch {
+    return "";
+  }
+}
+
 /**
  * @param {string} prompt
  * @param {object} options
@@ -412,6 +429,7 @@ async function generateSceneJsonString(prompt, options = {}) {
   const effectivePrompt = await resolveEffectiveGeneratePrompt(trimmedPrompt, options);
   const chatOpts = stripChatTransportOptions(options);
   const maxTokens = options.maxTokens ?? DEFAULT_GENERATE_MAX_TOKENS;
+  const referenceMaterial = await resolveReferenceMaterialForPrompt(effectivePrompt, options);
 
   const content = await requestChatCompletion({
     ...options,
@@ -419,11 +437,11 @@ async function generateSceneJsonString(prompt, options = {}) {
     messages: [
       {
         role: "system",
-        content: buildSceneGenerationSystemPrompt()
+        content: buildSceneGenerationSystemPrompt(options)
       },
       {
         role: "user",
-        content: buildGenerateUserMessage(effectivePrompt)
+        content: [buildGenerateUserMessage(effectivePrompt), referenceMaterial].filter(Boolean).join("\n\n")
       }
     ]
   });
@@ -462,6 +480,7 @@ async function generateSceneJsonFromImage(input = {}, options = {}) {
 
   const effectivePrompt = await resolveEffectiveGeneratePrompt(trimmedPrompt, chatOptions);
   const maxTokens = chatOptions.maxTokens ?? DEFAULT_GENERATE_MAX_TOKENS;
+  const referenceMaterial = await resolveReferenceMaterialForPrompt(effectivePrompt, chatOptions);
 
   const content = await requestChatCompletion({
     ...options,
@@ -469,12 +488,12 @@ async function generateSceneJsonFromImage(input = {}, options = {}) {
     messages: [
       {
         role: "system",
-        content: buildSceneImageGenerationSystemPrompt()
+        content: buildSceneImageGenerationSystemPrompt(chatOptions)
       },
       {
         role: "user",
         content: [
-          { type: "text", text: buildGenerateUserMessage(effectivePrompt) },
+          { type: "text", text: [buildGenerateUserMessage(effectivePrompt), referenceMaterial].filter(Boolean).join("\n\n") },
           {
             type: "image_url",
             image_url: {
@@ -516,6 +535,7 @@ async function requestUpdatedSceneJsonString(prompt, currentSceneJsonString, opt
   const includePatch = options.includePatch === true;
   const chatOpts = stripChatTransportOptions(options);
   const currentSceneObj = parseSceneJsonString(String(currentSceneJsonString));
+  const referenceMaterial = await resolveReferenceMaterialForPrompt(prompt, options);
 
   if (updateMode === "incremental") {
     const currentScenePrettyJson = prettyJson(currentSceneObj);
@@ -529,7 +549,11 @@ async function requestUpdatedSceneJsonString(prompt, currentSceneJsonString, opt
         },
         {
           role: "user",
-          content: `Modification request:\n${String(prompt).trim()}\n\nCurrent scene JSON:\n${currentScenePrettyJson}`
+          content: [
+            `Modification request:\n${String(prompt).trim()}`,
+            referenceMaterial,
+            `Current scene JSON:\n${currentScenePrettyJson}`
+          ].filter(Boolean).join("\n\n")
         }
       ]
     });
@@ -560,7 +584,11 @@ async function requestUpdatedSceneJsonString(prompt, currentSceneJsonString, opt
       },
       {
         role: "user",
-        content: `Modification request:\n${String(prompt).trim()}\n\nCurrent scene JSON:\n${currentScenePrettyJson}`
+        content: [
+          `Modification request:\n${String(prompt).trim()}`,
+          referenceMaterial,
+          `Current scene JSON:\n${currentScenePrettyJson}`
+        ].filter(Boolean).join("\n\n")
       }
     ]
   });
@@ -616,7 +644,7 @@ async function requestUpdatedSceneEditCommands(prompt, context = {}, options = {
   const iterativeApply = options.iterativeApply === true;
   const singleRound = options.singleRound !== false && !agentRound && !iterativeApply;
 
-  const userContent =
+  const baseUserContent =
     typeof context.userMessage === "string" && context.userMessage.trim()
       ? context.userMessage.trim()
       : buildSceneCommandUpdateUserMessage({
@@ -634,6 +662,8 @@ async function requestUpdatedSceneEditCommands(prompt, context = {}, options = {
           singleRound,
           agentRound
         });
+  const referenceMaterial = await resolveReferenceMaterialForPrompt(prompt, options);
+  const userContent = [baseUserContent, referenceMaterial].filter(Boolean).join("\n\n");
 
   // Whenever the model is given the "auto" system prompt (commands preferred, full JSON allowed
   // for large restructures), the response parser below must accept both forms too — agent/
@@ -645,8 +675,14 @@ async function requestUpdatedSceneEditCommands(prompt, context = {}, options = {
   // after burning through every repair round on responses that were never actually invalid.
   const allowAutoOutputKind = outputMode === "auto" || agentRound || iterativeApply;
   const systemPrompt = allowAutoOutputKind
-    ? buildSceneCommandAutoUpdateSystemPrompt({ agentRound: agentRound || iterativeApply, iterativeApply })
-    : buildSceneCommandUpdateSystemPrompt();
+    ? buildSceneCommandAutoUpdateSystemPrompt({
+        agentRound: agentRound || iterativeApply,
+        iterativeApply,
+        onlineTextureHints: options.onlineTextureHints
+      })
+    : buildSceneCommandUpdateSystemPrompt({
+        onlineTextureHints: options.onlineTextureHints
+      });
 
   const content = await requestChatCompletion({
     ...options,

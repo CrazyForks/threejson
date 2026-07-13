@@ -299,6 +299,8 @@ async function main() {
         onAgentProgress: updateAgentProgress,
         includeReferenceLinks: settings.ai?.attachReferenceLinks !== false,
         locale: getHostLocale(),
+        capabilityLookup: settings.ai?.capabilityLookupEnabled !== false,
+        onlineTextureHints: settings.ai?.onlineTextureHints !== false,
         signal: abortController.signal
       });
       clearBusyIfCurrent();
@@ -446,6 +448,8 @@ async function main() {
           streaming.update(streamBuffer);
         },
         locale: getHostLocale(),
+        capabilityLookup: settings.ai?.capabilityLookupEnabled !== false,
+        onlineTextureHints: settings.ai?.onlineTextureHints !== false,
         signal: abortController.signal
       });
       clearBusyIfCurrent();
@@ -670,7 +674,14 @@ async function main() {
 
   const chatPanel = createThreeBoxChatPanel({
     onUserMessage: handleUserMessage,
-    onStopRequested: () => activeAbortController?.abort()
+    onStopRequested: () => activeAbortController?.abort(),
+    getJsonViewerOptions: () => {
+      const io = settingsModal.getSettings()?.io || {};
+      return {
+        lineNumbers: io.jsonViewerLineNumbers !== false,
+        highlight: io.jsonViewerHighlight !== false
+      };
+    }
   });
   chatPanel.init();
 

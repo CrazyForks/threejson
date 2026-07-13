@@ -51,6 +51,16 @@ test("buildSceneCommandUpdateSystemPrompt teaches single-round mutating commands
   assert.equal(prompt.includes("≥3"), false);
 });
 
+test("buildSceneCommandUpdateSystemPrompt respects online texture hint toggle", () => {
+  const enabled = buildSceneCommandUpdateSystemPrompt();
+  assert.match(enabled, /any public web source, not only a CDN/);
+
+  const disabled = buildSceneCommandUpdateSystemPrompt({ onlineTextureHints: false });
+  assert.match(disabled, /Proactive online texture hints are disabled/);
+  assert.match(disabled, /Do not add new material\.textureUrl fields/);
+  assert.doesNotMatch(disabled, /any public web source, not only a CDN/);
+});
+
 test("buildSceneCommandAutoUpdateSystemPrompt distinguishes agent vs single round", () => {
   const single = buildSceneCommandAutoUpdateSystemPrompt();
   assert.ok(single.includes("Single-round"));

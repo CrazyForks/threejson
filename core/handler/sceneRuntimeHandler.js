@@ -79,19 +79,59 @@ function createLight(lightConfig){
 	if(!lightConfig){
 		return null;
 	}
-	if(lightConfig.type === 'ambient'){
+	const type = String(lightConfig.type || '').trim().toLowerCase();
+	if(type === 'ambient'){
 		return new THREE.AmbientLight(
 			lightConfig.color || 0xffffff,
 			getValue(lightConfig, 'intensity', 1)
 		);
 	}
-	if(lightConfig.type === 'directional'){
+	if(type === 'hemisphere'){
+		const light = new THREE.HemisphereLight(
+			lightConfig.skyColor || lightConfig.color || 0xffffff,
+			lightConfig.groundColor || 0x444444,
+			getValue(lightConfig, 'intensity', 1)
+		);
+		return light;
+	}
+	if(type === 'directional'){
 		const light = new THREE.DirectionalLight(
 			lightConfig.color || 0xffffff,
 			getValue(lightConfig, 'intensity', 1)
 		);
 		const position = toVector3(lightConfig.position, {x: 0, y: 1, z: 0});
 		light.position.set(position.x, position.y, position.z);
+		return light;
+	}
+	if(type === 'point'){
+		const light = new THREE.PointLight(
+			lightConfig.color || 0xffffff,
+			getValue(lightConfig, 'intensity', 1),
+			getValue(lightConfig, 'distance', 0),
+			getValue(lightConfig, 'decay', 2)
+		);
+		const position = toVector3(lightConfig.position, {x: 0, y: 1, z: 0});
+		light.position.set(position.x, position.y, position.z);
+		return light;
+	}
+	if(type === 'spot'){
+		const light = new THREE.SpotLight(
+			lightConfig.color || 0xffffff,
+			getValue(lightConfig, 'intensity', 1),
+			getValue(lightConfig, 'distance', 0),
+			getValue(lightConfig, 'angle', Math.PI / 3),
+			getValue(lightConfig, 'penumbra', 0),
+			getValue(lightConfig, 'decay', 2)
+		);
+		const position = toVector3(lightConfig.position, {x: 0, y: 1, z: 0});
+		light.position.set(position.x, position.y, position.z);
+		if(lightConfig.target && typeof lightConfig.target === 'object'){
+			const targetPos = toVector3(lightConfig.target, {x: 0, y: 0, z: 0});
+			const target = new THREE.Object3D();
+			target.position.set(targetPos.x, targetPos.y, targetPos.z);
+			light.target = target;
+			light.userData.__threeJsonSpotTarget = target;
+		}
 		return light;
 	}
 	return null;
@@ -102,6 +142,10 @@ function addLights(scene, lightsConfig = []){
 		const light = createLight(lightsConfig[i]);
 		if(light){
 			scene.add(light);
+			const target = light.userData?.__threeJsonSpotTarget;
+			if(target){
+				scene.add(target);
+			}
 		}
 	}
 }

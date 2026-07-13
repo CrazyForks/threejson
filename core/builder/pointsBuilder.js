@@ -22,6 +22,11 @@ function valueOr(value, fallback) {
   return hasValue(value) ? value : fallback;
 }
 
+function numberOr(value, fallback) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 function normalizePosition(position = {}) {
   return {
     x: Number(valueOr(position.x, 0)),
@@ -151,6 +156,76 @@ export function buildPositionsFromExplicitArray(positions) {
   return out.subarray(0, valid * 3);
 }
 
+function resolveDistribution(record = {}) {
+  const emitter = record?.emitter && typeof record.emitter === "object" ? record.emitter : {};
+  const distribution = record?.distribution && typeof record.distribution === "object"
+    ? record.distribution
+    : emitter.distribution && typeof emitter.distribution === "object"
+      ? emitter.distribution
+      : {};
+  const geometry = record?.geometry && typeof record.geometry === "object" ? record.geometry : {};
+  const bounds = record?.bounds && typeof record.bounds === "object" ? record.bounds : {};
+  const mode = String(distribution.type || distribution.mode || record.distribution || emitter.distribution || "").trim().toLowerCase();
+  const radius = Math.max(0, numberOr(
+    distribution.radius ?? emitter.radius ?? record.radius ?? geometry.radius ?? bounds.radius,
+    Math.max(
+      Math.abs(numberOr(bounds.width ?? geometry.width, 100)),
+      Math.abs(numberOr(bounds.height ?? geometry.height, 100)),
+      Math.abs(numberOr(bounds.depth ?? geometry.depth, 100))
+    ) / 2
+  ));
+  const innerRadius = Math.max(0, numberOr(
+    distribution.innerRadius ?? emitter.innerRadius ?? record.innerRadius ?? geometry.innerRadius,
+    0
+  ));
+  const thickness = Math.max(0, numberOr(
+    distribution.thickness ?? emitter.thickness ?? record.thickness ?? geometry.thickness,
+    Math.max(radius * 0.12, 1)
+  ));
+  return { mode, radius, innerRadius, thickness };
+}
+
+function randomUnitVector() {
+  const z = Math.random() * 2 - 1;
+  const theta = Math.random() * Math.PI * 2;
+  const r = Math.sqrt(Math.max(0, 1 - z * z));
+  return {
+    x: r * Math.cos(theta),
+    y: z,
+    z: r * Math.sin(theta)
+  };
+}
+
+function randomShellRadius(radius, thickness) {
+  const half = thickness / 2;
+  return Math.max(0, radius - half + Math.random() * thickness);
+}
+
+function buildSphericalPositionsFloat32Array(record, count, distribution) {
+  if (count <= 0 || distribution.radius <= 0) {
+    return null;
+  }
+  const out = new Float32Array(count * 3);
+  const isShell = distribution.mode === "shell" || distribution.mode === "sphere-shell" || distribution.mode === "halo";
+  const minRadius = Math.min(distribution.innerRadius, distribution.radius);
+  for (let i = 0; i < count; i++) {
+    const dir = randomUnitVector();
+    let radius;
+    if (isShell) {
+      radius = randomShellRadius(distribution.radius, distribution.thickness);
+    } else {
+      const min3 = minRadius * minRadius * minRadius;
+      const max3 = distribution.radius * distribution.radius * distribution.radius;
+      radius = Math.cbrt(min3 + Math.random() * Math.max(0, max3 - min3));
+    }
+    const o = i * 3;
+    out[o] = dir.x * radius;
+    out[o + 1] = dir.y * radius;
+    out[o + 2] = dir.z * radius;
+  }
+  return out;
+}
+
 /**
  * @param {object} record
  * @returns {Float32Array|null}
@@ -163,6 +238,13 @@ export function buildPositionsFloat32Array(record) {
   const count = resolvePointsCount(record);
   if (count <= 0) {
     return null;
+  }
+  const distribution = resolveDistribution(record);
+  if (distribution.mode === "sphere" || distribution.mode === "shell" || distribution.mode === "sphere-shell" || distribution.mode === "halo") {
+    const spherical = buildSphericalPositionsFloat32Array(record, count, distribution);
+    if (spherical) {
+      return spherical;
+    }
   }
   const bounds = record?.bounds && typeof record.bounds === "object"
     ? record.bounds

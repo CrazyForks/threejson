@@ -62,6 +62,7 @@ import { createIrregularGeometry } from "../builder/irregularGeometryBuilder.js"
 import { deployInfoPanel } from "../builder/infoPanelBuilder.js";
 import { createText, createTextAsync, preloadSceneTextFonts } from "../builder/textBuilder.js";
 import { deployCss3dPanel } from "../builder/css3d/css3dPanelBuilder.js";
+import { deployParticleEmitter } from "../builder/particle/particleEmitterBuilder.js";
 import { integrateCss3dIntoSceneLoad } from "../builder/css3d/attachSceneRuntime.js";
 import { integrateEventMechanismIntoSceneLoad } from "../runtime/eventMechanism/attachSceneEventRuntime.js";
 import {
@@ -524,7 +525,7 @@ function deployCanonicalRecord(overlayRoot, record, ctx) {
     if (deployByObjTypeExtension(record, overlayRoot, ctx)) {
       return;
     }
-    log.warn("[sceneLoad] objType particleEmitter: no deployer registered (import from \"threejson\")");
+    deployParticleEmitter(record, overlayRoot, ctx);
     return;
   }
   if (objType === "plane") {

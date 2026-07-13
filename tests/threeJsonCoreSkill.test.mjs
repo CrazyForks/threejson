@@ -35,8 +35,17 @@ test("generation system prompt covers core ThreeJSON capabilities", () => {
   assert.match(prompt, /Never add decorative lineList, particleEmitter/);
   assert.match(prompt, /Particle emitters are opt-in effects/);
   assert.match(prompt, /ambient 0\.45-0\.65 plus directional 0\.9-1\.2/);
+  assert.match(prompt, /point\/spot lights/);
   assert.match(prompt, /grounded physical scenes should usually include/);
   assert.match(prompt, /Implied support surface/);
+  assert.match(prompt, /renderLoop\.updateAnimations/);
+  assert.match(prompt, /motion perceptible/);
+  assert.match(prompt, /distribution \{type:"sphere"\|"shell"\|"halo"/);
+  assert.match(prompt, /self-evidently incomplete as a flat color/);
+  assert.match(prompt, /reachable online image URL/);
+  assert.match(prompt, /not limited to CDNs/);
+  assert.match(prompt, /textureRepeat/);
+  assert.match(prompt, /Do not force a textureUrl onto generic\/abstract shapes/);
   assert.match(prompt, /sceneConfig/);
   assert.match(THREE_JSON_LIST_PLACEMENT, /nativeThree/);
   assert.match(THREE_JSON_PRIMITIVE_GEOMETRY, /radiusTop/);
@@ -53,6 +62,18 @@ test("outline system prompt includes capability catalog", () => {
   assert.match(prompt, /particleList/);
   assert.match(prompt, /plan only the capabilities needed/);
   assert.match(prompt, /Why any non-basic capability is necessary/);
+});
+
+test("online texture hints can be disabled in scene prompts", () => {
+  const enabled = buildSceneGenerationSystemPrompt();
+  assert.match(enabled, /Online resources are not limited to CDNs/);
+  assert.match(enabled, /any suitable public web image URL/);
+
+  const disabled = buildSceneGenerationSystemPrompt({ onlineTextureHints: false });
+  assert.match(disabled, /host disabled proactive online texture hints/);
+  assert.match(disabled, /Do not add new material\.textureUrl fields/);
+  assert.doesNotMatch(disabled, /self-evidently incomplete as a flat color/);
+  assert.doesNotMatch(disabled, /any suitable public web image URL/);
 });
 
 test("buildIntentHints maps solar system prompt to sphere capability", () => {
@@ -99,6 +120,12 @@ test("evaluateCapabilityFit flags missing sphere for planet prompt", () => {
 test("matchIntentSignals finds native geometry intent", () => {
   const signals = matchIntentSignals("add a torus knot sculpture");
   assert.ok(signals.some((s) => s.id === "native"));
+});
+
+test("matchIntentSignals finds lighting and declarative animation intents", () => {
+  const signals = matchIntentSignals("make the scene brighter with a point light and rotate the sun");
+  assert.ok(signals.some((s) => s.id === "lighting"));
+  assert.ok(signals.some((s) => s.id === "declarativeAnimation"));
 });
 
 test("buildIntentHints maps css3d panel prompt", () => {

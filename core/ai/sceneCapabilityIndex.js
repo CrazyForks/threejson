@@ -5,7 +5,7 @@
  * runnable examples stay in docs/ and assets/json/tutorial/.
  */
 
-const THREE_JSON_AGENT_CAPABILITY_INDEX = `
+const THREE_JSON_AGENT_CAPABILITY_INDEX_BASE = `
 ThreeJSON capability index (choose the most appropriate/specific feature for what's described; this is not a checklist):
 
 Selection principle:
@@ -56,6 +56,20 @@ Command and patch editing:
 - Use commands for small edits and full JSON for broad restructuring. Use JSON Patch for minimal document-level edits when paths are clear.
 `;
 
+const THREE_JSON_AGENT_ONLINE_TEXTURE_INDEX = `
+Online texture hints:
+- When enabled, use a real reachable online material.textureUrl by default when a described object or surface would look wrong or ambiguous as a flat color: named planets, terrain/grass/water, asphalt, brick/concrete/wood/stone/fabric, signs/screens/maps, paintings, labels, carpets, and other recognizable image-bearing or patterned things. The URL can come from any suitable public web source, not only a CDN; https is preferred when available. Add textureRepeat for large tiled surfaces. Keep flat colors for abstract/simple blockouts and plain colored objects.
+`;
+
+function buildAgentCapabilityIndex(options = {}) {
+  return [
+    THREE_JSON_AGENT_CAPABILITY_INDEX_BASE.trim(),
+    options.onlineTextureHints === true ? THREE_JSON_AGENT_ONLINE_TEXTURE_INDEX.trim() : ""
+  ].filter(Boolean).join("\n\n");
+}
+
+const THREE_JSON_AGENT_CAPABILITY_INDEX = buildAgentCapabilityIndex();
+
 const THREE_JSON_AGENT_EXAMPLE_INDEX = `
 Capability patterns:
 - Domain object: worldInfo.domainModelList item with domain + handler + payload/items/options; do not use objType box in domainModelList.
@@ -69,5 +83,8 @@ Capability patterns:
 
 export {
   THREE_JSON_AGENT_CAPABILITY_INDEX,
+  THREE_JSON_AGENT_CAPABILITY_INDEX_BASE,
+  THREE_JSON_AGENT_ONLINE_TEXTURE_INDEX,
+  buildAgentCapabilityIndex,
   THREE_JSON_AGENT_EXAMPLE_INDEX
 };

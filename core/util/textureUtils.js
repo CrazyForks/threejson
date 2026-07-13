@@ -154,7 +154,7 @@ function applyOpacityToImageTexture(texture, opacity) {
 	const ctx = canvas.getContext("2d");
 	ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
 	multiplyCanvasAlpha(canvas, factor);
-	return createCanvasTexture(canvas, textureInfo);
+	return createCanvasTexture(canvas, texture);
 }
 
 /**

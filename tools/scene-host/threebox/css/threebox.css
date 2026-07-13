@@ -164,6 +164,24 @@ button { font: inherit; }
 .jsonCollapseCopyBtn.copied { color: #6bd987; }
 .jsonCollapse pre { margin: 0; padding: 0 12px 12px; overflow-x: auto; max-height: 400px; overflow-y: auto; }
 .jsonCollapse code { font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace; font-size: 12px; line-height: 1.55; color: #d7dae0; }
+.jsonCodeView { tab-size: 2; }
+.jsonCodeLines { display: grid; min-width: max-content; }
+.jsonCodeLine { display: grid; grid-template-columns: minmax(2.6em, auto) 1fr; min-height: 18px; }
+.jsonCodeView:not(.jsonCodeViewLineNumbers) .jsonCodeLine { grid-template-columns: 1fr; }
+.jsonCodeLineNumber {
+  user-select: none;
+  padding-right: 12px;
+  color: var(--muted);
+  opacity: 0.68;
+  text-align: right;
+  border-right: 1px solid var(--line);
+}
+.jsonCodeLineContent { padding-left: 12px; white-space: pre; }
+.jsonCodeView:not(.jsonCodeViewLineNumbers) .jsonCodeLineContent { padding-left: 0; }
+.jsonTokenKey { color: #8ab4f8; }
+.jsonTokenString { color: #9ccc65; }
+.jsonTokenNumber { color: #ffb74d; }
+.jsonTokenLiteral { color: #ce93d8; }
 .diffCollapse { background: #14181f; }
 
 .chatMessageText.markdown-body p { margin: 0 0 10px; }

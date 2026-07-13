@@ -226,6 +226,77 @@ export function createThreeBoxChatPanel(host = {}) {
   const CHECK_ICON =
     '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M3.5 8.5 6.5 11.5 12.5 4.5"/></svg>';
 
+  function getJsonViewerOptions() {
+    const opts = typeof host.getJsonViewerOptions === "function" ? host.getJsonViewerOptions() : {};
+    return {
+      lineNumbers: opts.lineNumbers !== false,
+      highlight: opts.highlight !== false
+    };
+  }
+
+  function escapeHtml(text) {
+    return String(text ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function highlightJsonLine(line) {
+    return escapeHtml(line).replace(
+      /(&quot;(?:\\.|[^"\\])*&quot;)(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g,
+      (match, stringToken, colon, keyword) => {
+        if (stringToken) {
+          return colon
+            ? `<span class="jsonTokenKey">${stringToken}</span>${colon}`
+            : `<span class="jsonTokenString">${stringToken}</span>`;
+        }
+        if (keyword) {
+          return `<span class="jsonTokenLiteral">${match}</span>`;
+        }
+        return `<span class="jsonTokenNumber">${match}</span>`;
+      }
+    );
+  }
+
+  function buildJsonCodeBlock(text) {
+    const { lineNumbers, highlight } = getJsonViewerOptions();
+    const pre = document.createElement("pre");
+    pre.className = "jsonCodeView";
+    pre.classList.toggle("jsonCodeViewLineNumbers", lineNumbers);
+    pre.classList.toggle("jsonCodeViewHighlighted", highlight);
+    const lines = String(text || "").split(/\r?\n/);
+    if (!lineNumbers && !highlight) {
+      const code = document.createElement("code");
+      code.textContent = text;
+      pre.appendChild(code);
+      return pre;
+    }
+    const table = document.createElement("code");
+    table.className = "jsonCodeLines";
+    lines.forEach((line, index) => {
+      const row = document.createElement("span");
+      row.className = "jsonCodeLine";
+      if (lineNumbers) {
+        const gutter = document.createElement("span");
+        gutter.className = "jsonCodeLineNumber";
+        gutter.textContent = String(index + 1);
+        row.appendChild(gutter);
+      }
+      const content = document.createElement("span");
+      content.className = "jsonCodeLineContent";
+      if (highlight) {
+        content.innerHTML = highlightJsonLine(line);
+      } else {
+        content.textContent = line;
+      }
+      row.appendChild(content);
+      table.appendChild(row);
+    });
+    pre.appendChild(table);
+    return pre;
+  }
+
   /** Wires a copy-to-clipboard button: click copies `getText()`'s current value, briefly swaps
    * the icon to a checkmark as feedback, then reverts. */
   function wireCopyButton(btn, getText) {
@@ -281,11 +352,7 @@ export function createThreeBoxChatPanel(host = {}) {
         () => jsonString
       )
     );
-    const pre = document.createElement("pre");
-    const code = document.createElement("code");
-    code.textContent = jsonString;
-    pre.appendChild(code);
-    details.appendChild(pre);
+    details.appendChild(buildJsonCodeBlock(jsonString));
     return details;
   }
 
@@ -304,11 +371,7 @@ export function createThreeBoxChatPanel(host = {}) {
     const copyTitle =
       kind === "patch" ? t("threebox.chat.copyAdjustPatch", "复制 JSON Patch") : t("threebox.chat.copyAdjustCommands", "复制调整命令");
     details.appendChild(buildCollapseSummary(label, copyTitle, () => text));
-    const pre = document.createElement("pre");
-    const code = document.createElement("code");
-    code.textContent = text;
-    pre.appendChild(code);
-    details.appendChild(pre);
+    details.appendChild(buildJsonCodeBlock(text));
     return details;
   }
 

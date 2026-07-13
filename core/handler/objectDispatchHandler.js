@@ -28,6 +28,7 @@ import { createIrregularGeometry } from "../builder/irregularGeometryBuilder.js"
 import { deployInfoPanel } from "../builder/infoPanelBuilder.js";
 import { createText, createTextAsync } from "../builder/textBuilder.js";
 import { deploySceneAudio } from "../builder/audioBuilder.js";
+import { deployParticleEmitter } from "../builder/particle/particleEmitterBuilder.js";
 import {
   deployNativeObjectRecordWithFallback
 } from "./nativeObjectDispatch.js";
@@ -281,6 +282,13 @@ function deployObjectRecord(targetRoot, record, ctx = {}) {
       return;
     }
     log.warn("[sceneLoad] objType shaderSurface: no deployer registered (import from \"threejson\")");
+    return;
+  }
+  if (objType === "particleemitter") {
+    if (deployByObjTypeExtension(record, targetRoot, ctx)) {
+      return;
+    }
+    deployParticleEmitter(record, targetRoot, ctx);
     return;
   }
   if (objType === "plane") {

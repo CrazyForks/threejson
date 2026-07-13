@@ -37,6 +37,19 @@ test("buildPositionsFloat32Array random fill matches count", () => {
   assert.equal(buf.length, 15);
 });
 
+test("buildPositionsFloat32Array supports spherical shell distribution", () => {
+  const buf = buildPositionsFloat32Array({
+    count: 20,
+    distribution: { type: "shell", radius: 10, thickness: 2 }
+  });
+  assert.ok(buf);
+  assert.equal(buf.length, 60);
+  for (let i = 0; i < buf.length; i += 3) {
+    const r = Math.hypot(buf[i], buf[i + 1], buf[i + 2]);
+    assert.ok(r >= 9 && r <= 11, `expected radius in shell, got ${r}`);
+  }
+});
+
 test("resolvePointsBlending maps additive", async () => {
   const THREE = await import("three");
   assert.equal(resolvePointsBlending("additive"), THREE.AdditiveBlending);

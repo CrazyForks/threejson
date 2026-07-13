@@ -19,7 +19,7 @@ export const THREEBOX_SETTINGS_DEFAULTS = {
   ai: {
     providers: [],
     defaultProviderId: "",
-    rememberKeys: false,
+    rememberKeys: true,
     selfName: "ThreeBox",
     updateOutputMode: "commands",
     includeSpatialSummary: true,
@@ -29,7 +29,9 @@ export const THREEBOX_SETTINGS_DEFAULTS = {
     includeTurnSummary: true,
     autoGenerateSceneTitle: true,
     sceneTitleLanguage: "auto",
-    attachReferenceLinks: true
+    attachReferenceLinks: true,
+    capabilityLookupEnabled: true,
+    onlineTextureHints: true
   },
   agent: {
     enabled: false,
@@ -40,7 +42,9 @@ export const THREEBOX_SETTINGS_DEFAULTS = {
     exportJsonIndent: 2,
     copyFriendlyJson: false,
     tjzAssetPolicy: "preserve",
-    turnCacheMode: "full"
+    turnCacheMode: "full",
+    jsonViewerLineNumbers: true,
+    jsonViewerHighlight: true
   }
 };
 
@@ -86,6 +90,8 @@ export const THREEBOX_SETTINGS_FIELDS = [
     type: "checkbox",
     label: "提示词中附带 ThreeJSON 文档与示例仓库链接"
   },
+  { section: "ai", path: "ai.capabilityLookupEnabled", type: "checkbox", label: "按意图查阅 ThreeJSON 能力示例" },
+  { section: "ai", path: "ai.onlineTextureHints", type: "checkbox", label: "为适合的物体自动添加在线纹理" },
 
   { section: "agent", path: "agent.enabled", type: "checkbox", label: "开启多轮 Agent" },
   { section: "agent", path: "agent.depth", type: "select", label: "Agent 深度", options: [["simple", "简单"], ["medium", "中等"], ["deep", "深入"], ["auto", "自动"]] },
@@ -94,6 +100,8 @@ export const THREEBOX_SETTINGS_FIELDS = [
   { section: "io", path: "io.exportJsonIndent", type: "number", label: "导出 JSON 缩进", min: 0, max: 4 },
   { section: "io", path: "io.copyFriendlyJson", type: "checkbox", label: "复制 JSON 时使用友好格式" },
   { section: "io", path: "io.tjzAssetPolicy", type: "select", label: ".tjz 资源策略", options: [["preserve", "保留原始 URL"], ["tryPack", "尝试打包资源"]] },
+  { section: "io", path: "io.jsonViewerLineNumbers", type: "checkbox", label: "JSON 查看显示行号" },
+  { section: "io", path: "io.jsonViewerHighlight", type: "checkbox", label: "JSON 查看代码高亮" },
   {
     section: "io",
     path: "io.turnCacheMode",

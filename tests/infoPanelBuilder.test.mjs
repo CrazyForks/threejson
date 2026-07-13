@@ -11,7 +11,7 @@ import {
   getInfoPanelMaxInFlightAsync,
   _resetInfoPanelDeployConfigForTests
 } from "../core/builder/infoPanelBuilder.js";
-import { applyOpacityToColor } from "../core/util/textureUtils.js";
+import { applyOpacityToColor, applyOpacityToImageTexture } from "../core/util/textureUtils.js";
 
 test("applyInfoPanelTextureDefaults configures UI-friendly texture sampling", () => {
   const texture = new THREE.DataTexture(new Uint8Array(4), 1, 1);
@@ -173,6 +173,54 @@ test("normalizeInfoPanelDescriptor falls back unknown panelBoxType to box", () =
 test("applyOpacityToColor bakes opacity into rgba", () => {
   assert.equal(applyOpacityToColor("#3A8798", 0.5), "rgba(58, 135, 152, 0.5)");
   assert.equal(applyOpacityToColor("#3A8798", 1), "#3A8798");
+});
+
+test("applyOpacityToImageTexture creates faded canvas texture without throwing", () => {
+  const originalDocument = globalThis.document;
+  const calls = [];
+  const canvas = {
+    width: 0,
+    height: 0,
+    getContext(type) {
+      assert.equal(type, "2d");
+      return {
+        drawImage(...args) {
+          calls.push(["drawImage", args.length]);
+        },
+        getImageData(x, y, width, height) {
+          calls.push(["getImageData", width, height]);
+          return { data: new Uint8ClampedArray([20, 40, 60, 200]) };
+        },
+        putImageData(imageData) {
+          calls.push(["putImageData", imageData.data[3]]);
+        }
+      };
+    }
+  };
+
+  globalThis.document = {
+    createElement(tagName) {
+      assert.equal(tagName, "canvas");
+      return canvas;
+    }
+  };
+
+  try {
+    const source = new THREE.Texture({ width: 2, height: 1 });
+    source.textureQuality = "high";
+    const faded = applyOpacityToImageTexture(source, 0.5);
+    assert.ok(faded instanceof THREE.CanvasTexture);
+    assert.equal(faded.image, canvas);
+    assert.equal(canvas.width, 2);
+    assert.equal(canvas.height, 1);
+    assert.deepEqual(calls, [
+      ["drawImage", 5],
+      ["getImageData", 2, 1],
+      ["putImageData", 100]
+    ]);
+  } finally {
+    globalThis.document = originalDocument;
+  }
 });
 
 test("buildInfoPanelObject keeps material opacity at 1 when panel opacity below 1", () => {

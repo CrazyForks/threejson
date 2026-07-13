@@ -2128,7 +2128,7 @@ function createSphere(sphereObj) {
 }
 
 /**
- * Create sphere mesh via {@link superCreateMesh} and add to scene.
+ * Create sphere mesh via {@link createSphere} and add to scene.
  * @param {object} sphereObj
  * @param {THREE.Scene|THREE.Object3D} scene
  */
@@ -2136,7 +2136,7 @@ function deploySphere(sphereObj, scene) {
     if(!sphereObj || !scene) {
         return;
     }
-    let sphereMesh = superCreateMesh(sphereObj);
+    let sphereMesh = createSphere(sphereObj);
     if(sphereMesh){
         scene.add(sphereMesh);
         registerObject(sphereMesh, sphereObj);

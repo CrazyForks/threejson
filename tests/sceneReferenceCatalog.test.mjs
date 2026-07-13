@@ -92,6 +92,48 @@ test("fetchReferenceMaterial fetches doc + example for an 'events' signal", asyn
   }
 });
 
+test("fetchReferenceMaterial maps lighting and animation signals to focused references", async () => {
+  const signals = matchIntentSignals("make it brighter and spin the planet");
+  assert.ok(signals.some((s) => s.id === "lighting"));
+  assert.ok(signals.some((s) => s.id === "declarativeAnimation"));
+
+  const restore = installFetchMock({
+    "https://example.test/assets/json/demo-show/manifest.json": JSON.stringify([
+      ...MANIFEST,
+      {
+        section: "materials-lighting",
+        sectionTitleEn: "Materials And Lighting",
+        docLinks: [{ file: "materials.md" }],
+        items: [{ id: "directional-light", json: "assets/json/demo-show/materials-lighting/directional-light.json" }]
+      },
+      {
+        section: "runtime",
+        sectionTitleEn: "Runtime",
+        docLinks: [{ file: "runtime.md" }],
+        items: [{ id: "runtime-animation", json: "assets/json/demo-show/runtime/runtime-animation.json" }]
+      }
+    ]),
+    "https://example.test/docs/en/materials.md": "# Materials\nUse sceneConfig.lights.",
+    "https://example.test/assets/json/demo-show/materials-lighting/directional-light.json":
+      '{"sceneConfig":{"lights":[{"type":"directional","intensity":1}]}}',
+    "https://example.test/docs/en/runtime.md": "# Runtime\nUse renderLoop updateAnimations for declarative animations.",
+    "https://example.test/assets/json/demo-show/runtime/runtime-animation.json":
+      '{"animations":[{"type":"rotate","axis":"y","speed":0.1}]}'
+  });
+  try {
+    const result = await fetchReferenceMaterial(signals, { resolveUrl, locale: "en-US" });
+    assert.ok(result.includes("Materials And Lighting"));
+    assert.ok(result.includes("sceneConfig.lights"));
+    assert.ok(result.includes("directional-light.json"));
+    assert.ok(result.includes("Runtime"));
+    assert.ok(result.includes("updateAnimations"));
+    assert.ok(result.includes("runtime-animation.json"));
+    assert.ok(result.includes("cdn.jsdelivr.net"));
+  } finally {
+    restore();
+  }
+});
+
 test("fetchReferenceMaterial degrades to '' on fetch failure, never throws", async () => {
   const signals = matchIntentSignals("add a click event handler");
   const originalFetch = globalThis.fetch;
