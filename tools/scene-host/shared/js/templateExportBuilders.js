@@ -34,7 +34,7 @@ export function buildHtmlTemplate({ sceneJsonText, inlineJson }) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ThreeJSON Scene</title>
-  <link rel="icon" href="${ASSETS_CDN}img/threejson.ico" type="image/x-icon">
+  <link rel="icon" href="${ASSETS_CDN}img/favicon.ico" type="image/x-icon">
   ${buildImportMapHtml()}
   <style>
     html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #11151b; }

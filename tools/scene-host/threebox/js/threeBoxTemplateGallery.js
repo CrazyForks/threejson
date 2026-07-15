@@ -19,7 +19,7 @@ const THUMB_WIDTH = 320;
 const THUMB_HEIGHT = 200;
 const THUMB_LOAD_TIMEOUT_MS = 8000;
 const MANIFEST_REPO_RELATIVE_PATH = "assets/json/other/threebox/manifest.json";
-const PLACEHOLDER_THUMB_URL = sceneHostAssetUrl("assets/img/ThreeJSON.png");
+const PLACEHOLDER_THUMB_URL = sceneHostAssetUrl("assets/img/logo/threejson-logo-256.png");
 
 let thumbCanvas = null;
 let thumbObserver = null;

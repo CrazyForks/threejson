@@ -20,7 +20,7 @@ test("normalizeIntroConfig accepts postLoad slides and defaults blockInteraction
     postLoad: {
       slides: [
         { type: "text", content: "Hello", durationMs: 100 },
-        { type: "image", url: "/assets/img/ThreeJSON.png", durationMs: 200 }
+        { type: "image", url: "/assets/img/threejson.png", durationMs: 200 }
       ],
       skipOnClick: false
     }
@@ -219,14 +219,14 @@ test("runPostLoadIntro resolves /assets image slides through active assetsBase",
     const intro = normalizeIntroConfig({
       enabled: true,
       postLoad: {
-        slides: [{ type: "image", url: "/assets/img/ThreeJSON.png", durationMs: 1 }],
+        slides: [{ type: "image", url: "/assets/img/threejson.png", durationMs: 1 }],
         fadeInMs: 0,
         fadeOutMs: 0,
         skipOnClick: false
       }
     });
     await runPostLoadIntro(intro, host);
-    assert.deepEqual(preloadedUrls, ["../../../assets/img/ThreeJSON.png"]);
+    assert.deepEqual(preloadedUrls, ["../../../assets/img/threejson.png"]);
   } finally {
     restoreAssetsBase();
     globalThis.document = priorDocument;

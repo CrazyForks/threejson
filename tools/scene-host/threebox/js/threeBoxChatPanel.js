@@ -79,7 +79,7 @@ export function createThreeBoxChatPanel(host = {}) {
       el.textContent = "U";
     } else {
       const img = document.createElement("img");
-      img.src = "../../../assets/img/ThreeJSON.png";
+      img.src = "../../../assets/img/logo/threejson-logo-256.png";
       img.alt = "ThreeBox";
       el.appendChild(img);
     }

@@ -25,7 +25,7 @@ function walkHtmlFiles(dir, out = []) {
 }
 
 const replacements = [
-  [/href="\/assets\/img\/threejson\.ico"/g, `href="${PAGE_ROOT}assets/img/threejson.ico"`],
+  [/href="\/assets\/img\/threejson\.ico"/g, `href="${PAGE_ROOT}assets/img/favicon.ico"`],
   [/"threejson":\s*"\/builtins\/full\.js"/g, `"threejson": "${PAGE_ROOT}builtins/full.js"`],
   [/"threejson\/core":\s*"\/core\/index\.js"/g, `"threejson/core": "${PAGE_ROOT}core/index.js"`],
   [/assetsBase:\s*"\/assets"/g, `assetsBase: "${PAGE_ROOT}assets"`],

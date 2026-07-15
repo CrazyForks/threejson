@@ -17,7 +17,7 @@ const content = `<!DOCTYPE html>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ThreeJSON Tutorial \u00b7 Track 0 \u00b7 sceneConfig.intro</title>
-  <link rel="icon" href="../../../assets/img/threejson.ico" type="image/x-icon">
+  <link rel="icon" href="../../../assets/img/favicon.ico" type="image/x-icon">
   <script type="importmap">
     {
       "imports": {
