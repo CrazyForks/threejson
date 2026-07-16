@@ -119,6 +119,7 @@ const result = await aiClient.runSceneAgent(
 - `apiKey`: required
 - `model`, `baseUrl`, `temperature` (default `0.2`)
 - `maxTokens`: default `4000` for updates/textures; generation often uses **6000**
+- `segmentedOutput`: generation-only, `"auto"` by default. Ordinary scenes use one response; auto enables continuation only when `estimatedSegments > 1`. `true`/`false` explicitly enable/disable it, and `maxSceneSegments` only caps an enabled segmented run.
 - `imageDetail`: `auto` | `low` | `high` (image-to-scene only)
 
 ## Validation

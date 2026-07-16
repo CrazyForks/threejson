@@ -59,7 +59,7 @@ export function createThreeBoxSceneCard() {
   canvasWrap.appendChild(canvas);
   const loadingMask = document.createElement("div");
   loadingMask.className = "sceneCardLoadingMask";
-  loadingMask.textContent = t("threebox.sceneCard.rendering", "正在渲染场景…");
+  loadingMask.textContent = t("threebox.sceneCard.waitingForDraft", "等待场景草稿…");
   canvasWrap.appendChild(loadingMask);
 
   const actionBar = document.createElement("div");
@@ -149,6 +149,7 @@ export function createThreeBoxSceneCard() {
     setLabel(
       options.label || sceneJsonPayload?.label || sceneJsonPayload?.name || t("threebox.sceneCard.defaultLabel", "ThreeBox 场景")
     );
+    loadingMask.textContent = t("threebox.sceneCard.rendering", "场景渲染中（不消耗 Token）…");
     loadingMask.hidden = false;
     const { createJsonScene } = await import("threejson");
     const { width, height } = await waitForStableSize(canvasWrap);

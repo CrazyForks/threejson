@@ -302,6 +302,12 @@ async function main() {
     return [`**Agent process**`, ...lines, more].filter(Boolean).join("\n");
   }
 
+  function waitForStatusPaint() {
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    });
+  }
+
   /** Resolves a turn's full scene JSON string, reconstructing it via command replay when the turn
    * was diff-cached (io.turnCacheMode "diff" — see threeBoxSettingsSchema.js and
    * threeBoxOrchestrator.js's resolveTurnSceneJsonString). Turns cached in "full" mode (the
@@ -365,6 +371,12 @@ async function main() {
         onDelta: (delta) => {
           streamBuffer += delta;
           streaming.update(streamBuffer);
+        },
+        onGenerationPhase: async (phase) => {
+          if (phase?.phase === "processing") {
+            streaming.processing();
+            await waitForStatusPaint();
+          }
         },
         agentOptions,
         onAgentProgress: updateAgentProgress,

@@ -60,6 +60,7 @@ export const THREEBOX_SHELL_LABELS_EN = {
   "threebox.app.templateAppliedRecap": "Applied template \"{label}\".",
   "threebox.app.templateTouchLabel": "Template: {label}",
   "threebox.app.processingFailed": "Processing failed: {error}",
+  "threebox.chat.preparingScene": "JSON generated. Parsing and preparing the scene preview (no tokens used)…",
   "threebox.app.noProviderConfigured": "No AI provider is configured yet. Click \"AI Settings\" on the left to add a provider and enter an API key, then try again.",
   "threebox.app.loadAttachedFailed": "Failed to load the attached scene: {error}",
   "threebox.app.replayFailed": "Failed to replay this turn's scene: {error}",
@@ -191,7 +192,8 @@ export const THREEBOX_SHELL_LABELS_EN = {
   "threebox.resource.remove": "Remove",
   "threebox.resource.notLoadable": "This file type can't be loaded directly as scene context",
 
-  "threebox.sceneCard.rendering": "Rendering scene…",
+  "threebox.sceneCard.waitingForDraft": "Waiting for a scene draft…",
+  "threebox.sceneCard.rendering": "Rendering scene (no tokens used)…",
   "threebox.sceneCard.downloadJson": "Download JSON",
   "threebox.sceneCard.exportTjz": "Export .tjz Package",
   "threebox.sceneCard.openInEditor": "Open in Editor",

@@ -378,6 +378,8 @@ function stripChatTransportOptions(options = {}) {
   delete next.estimatedSegments;
   delete next.maxSceneSegments;
   delete next.onSegmentProgress;
+  delete next.segmentedOutput;
+  delete next.onGenerationPhase;
   delete next.outputFormat;
   delete next.friendlyMap;
   delete next.allowInvalidSceneDraft;
@@ -490,6 +492,22 @@ function emitSceneSegmentProgress(options, detail) {
   if (typeof options.onSegmentProgress === "function") {
     options.onSegmentProgress(detail);
   }
+}
+
+async function emitSceneGenerationPhase(options, detail) {
+  if (typeof options.onGenerationPhase === "function") {
+    await options.onGenerationPhase(detail);
+  }
+}
+
+function shouldUseSegmentedSceneOutput(options, estimatedSegments) {
+  if (options.segmentedOutput === true) {
+    return true;
+  }
+  if (options.segmentedOutput === false) {
+    return false;
+  }
+  return estimatedSegments > 1;
 }
 
 async function requestSegmentedSceneJsonContent(messages, options, maxTokens) {
@@ -645,7 +663,9 @@ async function maybeApplyCapabilityReview(prompt, sceneJsonString, options = {})
  * Generate a formatted full-scene JSON string from natural language.
  * @param {string} prompt User requirement description
  * @param {object} [options={}] apiKey, provider, model, temperature, baseUrl, etc.; forwarded to requestChatCompletion
- * @param {number} [options.maxSceneSegments=16] Maximum segmented responses to assemble (clamped to 1..64)
+ * @param {"auto"|boolean} [options.segmentedOutput="auto"] Use multi-response output explicitly,
+ *   disable it explicitly, or in auto mode use it only when estimatedSegments is greater than 1
+ * @param {number} [options.maxSceneSegments=16] Maximum responses when segmented output is active (clamped to 1..64)
  * @returns {Promise<string>}
  */
 async function generateSceneJsonString(prompt, options = {}) {
@@ -660,23 +680,31 @@ async function generateSceneJsonString(prompt, options = {}) {
   const referenceMaterial = await resolveReferenceMaterialForPrompt(effectivePrompt, options);
 
   const estimatedSegments = clampInteger(options.estimatedSegments, 1, 1, DEFAULT_MAX_SCENE_SEGMENTS);
-  const content = await requestSegmentedSceneJsonContent(
-    [
-      {
-        role: "system",
-        content: [
-          buildSceneGenerationSystemPrompt({ ...options, particleEffects }),
-          buildSegmentedSceneProtocolPrompt(estimatedSegments)
-        ].join("\n\n")
-      },
-      {
-        role: "user",
-        content: [buildGenerateUserMessage(effectivePrompt), referenceMaterial].filter(Boolean).join("\n\n")
-      }
-    ],
-    options,
-    maxTokens
-  );
+  const segmentedOutput = shouldUseSegmentedSceneOutput(options, estimatedSegments);
+  const systemPrompt = buildSceneGenerationSystemPrompt({ ...options, particleEffects });
+  const messages = [
+    {
+      role: "system",
+      content: segmentedOutput
+        ? [systemPrompt, buildSegmentedSceneProtocolPrompt(estimatedSegments)].join("\n\n")
+        : systemPrompt
+    },
+    {
+      role: "user",
+      content: [buildGenerateUserMessage(effectivePrompt), referenceMaterial].filter(Boolean).join("\n\n")
+    }
+  ];
+  const content = segmentedOutput
+    ? await requestSegmentedSceneJsonContent(messages, options, maxTokens)
+    : await requestChatCompletion({ ...options, maxTokens, messages });
+
+  // Network/token generation has finished. Let browser hosts paint a parsing/rendering status
+  // before the synchronous JSON normalization below; non-UI callers pay no extra delay.
+  await emitSceneGenerationPhase(options, {
+    phase: "processing",
+    segmentedOutput,
+    estimatedSegments
+  });
 
   let jsonText = extractJsonText(content);
   let sceneJsonString = projectSceneDraftJsonString(jsonText, "standard", options);

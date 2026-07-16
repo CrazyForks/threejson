@@ -543,18 +543,18 @@ test("generateSceneJsonString authors standard JSON and projects friendly output
   }
 });
 
-test("generateSceneJsonString completes a one-segment response and strips its control marker", async () => {
+test("generateSceneJsonString uses the single-response fast path for an ordinary scene", async () => {
   const scene = '{"threeJsonId":"one-segment","sceneConfig":{"scene":{"background":"#111111"}}}';
   let requestCount = 0;
   globalThis.fetch = async (_url, init = {}) => {
     requestCount += 1;
     const body = JSON.parse(init.body);
-    assert.match(body.messages[0].content, /THREEJSON_COMPLETE/);
+    assert.doesNotMatch(body.messages[0].content, /THREEJSON_COMPLETE/);
     return {
       ok: true,
       async json() {
         return {
-          choices: [{ message: { content: `${scene}\n<<<THREEJSON_COMPLETE>>>` } }]
+          choices: [{ message: { content: scene } }]
         };
       }
     };
@@ -570,13 +570,36 @@ test("generateSceneJsonString completes a one-segment response and strips its co
 
   assert.equal(requestCount, 1);
   assert.equal(JSON.parse(output).threeJsonId, "one-segment");
-  assert.equal(deltas.join(""), scene);
+  assert.equal(deltas.join(""), "");
   assert.doesNotMatch(output, /THREEJSON_COMPLETE/);
 });
 
-test("generateSceneJsonString hides split transport markers from streamed JSON deltas", async () => {
+test("generateSceneJsonString does not silently turn a malformed ordinary response into 16 requests", async () => {
+  let requestCount = 0;
+  globalThis.fetch = async () => {
+    requestCount += 1;
+    return {
+      ok: true,
+      async json() {
+        return { choices: [{ message: { content: '{"threeJsonId":"unfinished","objectList":[' } }] };
+      }
+    };
+  };
+
+  await assert.rejects(
+    generateSceneJsonString("a simple box", {
+      provider: "chatgpt",
+      apiKey: "test-key",
+      capabilityReview: false,
+      estimatedSegments: 1
+    })
+  );
+  assert.equal(requestCount, 1);
+});
+
+test("generateSceneJsonString streams an ordinary scene directly without marker buffering", async () => {
   const scene = '{"threeJsonId":"streamed-segment","sceneConfig":{"scene":{"background":"#111111"}}}';
-  const streamedPieces = [scene, "\n<<<THREEJSON_", "COMPLETE>>>"];
+  const streamedPieces = [scene.slice(0, 30), scene.slice(30)];
   let pieceIndex = 0;
   globalThis.fetch = async () => ({
     ok: true,
@@ -606,7 +629,6 @@ test("generateSceneJsonString hides split transport markers from streamed JSON d
 
   assert.equal(JSON.parse(output).threeJsonId, "streamed-segment");
   assert.equal(deltas.join(""), scene);
-  assert.equal(deltas.some((delta) => delta.includes("THREEJSON")), false);
 });
 
 test("generateSceneJsonString joins explicit continuation segments without repeating JSON", async () => {
@@ -664,14 +686,15 @@ test("generateSceneJsonString continues when the provider truncates before emitt
   const output = await generateSceneJsonString("continue after truncation", {
     provider: "chatgpt",
     apiKey: "test-key",
-    capabilityReview: false
+    capabilityReview: false,
+    estimatedSegments: 2
   });
 
   assert.equal(requestCount, 2);
   assert.equal(JSON.parse(output).threeJsonId, "implicit-continuation");
 });
 
-test("generateSceneJsonString continues beyond eight responses with the new default", async () => {
+test("generateSceneJsonString can continue beyond eight responses when complexity opts in", async () => {
   const replies = [
     '{\n<<<THREEJSON_CONTINUE>>>',
     ...Array.from({ length: 8 }, () => ' \n<<<THREEJSON_CONTINUE>>>'),
@@ -692,7 +715,8 @@ test("generateSceneJsonString continues beyond eight responses with the new defa
   const output = await generateSceneJsonString("a scene requiring many segments", {
     provider: "chatgpt",
     apiKey: "test-key",
-    capabilityReview: false
+    capabilityReview: false,
+    estimatedSegments: 10
   });
 
   assert.equal(requestCount, 10);
@@ -718,6 +742,7 @@ test("generateSceneJsonString honors the caller maxSceneSegments option", async 
       provider: "chatgpt",
       apiKey: "test-key",
       capabilityReview: false,
+      segmentedOutput: true,
       maxSceneSegments: 2
     }),
     /after 2 response segments/

@@ -75,7 +75,7 @@ function buildClassifyIntentSystemPrompt() {
     '- If intent is "generate", "targetTurnId" MUST be null.',
     '- If intent is "adjust" but you cannot tell which prior turn is meant, still pick the single most recent turn as targetTurnId (most conversations continue the latest result) and explain the ambiguity in "note".',
     '- "note" is one short sentence explaining your choice.',
-    '- "estimatedSegments" estimates how many responses a FULL generated scene JSON would need at the provider output limit: 1 for ordinary/small scenes, up to 16 for unusually complex scenes. For adjust intent, still estimate the size of a full scene matching the newest request.',
+    '- "estimatedSegments" controls whether an expensive multi-response continuation protocol is activated. Use 1 by default for ordinary requests, including polished scenes made from a modest number of objects. Use 2-16 only when the requested FULL JSON is clearly too large for one provider response (for example, explicitly requested very large object populations or unusually detailed city-scale layouts). Complexity features are optional safeguards, not a quality setting: never increase this value merely to improve quality, reasoning, correctness, or visual detail. For adjust intent, still estimate the size of a full scene matching the newest request.',
     "",
     "Output requirement:",
     "Return ONLY one JSON object. No Markdown fences. No commentary before or after."

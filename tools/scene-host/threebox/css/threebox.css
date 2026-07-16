@@ -142,6 +142,18 @@ button { font: inherit; }
 .streamingPreview::-webkit-scrollbar { width: 6px; }
 .streamingPreview::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 999px; }
 .streamingPreviewPending { color: var(--muted); font-style: italic; font-family: inherit; }
+.streamingPreviewProcessing::before,
+.sceneCardLoadingMask::before {
+  content: ""; width: 14px; height: 14px; margin-right: 9px; flex: 0 0 auto;
+  display: inline-block; vertical-align: -2px; border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor; border-radius: 50%; animation: threeboxSpin .8s linear infinite;
+}
+.sceneCardLoadingMask { flex-direction: row; }
+@keyframes threeboxSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .streamingPreviewProcessing::before,
+  .sceneCardLoadingMask::before { animation-duration: 1.8s; }
+}
 
 /* ---- Collapsible final-JSON block ---- */
 .jsonCollapse { margin: 4px 0 10px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #17171a; }

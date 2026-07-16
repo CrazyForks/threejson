@@ -214,11 +214,20 @@ export function createThreeBoxChatPanel(host = {}) {
     el.addEventListener("click", () => el.classList.toggle("expanded"));
     function update(text) {
       el.classList.remove("streamingPreviewPending");
+      el.classList.remove("streamingPreviewProcessing");
       el.textContent = text;
       el.scrollTop = el.scrollHeight;
       revealBottomOf(el);
     }
-    return { el, update, remove: () => el.remove() };
+    function processing() {
+      el.classList.add("streamingPreviewPending", "streamingPreviewProcessing");
+      el.textContent = t(
+        "threebox.chat.preparingScene",
+        "JSON 已生成，正在解析并准备场景预览（不消耗 Token）…"
+      );
+      revealBottomOf(el);
+    }
+    return { el, update, processing, remove: () => el.remove() };
   }
 
   const COPY_ICON =

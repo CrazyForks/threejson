@@ -60,6 +60,7 @@
   "threebox.app.templateAppliedRecap": "已应用模板「{label}」。",
   "threebox.app.templateTouchLabel": "模板：{label}",
   "threebox.app.processingFailed": "处理失败：{error}",
+  "threebox.chat.preparingScene": "JSON 已生成，正在解析并准备场景预览（不消耗 Token）…",
   "threebox.app.noProviderConfigured": "尚未配置可用的 AI 供应商。请点击左侧「AI 配置」，添加一个供应商并填写 API Key 后再试。",
   "threebox.app.loadAttachedFailed": "加载已附加的场景失败：{error}",
   "threebox.app.replayFailed": "该轮场景重放失败：{error}",
@@ -191,7 +192,8 @@
   "threebox.resource.remove": "删除",
   "threebox.resource.notLoadable": "该类型暂不支持直接加载为场景上下文",
 
-  "threebox.sceneCard.rendering": "正在渲染场景…",
+  "threebox.sceneCard.waitingForDraft": "等待场景草稿…",
+  "threebox.sceneCard.rendering": "场景渲染中（不消耗 Token）…",
   "threebox.sceneCard.downloadJson": "下载 JSON",
   "threebox.sceneCard.exportTjz": "导出 .tjz 场景包",
   "threebox.sceneCard.openInEditor": "在编辑器内打开",
