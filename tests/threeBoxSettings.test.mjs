@@ -46,12 +46,19 @@ test("ThreeBox defaults remember API keys locally", () => {
   assert.equal(THREEBOX_SETTINGS_DEFAULTS.agent.progressiveGenerate, true);
   const settings = loadThreeBoxSettingsBundle();
   assert.equal(settings.ai.rememberKeys, true);
+  assert.equal(settings.ai.animationCapabilityMode, "auto");
   assert.equal(settings.ai.onlineTextureHints, true);
   assert.equal(settings.ai.maxSceneSegments, 16);
   assert.equal(settings.general.previewAuxiliaryLights, true);
   assert.equal(settings.io.sceneJsonFormat, "standard");
   assert.equal(settings.io.showMeshExportWarnings, true);
   assert.equal(settings.agent.progressiveGenerate, true);
+});
+
+test("ThreeBox persists the animation capability negotiation mode", () => {
+  installMemoryLocalStorage();
+  persistThreeBoxSettings({ ai: { animationCapabilityMode: "off", providers: [], rememberKeys: true } });
+  assert.equal(loadThreeBoxSettingsBundle().ai.animationCapabilityMode, "off");
 });
 
 test("ThreeBox migrates the legacy friendly-copy preference to the JSON format setting", () => {

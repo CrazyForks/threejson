@@ -32,6 +32,7 @@ export const THREEBOX_SETTINGS_DEFAULTS = {
     sceneTitleLanguage: "auto",
     attachReferenceLinks: true,
     capabilityLookupEnabled: true,
+    animationCapabilityMode: "auto",
     onlineTextureHints: true,
     maxSceneSegments: 16
   },
@@ -96,6 +97,13 @@ export const THREEBOX_SETTINGS_FIELDS = [
     label: "提示词中附带 ThreeJSON 文档与示例仓库链接"
   },
   { section: "ai", path: "ai.capabilityLookupEnabled", type: "checkbox", label: "按意图查阅 ThreeJSON 能力示例" },
+  {
+    section: "ai",
+    path: "ai.animationCapabilityMode",
+    type: "select",
+    label: "动画/事件脚本能力",
+    options: [["auto", "自动（由协商模型判断）"], ["on", "始终启用"], ["off", "关闭"]]
+  },
   { section: "ai", path: "ai.onlineTextureHints", type: "checkbox", label: "为适合的物体自动添加在线纹理" },
   {
     section: "ai",

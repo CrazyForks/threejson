@@ -92,16 +92,6 @@ export * from "./runtime/eventMechanism/index.js";
 export * from "./runtime/objectLifecycle/index.js";
 export { disposeObjectTree, detachObjectTree } from "./handler/disposeObjectTree.js";
 export * from "./compat/index.js";
-export {
-  attachHostedContainerDoorDblclick,
-  createHostedContainerDoorDblclickHandler,
-  findCabinetRoot,
-  findUpsRoot,
-  pickHostedContainerDoorAtClient,
-  pickHostedContainerDoorTarget,
-  tryToggleCabinetDoorFromNode,
-  tryToggleUpsDoorFromNode
-} from "./host/hostedContainerDoor.js";
 export * from "./handler/frameLoopHandler.js";
 export * from "./handler/animationHandler.js";
 export {

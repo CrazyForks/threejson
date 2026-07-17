@@ -4,7 +4,7 @@
  */
 
 import * as THREE from "three";
-import { isDoorInteractable, openOrCloseDoor } from "../../domains/door/doorKinematics.js";
+import { isDoorInteractable, openOrCloseDoor } from "../../../../domains/door/doorKinematics.js";
 
 /**
  * @param {import("three").Object3D|null|undefined} node

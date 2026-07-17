@@ -456,7 +456,6 @@
     setObjectsVisibleByNames,
     applyInfoPanelList,
     ensureThreeJsonIdsOnScenePayload,
-    attachHostedContainerDoorDblclick,
     openOrCloseProgressManager,
     disposeTrackedResources,
     trackDisposableResource,
@@ -501,6 +500,73 @@
   let doorLabelSyncTimer = 0;
   /** @type {(() => void)|null} */
   let detachHostedContainerDoorDblclick = null;
+
+  function findRoomContainerRoot(node) {
+    let current = node;
+    while (current) {
+      const descriptor = current.userData?.objJson;
+      if (descriptor?.domain === "device.cabinet" || descriptor?.domain === "device.ups") return current;
+      current = current.parent;
+    }
+    return null;
+  }
+
+  function isRoomDescendantOf(node, ancestor) {
+    let current = node;
+    while (current) {
+      if (current === ancestor) return true;
+      current = current.parent;
+    }
+    return false;
+  }
+
+  function pickRoomContainerDoor(event, options) {
+    const currentScene = options.getScene();
+    const currentCamera = options.getCamera();
+    const canvas = options.getCanvas();
+    if (!currentScene || !currentCamera || !canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const pointer = new THREE.Vector2(
+      ((event.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1,
+      -((event.clientY - rect.top) / Math.max(1, rect.height)) * 2 + 1
+    );
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(pointer, currentCamera);
+    const hits = raycaster.intersectObjects(currentScene.children, true)
+      .map((hit) => hit.object)
+      .filter((object) => object?.visible && !options.isPickBlocker?.(object));
+    for (const hit of hits) {
+      const container = findRoomContainerRoot(hit);
+      if (!container || container.userData?.objJson?.pickThroughRaycast !== true) continue;
+      for (const candidate of hits) {
+        if (!isRoomDescendantOf(candidate, container)) continue;
+        let current = candidate;
+        while (current) {
+          if (door.isDoorInteractable(current)) return current;
+          if (current === container) break;
+          current = current.parent;
+        }
+      }
+    }
+    return null;
+  }
+
+  function attachRoomContainerDoorDblclick(options) {
+    const handler = (event) => {
+      const canvas = options.getCanvas();
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) return;
+      const target = pickRoomContainerDoor(event, options);
+      if (!target) return;
+      door.openOrCloseDoor(target);
+      options.onDoorToggled?.();
+      event.stopImmediatePropagation();
+    };
+    document.addEventListener("dblclick", handler, true);
+    return () => document.removeEventListener("dblclick", handler, true);
+  }
+
 
   const toggleRoofBtn = document.getElementById("toggleRoofBtn");
   const toggleWallsBtn = document.getElementById("toggleWallsBtn");
@@ -734,7 +800,7 @@
 
   function bindHostedContainerDoorPick() {
     detachHostedContainerDoorDblclick?.();
-    detachHostedContainerDoorDblclick = attachHostedContainerDoorDblclick({
+    detachHostedContainerDoorDblclick = attachRoomContainerDoorDblclick({
       getScene: () => scene,
       getCamera: () => camera,
       getCanvas: () => renderer?.domElement ?? canvasContainer,

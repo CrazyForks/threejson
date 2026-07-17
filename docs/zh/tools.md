@@ -22,6 +22,14 @@
 
 scene-host 与旧版归档 **共用** settings / localStorage / 播放列表等存储（同 key、同 `setting.json` 路径），便于历史数据延续与对照排查。
 
+### scene-host 应用依赖边界
+
+`editor/`、`player/`、`shower/`、`threebox/` 是相互独立的宿主应用：禁止直接 import、动态 import 或加载另一个应用目录内的 JS/CSS。确属公共能力时放入 `tools/scene-host/shared/`；不能形成稳定公共契约时，各应用分别实现。`shared/` 也不得反向依赖任一应用内部模块。
+
+`scene-host/shared/` 仅服务 `scene-host` 内部应用。`room-show.html`、`port-show.html` 等独立宿主不得引用它，应直接依赖 core/domains 的公开能力，并在应用内实现自身专有交互。页面间导航和基于明确消息协议的场景传递不等同于源码依赖，但不得借此调用另一个应用的内部方法。
+
+上述约束由 [`tests/architectureDependencies.test.mjs`](../../tests/architectureDependencies.test.mjs) 自动检查。
+
 ## 生态概览
 
 | 组件 | 路径 | 说明 |

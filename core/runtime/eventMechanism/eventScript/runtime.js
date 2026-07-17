@@ -12,6 +12,10 @@ import {
 import { createTimerScheduler } from "./timerScheduler.js";
 import { resolveEventScriptStepLimit } from "./config.js";
 import { runEventScriptCommand } from "./runCommand.js";
+import { NUMERIC_CONSTANTS, NUMERIC_FUNCTIONS } from "../../../util/numericExpression.js";
+
+const BREAK_SIGNAL = Symbol("EventScript.break");
+const CONTINUE_SIGNAL = Symbol("EventScript.continue");
 
 /**
  * @param {object} ast
@@ -34,8 +38,10 @@ export async function runEventScriptAst(ast, runtimeCtx, options = {}) {
 
   async function executeBlock(body = []) {
     for (let i = 0; i < body.length; i++) {
-      await executeStatement(body[i]);
+      const signal = await executeStatement(body[i]);
+      if (signal === BREAK_SIGNAL || signal === CONTINUE_SIGNAL) return signal;
     }
+    return null;
   }
 
   async function executeStatement(node) {
@@ -56,12 +62,42 @@ export async function runEventScriptAst(ast, runtimeCtx, options = {}) {
       case "IfStatement": {
         const test = await evaluateExpression(node.test);
         if (test) {
-          await executeBlock(node.consequent?.body ?? []);
+          return executeBlock(node.consequent?.body ?? []);
         } else if (node.alternate) {
-          await executeBlock(node.alternate?.body ?? []);
+          return executeBlock(node.alternate?.body ?? []);
         }
         return;
       }
+      case "WhileStatement":
+        while (await evaluateExpression(node.test)) {
+          bumpSteps();
+          const signal = await executeLoopBlock(node.body?.body ?? []);
+          if (signal === BREAK_SIGNAL) break;
+        }
+        return;
+      case "RepeatStatement": {
+        const count = Math.max(0, Math.floor(Number(await evaluateExpression(node.count)) || 0));
+        for (let i = 0; i < count; i += 1) {
+          bumpSteps();
+          const signal = await executeLoopBlock(node.body?.body ?? []);
+          if (signal === BREAK_SIGNAL) break;
+        }
+        return;
+      }
+      case "ForStatement": {
+        if (node.init) await executeStatement(node.init);
+        while (node.test == null || await evaluateExpression(node.test)) {
+          bumpSteps();
+          const signal = await executeLoopBlock(node.body?.body ?? []);
+          if (signal === BREAK_SIGNAL) break;
+          if (node.update) await evaluateExpression(node.update);
+        }
+        return;
+      }
+      case "BreakStatement":
+        return BREAK_SIGNAL;
+      case "ContinueStatement":
+        return CONTINUE_SIGNAL;
       case "VarDeclaration": {
         const value = await evaluateExpression(node.init);
         if (node.objType && !assertScriptObjectType(value, node.objType)) {
@@ -80,11 +116,18 @@ export async function runEventScriptAst(ast, runtimeCtx, options = {}) {
         await evaluateExpression(node.expression);
         return;
       case "BlockStatement":
-        await executeBlock(node.body ?? []);
-        return;
+        return executeBlock(node.body ?? []);
       default:
         return;
     }
+  }
+
+  async function executeLoopBlock(body = []) {
+    for (let i = 0; i < body.length; i += 1) {
+      const signal = await executeStatement(body[i]);
+      if (signal === BREAK_SIGNAL || signal === CONTINUE_SIGNAL) return signal;
+    }
+    return null;
   }
 
   async function evaluateExpression(node) {
@@ -104,6 +147,12 @@ export async function runEventScriptAst(ast, runtimeCtx, options = {}) {
         }
         if (node.name === "payload") {
           return runtimeCtx.payload ?? null;
+        }
+        if (Object.prototype.hasOwnProperty.call(NUMERIC_CONSTANTS, node.name.toUpperCase())) {
+          return NUMERIC_CONSTANTS[node.name.toUpperCase()];
+        }
+        if (Object.prototype.hasOwnProperty.call(NUMERIC_FUNCTIONS, node.name.toLowerCase())) {
+          return NUMERIC_FUNCTIONS[node.name.toLowerCase()];
         }
         if (variables.has(node.name)) {
           return variables.get(node.name);
@@ -175,8 +224,10 @@ export async function runEventScriptAst(ast, runtimeCtx, options = {}) {
           case "&&":
             return Boolean(left) && Boolean(right);
           case "==":
+          case "===":
             return left == right;
           case "!=":
+          case "!==":
             return left != right;
           case "<":
             return left < right;
@@ -186,6 +237,19 @@ export async function runEventScriptAst(ast, runtimeCtx, options = {}) {
             return left <= right;
           case ">=":
             return left >= right;
+          case "+":
+            return Number(left) + Number(right);
+          case "-":
+            return Number(left) - Number(right);
+          case "*":
+            return Number(left) * Number(right);
+          case "/":
+            return Number(left) / Number(right);
+          case "%":
+            return Number(left) % Number(right);
+          case "**":
+          case "^":
+            return Math.pow(Number(left), Number(right));
           default:
             return undefined;
         }

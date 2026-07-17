@@ -94,7 +94,9 @@ async function resolveAgentReferenceMaterial(userPrompt, chatOptions) {
     return "";
   }
   try {
-    const signals = matchIntentSignals(userPrompt);
+    const signals = Array.isArray(chatOptions?.selectedCapabilityIds)
+      ? chatOptions.selectedCapabilityIds.map((id) => ({ id }))
+      : matchIntentSignals(userPrompt);
     return await fetchReferenceMaterial(signals, {
       resolveUrl: chatOptions.resolveReferenceUrl,
       locale: chatOptions.locale

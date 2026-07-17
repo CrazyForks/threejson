@@ -5,6 +5,8 @@ import { updatePointsMotion } from '../builder/pointsMotion.js';
 import { updateParticleGpuCompute } from '../builder/particle/particleGpuCompute.js';
 import { updatePlaneScrollMotion } from '../builder/planeScrollMotion.js';
 import { updateShaderMotion } from '../builder/shader/shaderMotion.js';
+import { evaluateNumericExpression } from '../util/numericExpression.js';
+import { resolvePosition, resolveRotation, resolveScale } from '../util/vectorValue.js';
 
 /**
  * Scene animation driver: per-frame updates from JSON `animations` (e.g. rotate) and unified updateEngineTweens.
@@ -12,6 +14,7 @@ import { updateShaderMotion } from '../builder/shader/shaderMotion.js';
 
 const DEFAULT_MAX_DELTA_SECONDS = 0.1;
 const sceneAnimationStateMap = new WeakMap();
+const objectAnimationStateMap = new WeakMap();
 const ROTATION_AXIS_MAP = {
 	x: 'x',
 	y: 'y',
@@ -68,6 +71,76 @@ function applyRotateAnimation(currObj, animation, deltaSeconds){
 	currObj.rotation[axis] += speed * deltaSeconds;
 }
 
+function getObjectAnimationState(object3D, animation, index){
+	let byObject = objectAnimationStateMap.get(object3D);
+	if(!byObject){
+		byObject = new Map();
+		objectAnimationStateMap.set(object3D, byObject);
+	}
+	const key = animation.id || animation.name || index;
+	if(!byObject.has(key)) byObject.set(key, { elapsed: 0, from: null });
+	return byObject.get(key);
+}
+
+function readObjectVector(object3D, property){
+	const source = object3D?.[property];
+	return { x: Number(source?.x) || 0, y: Number(source?.y) || 0, z: Number(source?.z) || 0 };
+}
+
+function resolveAnimationVector(value, property, fallback){
+	if(property === 'rotation') return resolveRotation(value, fallback);
+	if(property === 'scale') return resolveScale(value, fallback);
+	return resolvePosition(value, fallback);
+}
+
+function applyTransformAnimation(object3D, animation, deltaSeconds, index){
+	const property = ['position', 'rotation', 'scale'].includes(animation.property) ? animation.property : 'position';
+	const state = getObjectAnimationState(object3D, animation, index);
+	state.elapsed += deltaSeconds * 1000;
+	const delay = Math.max(0, Number(animation.delay) || 0);
+	if(state.elapsed < delay) return;
+	const duration = Math.max(1, Number(animation.duration) || 1000);
+	const localElapsed = state.elapsed - delay;
+	const cycle = Math.floor(localElapsed / duration);
+	const repeat = animation.repeat === true || animation.repeat === 'infinite'
+		? Infinity
+		: Math.max(0, Math.floor(Number(animation.repeat) || 0));
+	const finished = Number.isFinite(repeat) && cycle > repeat;
+	const activeCycle = finished ? repeat : cycle;
+	let progress = finished ? 1 : Math.min(1, (localElapsed % duration) / duration);
+	if(localElapsed > 0 && localElapsed % duration === 0) progress = 1;
+	if(animation.yoyo === true && activeCycle % 2 === 1) progress = 1 - progress;
+	if(!state.from) state.from = resolveAnimationVector(animation.from, property, readObjectVector(object3D, property));
+	const to = resolveAnimationVector(animation.to ?? animation.value, property, state.from);
+	const target = object3D[property];
+	target.set(
+		state.from.x + (to.x - state.from.x) * progress,
+		state.from.y + (to.y - state.from.y) * progress,
+		state.from.z + (to.z - state.from.z) * progress
+	);
+}
+
+function applyExpressionAnimation(object3D, animation, deltaSeconds, index){
+	const property = ['position', 'rotation', 'scale'].includes(animation.property) ? animation.property : 'position';
+	const state = getObjectAnimationState(object3D, animation, index);
+	state.elapsed += deltaSeconds;
+	const expressions = animation.expressions ?? animation.value ?? {};
+	const current = readObjectVector(object3D, property);
+	const variables = {
+		t: state.elapsed,
+		time: state.elapsed,
+		delta: deltaSeconds,
+		progress: Number(animation.duration) > 0 ? (state.elapsed * 1000 % Number(animation.duration)) / Number(animation.duration) : 0
+	};
+	const evaluateAxis = (axis) => {
+		const expression = Array.isArray(expressions) ? expressions[['x','y','z'].indexOf(axis)] : expressions?.[axis];
+		if(typeof expression === 'number') return expression;
+		if(typeof expression !== 'string' || !expression.trim()) return current[axis];
+		try { return evaluateNumericExpression(expression, variables); } catch (_error) { return current[axis]; }
+	};
+	object3D[property].set(evaluateAxis('x'), evaluateAxis('y'), evaluateAxis('z'));
+}
+
 /** Apply all enabled animations configured on a single Object3D. */
 function updateObjectAnimations(currObj, deltaSeconds){
 	const mode = getAnimationMode(currObj);
@@ -82,6 +155,10 @@ function updateObjectAnimations(currObj, deltaSeconds){
 		}
 		if('rotate' === animation.type){
 			applyRotateAnimation(currObj, animation, deltaSeconds);
+		} else if('transform' === animation.type || 'tween' === animation.type){
+			applyTransformAnimation(currObj, animation, deltaSeconds, i);
+		} else if('expression' === animation.type){
+			applyExpressionAnimation(currObj, animation, deltaSeconds, i);
 		}
 	}
 }

@@ -250,8 +250,8 @@ MeshRecord:
   "glassKind": "clear"|"tinted"|"frosted" (when objType is glass),
   "geometry": { ... see primitive geometry table ... },
   "position": { "x", "y", "z" },
-  "rotation": { "rotationX", "rotationY", "rotationZ" } (optional),
-  "scale": { "scaleX", "scaleY", "scaleZ" } (optional),
+  "rotation": { "x", "y", "z" } or [x,y,z] (optional, radians; safe formulas such as "PI/2" accepted),
+  "scale": { "x", "y", "z" } or [x,y,z] (optional),
   "material": {
     "type": "standard"|"phong"|"lambert"|"basic"|"dynamicBox",
     "color": "#RRGGBB",
@@ -338,7 +338,7 @@ Output requirement:
 - Strict JSON only: every value must be a JSON literal (number, string, boolean, null, object, array).
 - Do NOT use JavaScript expressions or identifiers: no Math.PI, no 3.14 / 2, no undefined, no trailing commas, no comments.
 - Omit every unused scene collection property. Never output empty placeholder arrays such as boxModelList: [], sphereModelList: [], modelList: [], lineList: [], domainModelList: [], or objectList: [].
-- For rotations use decimal radians (e.g. rotationZ: 1.5708 for 90°, 3.14159 for 180°).
+- For rotations use x/y/z radians; numeric formula strings are accepted (e.g. "PI/2" for 90°, "PI" for 180°).
 `;
 
 const THREE_JSON_PARTICLE_DISABLED_POLICY = `
@@ -405,8 +405,8 @@ Standard ThreeJSON scheme B (the only format permitted for AI output):
       "objType": string,
       "geometry"?: object,
       "position"?: { "x": number, "y": number, "z": number },
-      "rotation"?: { "rotationX": number, "rotationY": number, "rotationZ": number },
-      "scale"?: { "scaleX": number, "scaleY": number, "scaleZ": number },
+      "rotation"?: { "x": number|string, "y": number|string, "z": number|string } | [number|string, number|string, number|string],
+      "scale"?: { "x": number|string, "y": number|string, "z": number|string } | [number|string, number|string, number|string],
       "material"?: object,
       "events"?: object,
       "animations"?: array,
@@ -428,6 +428,20 @@ B) Domain object and static label:
 
 C) Interactive panel:
 {"version":"next","threeJsonId":"demo-panel","sceneConfig":{"scene":{"background":"#1a1a2e"},"camera":{"fov":55,"position":{"x":0,"y":6,"z":12}},"controls":{"target":{"x":0,"y":2,"z":0}},"lights":[{"type":"ambient","intensity":0.5},{"type":"directional","intensity":1,"position":{"x":5,"y":10,"z":8}}]},"objectList":[{"threeJsonId":"panel-1","objType":"css3dPanel","html":"<button>Start</button>","panel":{"position":{"x":0,"y":2,"z":0},"geometry":{"width":4,"height":3,"depth":0.1}}}]}
+`;
+
+const THREE_JSON_ANIMATION_CAPABILITY = `
+Optional ThreeJSON animation/event capability (include only when negotiated for this turn):
+- Prefer declarative per-frame animations for continuous smooth motion; they are advanced by sceneConfig.renderLoop and stop automatically when an object leaves the scene.
+- Smooth transform tween: "animations":[{"type":"transform","property":"position"|"rotation"|"scale","from":{"x":0,"y":0,"z":0},"to":{"x":10,"y":0,"z":0},"duration":1000,"delay":0,"repeat":true|integer,"yoyo":true}].
+- Generic formula motion: "animations":[{"type":"expression","property":"position","expressions":{"x":"10*cos(t)","y":"0","z":"6*sin(t)"}}]. Formula variables: t/time seconds, delta seconds, progress; constants PI/E/TAU; functions sin/cos/tan/sqrt/abs/min/max/pow.
+- Finite event/lifecycle sequences use actions or EventScript DSL. JSON lifecycle events are scene.ready/scene.dispose and object.ready/object.dispose. Do not invent host-only load hooks in JSON.
+- EventScript DSL supports var, if/else, while, repeat(count), for(var i=...;...;i=i+1), break/continue, await wait(ms), object refs, arithmetic + - * / % **, PI/E/TAU and math functions. maxSteps still limits runaway loops.
+- Do not put an endless loop inside scene.ready/object.ready: lifecycle dispatch awaits the script. Use declarative animations for continuous behavior.
+- Object handles support show/hide, moveBy/setPosition, rotateBy/setRotation, scaleBy/setScale. Declarative actions support object.set/toggleVisible, move/setPosition, rotate/setRotation, scale/setScale and object.patch.
+- Runtime transforms use position/rotation/scale as {x,y,z} or [x,y,z]. Rotation values are radians and may be formula strings such as "PI/2". Legacy rotationX/scaleX input is read for compatibility but never emit it.
+- External scripts use events.<event>.script with an HTTP(S)/relative URL or lib://token. lib entries use assetKind:"eventScript" and source or url. Keep JavaScript mode off unless trusted code is explicitly required.
+- Multi-part character motion requires pivot groups at hips/shoulders/neck; animate pivots and the root group, not limb geometry around its center.
 `;
 
 function onlineTextureHintsEnabled(options = {}) {
@@ -452,13 +466,17 @@ function filterParticleCapabilityLines(text, options = {}) {
 
 /** @returns {string} Shared catalog block for scene prompts. */
 function buildSceneCapabilityCatalog(options = {}) {
-  return [
+  const blocks = [
     buildAgentCapabilityIndex({ onlineTextureHints: onlineTextureHintsExplicitlyEnabled(options) }).trim(),
     THREE_JSON_STANDARD_AI_CAPABILITY_CATALOG.trim(),
     THREE_JSON_PRIMITIVE_GEOMETRY.trim(),
     THREE_JSON_AGENT_EXAMPLE_INDEX.trim(),
     THREE_JSON_STANDARD_FEW_SHOT_EXAMPLES.trim()
-  ].map((block) => filterParticleCapabilityLines(block, options)).join("\n\n");
+  ];
+  if (options.animationCapabilities === true) {
+    blocks.push(THREE_JSON_ANIMATION_CAPABILITY.trim());
+  }
+  return blocks.map((block) => filterParticleCapabilityLines(block, options)).join("\n\n");
 }
 
 /** @returns {string} Scene authoring rules plus optional host-configured online texture guidance. */

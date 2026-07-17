@@ -8,6 +8,12 @@ This document describes **host applications** built on ThreeJSON core (scene edi
 
 Done: the scene editor/player have moved from single root-level files to the modular [`tools/scene-host/`](../../tools/scene-host/) rebuild (contracts unchanged); scene-host is now the recommended entry point. The old single-file pages were relocated to [`tools/old_version/`](../../tools/old_version/) as a read-only archive.
 
+### scene-host application dependency boundary
+
+`editor/`, `player/`, `shower/`, and `threebox/` are independent host applications. They must not directly import, dynamically import, or load JS/CSS from another application's directory. Stable common code belongs in `tools/scene-host/shared/`; otherwise each application keeps its own implementation. The shared layer must not reverse-import application internals.
+
+`scene-host/shared/` is private to applications inside `scene-host`. Independent hosts such as `room-show.html` and `port-show.html` must use public core/domain APIs and implement host-specific interaction locally. Navigating to another application or exchanging scenes through an explicit message protocol is integration, not permission to call its internal methods. These constraints are guarded by [`tests/architectureDependencies.test.mjs`](../../tests/architectureDependencies.test.mjs).
+
 ## Ecosystem overview
 
 | Component | Path | Notes |

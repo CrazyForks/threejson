@@ -8,7 +8,7 @@ import {
   pickHostedContainerDoorTarget,
   tryToggleCabinetDoorFromNode,
   tryToggleUpsDoorFromNode
-} from "../core/host/hostedContainerDoor.js";
+} from "../tools/scene-host/shared/js/hostedContainerDoor.js";
 import { resolveDoorForAnimation } from "../domains/door/doorKinematics.js";
 import { updateEngineTweens } from "../core/compat/adapters/tween.js";
 

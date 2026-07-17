@@ -17,8 +17,8 @@ function cloneRecord(record) {
 function defaultTransformTriple() {
   return {
     position: { x: 0, y: 0, z: 0 },
-    rotation: { rotationX: 0, rotationY: 0, rotationZ: 0 },
-    scale: { scaleX: 1, scaleY: 1, scaleZ: 1 }
+    rotation: { x: 0, y: 0, z: 0 },
+    scale: { x: 1, y: 1, z: 1 }
   };
 }
 

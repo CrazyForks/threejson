@@ -1,31 +1,20 @@
 import { recordHasExplicitRotation } from "./shapeGeometryUtil.js";
+import { resolvePosition, resolveRotation, resolveScale } from "../util/vectorValue.js";
 
 function hasValue(value) {
   return value !== undefined && value !== null;
 }
 
 function normalizePosition(position = {}) {
-  return {
-    x: Number(hasValue(position.x) ? position.x : 0),
-    y: Number(hasValue(position.y) ? position.y : 0),
-    z: Number(hasValue(position.z) ? position.z : 0)
-  };
+  return resolvePosition(position);
 }
 
 function normalizeRotation(rotation = {}) {
-  return {
-    rotationX: Number(hasValue(rotation.rotationX) ? rotation.rotationX : 0),
-    rotationY: Number(hasValue(rotation.rotationY) ? rotation.rotationY : 0),
-    rotationZ: Number(hasValue(rotation.rotationZ) ? rotation.rotationZ : 0)
-  };
+  return resolveRotation(rotation);
 }
 
 function normalizeScale(scale = {}) {
-  return {
-    scaleX: Number(hasValue(scale.scaleX) ? scale.scaleX : 1),
-    scaleY: Number(hasValue(scale.scaleY) ? scale.scaleY : 1),
-    scaleZ: Number(hasValue(scale.scaleZ) ? scale.scaleZ : 1)
-  };
+  return resolveScale(scale);
 }
 
 /**
@@ -37,11 +26,11 @@ export function applyParallelToOrRotation(object3D, record = {}) {
   object3D.position.set(position.x, position.y, position.z);
 
   const scale = normalizeScale(record.scale);
-  object3D.scale.set(scale.scaleX, scale.scaleY, scale.scaleZ);
+  object3D.scale.set(scale.x, scale.y, scale.z);
 
   if (recordHasExplicitRotation(record)) {
     const rotation = normalizeRotation(record.rotation);
-    object3D.rotation.set(rotation.rotationX, rotation.rotationY, rotation.rotationZ);
+    object3D.rotation.set(rotation.x, rotation.y, rotation.z);
     return;
   }
 

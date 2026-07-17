@@ -1,6 +1,6 @@
 import { createSceneHostSysConfig } from "./createSceneHostSysConfig.js";
 
-/** Editor adapter over the host-neutral sysConfig baseline. */
-export function createEditorSysConfig() {
+/** Player adapter over the host-neutral sysConfig baseline. */
+export function createPlayerSysConfig() {
   return createSceneHostSysConfig();
 }

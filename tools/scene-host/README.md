@@ -43,12 +43,22 @@ scene-host **复制**常量与字段形状，不 import 旧版代码。
 ```text
 tools/scene-host/
   README.md
-  shared/          # editor + player 共用（runtime、settings、sceneLoad、CSS tokens）
+  shared/          # 仅供本目录内应用共用（runtime、settings、sceneLoad、CSS tokens）
   editor/          # 编辑器（正式版）
   player/          # 播放器（正式版）
+  shower/          # 场景展示器
+  threebox/        # AI 场景工作台
   desktop/         # Electron 双入口
   scripts/         # 从旧版归档复制用的维护脚本（非运行时）
 ```
+
+## 应用依赖边界
+
+- `editor/`、`player/`、`shower/`、`threebox/` 之间禁止直接 import、动态 import、加载对方内部 JS/CSS；公共运行时代码必须下沉到 `shared/`。
+- `shared/` 禁止反向 import 任一应用内部模块。
+- `shared/` 是 **scene-host 私有共享层**。`room-show.html`、`port-show.html` 等独立宿主不得依赖它；无法下沉到 core/domain 中性 API 的宿主交互由各应用自行实现。
+- 应用间打开页面、通过明确协议传递场景属于宿主集成，不代表允许复用对方内部实现。
+- 自动守卫位于 `tests/architectureDependencies.test.mjs`。
 
 ## 实施阶段（历史记录）
 

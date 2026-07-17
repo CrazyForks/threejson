@@ -57,7 +57,8 @@ export async function bindEventsFromRecord(object3D, options = {}) {
       threeJsonId: metadata.threeJsonId,
       eventName,
       sceneJsonRoot: options.sceneJsonRoot,
-      assetLibrary: options.assetLibrary
+      assetLibrary: options.assetLibrary,
+      runtimeScope: options.runtimeScope ?? object3D
     });
     if (!resolved && actions.length === 0) {
       continue;

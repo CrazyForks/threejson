@@ -16,33 +16,22 @@ import {
 } from './rasterizeHeatmap.js';
 import { createHeatmapVolumeMaterial, updateHeatmapVolumeUniforms } from './heatmapVolumeMaterial.js';
 import { applyVisibilityFromDescriptor } from '../../util/util.js';
+import { resolvePosition, resolveRotation, resolveScale } from '../../util/vectorValue.js';
 
 function hasValue(value) {
     return value !== undefined && value !== null;
 }
 
 function normalizePosition(position = {}) {
-    return {
-        x: hasValue(position.x) ? position.x : 0,
-        y: hasValue(position.y) ? position.y : 0,
-        z: hasValue(position.z) ? position.z : 0
-    };
+    return resolvePosition(position);
 }
 
 function normalizeRotation(rotation = {}) {
-    return {
-        rotationX: hasValue(rotation.rotationX) ? rotation.rotationX : 0,
-        rotationY: hasValue(rotation.rotationY) ? rotation.rotationY : 0,
-        rotationZ: hasValue(rotation.rotationZ) ? rotation.rotationZ : 0
-    };
+    return resolveRotation(rotation);
 }
 
 function normalizeScale(scale = {}) {
-    return {
-        scaleX: hasValue(scale.scaleX) ? scale.scaleX : 1,
-        scaleY: hasValue(scale.scaleY) ? scale.scaleY : 1,
-        scaleZ: hasValue(scale.scaleZ) ? scale.scaleZ : 1
-    };
+    return resolveScale(scale);
 }
 
 /**
@@ -56,8 +45,8 @@ function applyObjectTransform(object3D, source = {}) {
     const scale = normalizeScale(source.scale);
 
     object3D.position.set(position.x, position.y, position.z);
-    object3D.rotation.set(rotation.rotationX, rotation.rotationY, rotation.rotationZ);
-    object3D.scale.set(scale.scaleX, scale.scaleY, scale.scaleZ);
+    object3D.rotation.set(rotation.x, rotation.y, rotation.z);
+    object3D.scale.set(scale.x, scale.y, scale.z);
 }
 
 /**

@@ -18,6 +18,7 @@ import {
   normalizeHelpersConfig
 } from "../builder/sceneHelperBuilder.js";
 import { normalizeIntroConfig } from "../runtime/sceneIntroConfig.js";
+import { resolvePosition, resolveRotation, resolveScale } from "../util/vectorValue.js";
 import {
   JSON_ORIGIN_CONFIG,
   JSON_ORIGIN_LIST,
@@ -469,6 +470,31 @@ function normalizeCanonicalObjectRecord(record, options = {}) {
     return null;
   }
   record = applyLegacyGeometryObjTypeAlias(record) ?? record;
+  record = cloneRecord(record) ?? record;
+  if (hasOwn(record, "position")) record.position = resolvePosition(record.position);
+  if (hasOwn(record, "rotation")) record.rotation = resolveRotation(record.rotation);
+  if (hasOwn(record, "scale")) record.scale = resolveScale(record.scale);
+  if (record.panel && typeof record.panel === "object" && !Array.isArray(record.panel)) {
+    record.panel = { ...record.panel };
+    if (hasOwn(record.panel, "position")) record.panel.position = resolvePosition(record.panel.position);
+    if (hasOwn(record.panel, "rotation")) record.panel.rotation = resolveRotation(record.panel.rotation);
+    if (hasOwn(record.panel, "scale")) record.panel.scale = resolveScale(record.panel.scale);
+  }
+  if (Array.isArray(record.transforms)) {
+    record.transforms = record.transforms.map((entry) => ({
+      ...(entry && typeof entry === "object" ? entry : {}),
+      ...(entry && Object.prototype.hasOwnProperty.call(entry, "position") ? { position: resolvePosition(entry.position) } : {}),
+      ...(entry && Object.prototype.hasOwnProperty.call(entry, "rotation") ? { rotation: resolveRotation(entry.rotation) } : {}),
+      ...(entry && Object.prototype.hasOwnProperty.call(entry, "scale") ? { scale: resolveScale(entry.scale) } : {})
+    }));
+  }
+  for (const childKey of ["subScene", "boxModelList", "joins", "inters", "holes"]) {
+    if (Array.isArray(record[childKey])) {
+      record[childKey] = record[childKey]
+        .map((child) => normalizeCanonicalObjectRecord(child, { sceneConfig: options.sceneConfig }))
+        .filter(Boolean);
+    }
+  }
   if (normalizeSceneObjType(record.objType) === "default") {
     return null;
   }

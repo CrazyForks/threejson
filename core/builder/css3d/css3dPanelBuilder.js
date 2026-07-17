@@ -6,6 +6,7 @@ import { registerObject } from "../../handler/objectRegistry.js";
 import { setUserDataObjJson } from "../../handler/objectDescriptorAttach.js";
 import { applyVisibilityFromDescriptor } from "../../util/util.js";
 import { resolvePublicAssetUrl } from "../../util/assetsBase.js";
+import { resolvePosition, resolveRotation, resolveScale } from "../../util/vectorValue.js";
 import {
   DEFAULT_IFRAME_SANDBOX,
   DEFAULT_PANEL_HEIGHT_PX,
@@ -92,28 +93,21 @@ function createPanelElement(record, content, widthPx, heightPx) {
 }
 
 function applyTransform(cssObject, record) {
-  const position = record.position || record.panel?.position || {};
-  cssObject.position.set(
-    Number(valueOr(position.x, 0)),
-    Number(valueOr(position.y, 0)),
-    Number(valueOr(position.z, 0))
-  );
+  const position = resolvePosition(record.position || record.panel?.position);
+  cssObject.position.set(position.x, position.y, position.z);
 
-  const rotation = record.rotation || record.panel?.rotation || {};
-  cssObject.rotation.set(
-    THREE.MathUtils.degToRad(Number(valueOr(rotation.rotationX, 0))),
-    THREE.MathUtils.degToRad(Number(valueOr(rotation.rotationY, 0))),
-    THREE.MathUtils.degToRad(Number(valueOr(rotation.rotationZ, 0)))
-  );
+  const rotation = resolveRotation(record.rotation || record.panel?.rotation);
+  cssObject.rotation.set(rotation.x, rotation.y, rotation.z);
 
   const widthPx = Math.max(40, Number(valueOr(record.width, DEFAULT_PANEL_WIDTH_PX)));
   const worldWidth = Number(valueOr(record.panelWidth, widthPx * 0.05));
   const uniformScale = worldWidth / widthPx;
 
-  const scale = record.scale || record.panel?.scale || {};
-  const sx = hasValue(scale.scaleX) ? Number(scale.scaleX) : uniformScale;
-  const sy = hasValue(scale.scaleY) ? Number(scale.scaleY) : uniformScale;
-  const sz = hasValue(scale.scaleZ) ? Number(scale.scaleZ) : uniformScale;
+  const scaleSource = record.scale || record.panel?.scale;
+  const scale = resolveScale(scaleSource, { x: uniformScale, y: uniformScale, z: uniformScale });
+  const sx = scale.x;
+  const sy = scale.y;
+  const sz = scale.z;
   cssObject.scale.set(sx, sy, sz);
 }
 

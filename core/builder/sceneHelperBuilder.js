@@ -2,6 +2,7 @@
  * Scene helpers: GridHelper / AxesHelper (sceneConfig.helpers).
  */
 import * as THREE from "three";
+import { resolvePosition, resolveRotation } from "../util/vectorValue.js";
 import { trackDisposableResource } from "../handler/trackedResourceRegistry.js";
 import { registerObject, unregisterObject } from "../handler/objectRegistry.js";
 import { estimateSceneExtentFromPayload } from "../util/sceneRuntimeDefaults.js";
@@ -36,26 +37,18 @@ function clonePlainObject(value) {
 }
 
 function normalizePosition(position = {}) {
-  return {
-    x: Number(hasValue(position.x) ? position.x : 0),
-    y: Number(hasValue(position.y) ? position.y : 0),
-    z: Number(hasValue(position.z) ? position.z : 0)
-  };
+  return resolvePosition(position);
 }
 
 function normalizeRotation(rotation = {}) {
-  return {
-    rotationX: Number(hasValue(rotation.rotationX) ? rotation.rotationX : 0),
-    rotationY: Number(hasValue(rotation.rotationY) ? rotation.rotationY : 0),
-    rotationZ: Number(hasValue(rotation.rotationZ) ? rotation.rotationZ : 0)
-  };
+  return resolveRotation(rotation);
 }
 
 function applyHelperTransform(object3D, config = {}) {
   const position = normalizePosition(config.position);
   const rotation = normalizeRotation(config.rotation);
   object3D.position.set(position.x, position.y, position.z);
-  object3D.rotation.set(rotation.rotationX, rotation.rotationY, rotation.rotationZ);
+  object3D.rotation.set(rotation.x, rotation.y, rotation.z);
   object3D.visible = config.visible !== false;
 }
 

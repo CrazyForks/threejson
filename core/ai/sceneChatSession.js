@@ -23,6 +23,7 @@
  */
 import { requestChatCompletion, extractJsonText } from "./sceneAiService.js";
 import { sanitizeAiJsonText } from "./sceneJsonSanitize.js";
+import { THREE_JSON_AGENT_CAPABILITY_INDEX } from "./sceneCapabilityIndex.js";
 
 const DEFAULT_CLASSIFY_MAX_TOKENS = 300;
 const DEFAULT_SUMMARIZE_MAX_TOKENS = 400;
@@ -60,15 +61,15 @@ function normalizeHistoryEntries(history) {
   return out;
 }
 
-function buildClassifyIntentSystemPrompt() {
+function buildClassifyIntentSystemPrompt(animationCapabilityMode = "auto") {
   return [
-    "You are an intent router for a 3D-scene generation chat app.",
+    "You are the pre-generation negotiation model for a ThreeJSON 3D-scene app.",
     "Given the user's newest message and a list of prior conversation turns (each with a short summary), decide:",
     "- \"generate\": the user wants a brand-new scene, unrelated to (or not clearly continuing) any prior turn.",
     "- \"adjust\": the user wants to modify the scene produced by a specific prior turn.",
     "",
     "Output shape (strict):",
-    '{ "intent": "generate"|"adjust", "targetTurnId": string|null, "note": string, "generationStrategy": "single"|"segmented"|"compact", "estimatedSegments": integer }',
+    '{ "intent": "generate"|"adjust", "targetTurnId": string|null, "note": string, "generationStrategy": "single"|"segmented"|"compact", "estimatedSegments": integer, "selectedCapabilityIds": string[], "requiresAnimation": boolean }',
     "",
     "Rules:",
     '- "targetTurnId" MUST be one of the provided turn ids, or null. Never invent an id.',
@@ -78,6 +79,14 @@ function buildClassifyIntentSystemPrompt() {
     '- Choose "generationStrategy" before generation starts. "single" means the complete JSON clearly fits one response. "segmented" means the request genuinely needs multiple responses AND you can follow the host segmented-output protocol from the first response. "compact" means a literal/full expansion is too large or segmented output is unsuitable; preserve the visual intent with instancing, bounded representative populations, and fewer explicit records so complete JSON fits one response.',
     '- Complexity features are optional safeguards, not a quality setting. Never choose "segmented" merely to improve quality, reasoning, correctness, or visual detail. Never begin a large one-shot response expecting the host to repair an arbitrary cutoff later.',
     '- For "single" or "compact", estimatedSegments MUST be 1. For "segmented", use 2-16 and only when the requested JSON is clearly too large for one provider response. If you are not confident that strict segmented output is supported, choose "compact" instead.',
+    '- selectedCapabilityIds lists only the capability ids whose detailed syntax/examples the generation model needs. Do semantic reasoning; do not select capabilities merely because a keyword appears.',
+    animationCapabilityMode === "on"
+      ? '- Animation capability is explicitly enabled by the user: requiresAnimation MUST be true and selectedCapabilityIds MUST include events, lifecycle, or declarativeAnimation as appropriate.'
+      : animationCapabilityMode === "off"
+        ? '- Animation capability is explicitly disabled by the user: requiresAnimation MUST be false and do not select events/lifecycle/declarativeAnimation solely for animation.'
+        : '- Animation mode is automatic: set requiresAnimation from the requested behavior and scene meaning, not from keyword matching.',
+    '',
+    THREE_JSON_AGENT_CAPABILITY_INDEX.trim(),
     "",
     "Output requirement:",
     "Return ONLY one JSON object. No Markdown fences. No commentary before or after."
@@ -112,14 +121,16 @@ async function classifyTurnIntent(input = {}, options = {}) {
     targetTurnId: null,
     note: "",
     generationStrategy: "single",
-    estimatedSegments: 1
+    estimatedSegments: 1,
+    selectedCapabilityIds: [],
+    requiresAnimation: options.animationCapabilityMode === "on"
   };
 
   try {
     const content = await requestChatCompletion({
       ...pickChatCompletionOptions(options, DEFAULT_CLASSIFY_MAX_TOKENS),
       messages: [
-        { role: "system", content: buildClassifyIntentSystemPrompt() },
+        { role: "system", content: buildClassifyIntentSystemPrompt(options.animationCapabilityMode) },
         { role: "user", content: buildClassifyIntentUserMessage(userPrompt, historyEntries) }
       ]
     });
@@ -144,10 +155,18 @@ async function classifyTurnIntent(input = {}, options = {}) {
         : "single";
     const generationStrategy = parsedStrategy;
     const estimatedSegments = generationStrategy === "segmented" ? Math.max(2, boundedSegments) : 1;
+    const selectedCapabilityIds = Array.isArray(parsed?.selectedCapabilityIds)
+      ? [...new Set(parsed.selectedCapabilityIds.map((id) => String(id || "").trim()).filter(Boolean))].slice(0, 12)
+      : [];
+    const requiresAnimation = options.animationCapabilityMode === "on"
+      ? true
+      : options.animationCapabilityMode === "off"
+        ? false
+        : parsed?.requiresAnimation === true;
     if (intent === "adjust" && !targetTurnId) {
       return { ...fallback, note: "fallback: model chose adjust but named an unknown targetTurnId" };
     }
-    return { intent, targetTurnId, note, generationStrategy, estimatedSegments };
+    return { intent, targetTurnId, note, generationStrategy, estimatedSegments, selectedCapabilityIds, requiresAnimation };
   } catch (error) {
     return { ...fallback, note: `fallback: classification failed (${error?.message || error})` };
   }
@@ -308,6 +327,8 @@ async function generateSceneTitle(input = {}, options = {}) {
  *   globalPromptPrefix?: string|null,
  *   includeReferenceLinks?: boolean,
  *   generationStrategy?: "single"|"segmented"|"compact"
+ *   selectedCapabilityIds?: string[],
+ *   requiresAnimation?: boolean
  * }} input
  *   `includeReferenceLinks`: when true, adds a `referenceLinks` block pointing at the ThreeJSON
  *   docs site and its example-JSON repo folder — a citation only (this function does no network
@@ -336,6 +357,12 @@ function buildStructuredTurnEnvelope(input = {}) {
       docsIndex: THREE_JSON_REFERENCE_LINKS.docs,
       jsonExamples: THREE_JSON_REFERENCE_LINKS.examples
     };
+  }
+  if (Array.isArray(input?.selectedCapabilityIds) && input.selectedCapabilityIds.length > 0) {
+    envelope.selectedCapabilityIds = [...new Set(input.selectedCapabilityIds.map((id) => String(id || "").trim()).filter(Boolean))];
+  }
+  if (typeof input?.requiresAnimation === "boolean") {
+    envelope.requiresAnimation = input.requiresAnimation;
   }
   if (envelope.intent === "generate") {
     const strategy = ["single", "segmented", "compact"].includes(input?.generationStrategy)

@@ -9,7 +9,7 @@ description: Generate or modify ThreeJSON scene JSON, core command scripts, and 
 
 Provide a clear workflow for AI-driven ThreeJSON scene generation and scene updates.
 
-This skill is the human-readable guide. **Runtime LLM prompts** are assembled in `threeJsonCoreSkill.js` (scene) and `texturePrompt.js` (texture task plans). **Intent/capability matching** for post-generation review lives in `sceneCapability.js`. Editing this SKILL.md alone does not change single-turn API behavior.
+This skill is the human-readable guide. **Runtime LLM prompts** are assembled in `threeJsonCoreSkill.js` (scene) and `texturePrompt.js` (texture task plans). The supplier-model negotiation in `sceneChatSession.js` selects intent, generation strategy, capability IDs, and whether animation guidance is needed. `sceneCapability.js` remains the post-generation capability review surface. Editing this SKILL.md alone does not change single-turn API behavior.
 
 ## When To Use
 
@@ -27,7 +27,7 @@ Use this skill when the request includes one of these intents:
 
 ## Capability catalog (runtime prompts)
 
-Generation/update prompts (`threeJsonCoreSkill.js`) include the compact runtime index from `sceneCapabilityIndex.js`, then focused schema/few-shot blocks. The index covers primitives, complex/native geometry, CSG, assetLibrary, materials/texture sampling, post-processing passes, built-in domains, events/EventScript, object/scene lifecycle, audio, animationGraph, scene intro, shader/particles/weather/nature/stat/device/port capabilities, and command/Patch editing. Host-only wiring (PluginHost, extension bootstrap) is **not** auto-generated — see [`docs/zh/extensions.md`](../../docs/zh/extensions.md). Business objects use [`docs/zh/domains.md`](../../docs/zh/domains.md) — see [`docs/zh/glossary.md`](../../docs/zh/glossary.md).
+Generation/update prompts (`threeJsonCoreSkill.js`) include a compact runtime index from `sceneCapabilityIndex.js`. Before formal generation, the supplier model returns a fixed JSON negotiation result containing `intent`, `generationStrategy`, `estimatedSegments`, `selectedCapabilityIds`, and `requiresAnimation`. Core parses that response and injects the selected references and optional detailed animation block. Core must not infer animation through local keyword rules; the supplier model evaluates the complete user intent. Host-only wiring (PluginHost, extension bootstrap) is **not** auto-generated — see [`docs/zh/extensions.md`](../../docs/zh/extensions.md). Business objects use [`docs/zh/domains.md`](../../docs/zh/domains.md) — see [`docs/zh/glossary.md`](../../docs/zh/glossary.md).
 
 Use `THREE_JSON_AGENT_CAPABILITY_INDEX` as the token-cheap multi-turn lookup surface. Do not paste all docs into every turn; use the index first, then retrieve docs/examples only for a specific capability.
 
@@ -50,9 +50,10 @@ From **`threejson`** / **`threejson/core`** / **`core/index.js`** (ESM named exp
 11. `parseSceneJsonString(str)` / `extractJsonText(str)` / `resolveVisionImageUrl(image)` — parsing and image URL normalization for vision chat.
 12. `createSceneAiClient(defaultOptions?)` — merges defaults into generate/update/plan/fill/agent methods (no file I/O).
 13. `runSceneAgent(input, options?)` — optional multi-step agent; **requires `options.agent.enabled === true`**; default is single-shot. Depth: `simple` | `medium` | `deep` | `auto`. Browser agent does not persist textures to disk.
-14. Scene generation prompts describe full engine capabilities; `sceneCapability.js` infers intent hints and optional capability-fit review.
-15. `generateSceneJsonString` options: `planFirst`, `capabilityReview` (default on), `maxCapabilityReviewAttempts`, `maxTokens` (**default 6000** for generation), and optional segmented output. The chat preflight chooses `single`, `segmented`, or `compact`; planned `segmented` output starts its continuation/stitching protocol in the first response and uses the caller's `maxSceneSegments` limit (default 16, hard maximum 64). `single` and `compact` do not silently upgrade into arbitrary-cutoff continuation. If an unsegmented response genuinely hits the provider limit, generation makes at most one full compact retry from the beginning; set `compactRetryOnTruncation: false` to disable it.
+14. The supplier-model negotiation chooses relevant capability IDs before formal generation; `sceneCapability.js` performs optional post-generation capability-fit review.
+15. `generateSceneJsonString` options: `planFirst`, `capabilityReview` (default on), `maxCapabilityReviewAttempts`, `maxTokens` (**default 6000** for generation), and optional segmented output. The supplier-model negotiation chooses `single`, `segmented`, or `compact`; planned `segmented` output starts its continuation/stitching protocol in the first response and uses the caller's `maxSceneSegments` limit (default 16, hard maximum 64). `single` and `compact` do not silently upgrade into arbitrary-cutoff continuation. If an unsegmented response genuinely hits the provider limit, generation makes at most one full compact retry from the beginning; set `compactRetryOnTruncation: false` to disable it.
 16. Agent depth presets (`agentDepth.js`): `simple` runs structural repair + capability review; `medium`/`deep`/`auto` add outline/layout review. This is **business Agent depth**, not a provider/model reasoning-depth parameter.
+17. Animation capability prompting accepts `animationCapabilityMode: "auto" | "on" | "off"`. `auto` follows the supplier negotiation, `on` always injects animation guidance, and `off` never injects it.
 
 Browser global `window.ThreeJsonAI` exposes `createSceneAiClient`, `generateSceneJsonString`, `generateSceneJsonFromImage`, `updateSceneJsonString`, `resolveVisionImageUrl`, `planTextures`, `fillTextureUrls`, `createOpenAiImageProvider`, `normalizeImageRawToBlob`, `listTextureUrlPointers`, and **`runSceneAgent`** (no `updateSceneJsonFile`; avoid shipping secrets in public bundles).
 
@@ -90,6 +91,7 @@ AI output should satisfy:
 - Geometry fields for generic boxes use `width`, `height`, `depth` (not `length`).
 - Do not embed `alarmList` or page UI chrome in scene JSON.
 - Numeric values are finite and practical for scene rendering.
+- `position`, `rotation`, and `scale` accept `{ "x": ..., "y": ..., "z": ... }` or `[x, y, z]`. Rotation uses radians and numeric expressions such as `"PI / 2"`; generated JSON must not emit legacy `rotationX` or `scaleX` fields.
 - **Scene text** (`objType: "text"` in `objectList`): plain floating labels — not `infoPanelList`. Use `content`, `fontSize`, `color`, optional `mode` (`sdf` | `texture` | `mesh`).
 - **Static panels** → `infoPanelList` (baked texture). **Interactive DOM** → `css3dPanelList` (host CSS3D required). **Particles** → prefer `objType: particleEmitter`.
 - Do not put panel chrome in `objType: text` records.
@@ -99,6 +101,15 @@ AI output should satisfy:
 Use `requestUpdatedSceneEditCommands` when changing few objects, colors, or camera framing. Output is micro DSL or JSONL (`object.patch`, `material.patch`, `object.add`, `camera.fit`, etc.). Prompt rules live in `sceneCommandSkill.js`. Editor wrappers add `editor.*` separately — not in core prompts.
 
 Implementation note: `sceneAiService.extractJsonText()` may still recover JSON from Markdown fences or surrounding text; prefer teaching the model to output raw JSON only.
+
+## Lifecycle, events, scripts, and smooth animation
+
+- Use `scene.ready` for whole-scene startup, and `object.ready` / `object.dispose` for object-local setup and cleanup. Do not create an endless lifecycle script to simulate frames.
+- Use declarative actions for discrete changes: visibility, position, rotation, scale, color/material patches, and object replacement. Use canonical vector fields or arrays.
+- Use an object's `animations` `transform`/`tween` tracks for smooth position, rotation, or scale interpolation. Use `expression` tracks for deterministic per-frame formulas with `t`, `delta`, `progress`, `PI`, `TAU`, and math functions.
+- EventScript supports `if`, `while`, `repeat`, C-style `for`, `break`, `continue`, arithmetic, `PI`/`E`/`TAU`, math functions, `wait`, and object handles. For articulated motion, animate a parent group for travel and child limbs for local rotation.
+- External scripts use the unified `events.*.script` field. It accepts inline source, HTTP(S)/relative URLs, or `lib://id`; an `assetLibrary` entry with `assetKind: "eventScript"` may provide inline `source` or its own `url`. `scriptUrl` is legacy input only.
+- Physics extensions handle collision and rigid-body integration. They are not the default property-animation system and should be selected only when the requested behavior needs physical simulation.
 
 ## File Update Workflow
 

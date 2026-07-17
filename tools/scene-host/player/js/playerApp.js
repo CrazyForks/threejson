@@ -20,8 +20,8 @@ import {
   trackDisposableResource
 } from "threejson";
 import { isLoadableScenePayload } from "../../../../core/handler/sceneFriendlyNormalizer.js";
-import { buildEditorScenePayload } from "../../shared/js/buildEditorRuntimeConfig.js";
-import { createEditorSysConfig } from "../../shared/js/createEditorSysConfig.js";
+import { buildPlayerScenePayload } from "../../shared/js/buildPlayerRuntimeConfig.js";
+import { createPlayerSysConfig } from "../../shared/js/createPlayerSysConfig.js";
 import { resolveSceneHostUrl, sceneHostAssetUrl } from "../../shared/js/sceneHostPaths.js";
 import {
   fetchPlayerSettingsFileDefaults,
@@ -113,7 +113,7 @@ export async function bootstrapPlayerApp() {
   const playlistContextCopyNameBtn = document.getElementById("playlistContextCopyNameBtn");
   const playlistContextRemoveBtn = document.getElementById("playlistContextRemoveBtn");
 
-  const sysConfig = createEditorSysConfig();
+  const sysConfig = createPlayerSysConfig();
   let playerSettings = null;
   let playerSettingsFileDefaults = null;
   let scene = null;
@@ -628,7 +628,7 @@ export async function bootstrapPlayerApp() {
 
   async function initSceneRuntime() {
     await waitCanvasLayout();
-    const payload = buildEditorScenePayload(sysConfig, playerSettings);
+    const payload = buildPlayerScenePayload(sysConfig, playerSettings);
     sceneRuntime = await createJsonScene(payload, buildCreateJsonSceneOptions());
     assignRuntime(sceneRuntime);
     const normalized = sceneRuntime?.normalizedPayload;

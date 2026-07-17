@@ -33,6 +33,31 @@ test("parseEventScript supports unary minus on identifiers", () => {
   assert.equal(moveCall.args[0].operator, "-");
 });
 
+test("EventScript supports arithmetic, PI, repeat, while and for loops", async () => {
+  clearObjectRegistry();
+  const mesh = new THREE.Mesh();
+  setUserDataObjJson(mesh, {
+    threeJsonId: "tj-loop-math",
+    objType: "box",
+    position: { x: 0, y: 0, z: 0 },
+    rotation: { x: 0, y: 0, z: 0 }
+  });
+  registerObject(mesh, mesh.userData.objJson, { recursive: false });
+  await runEventScript(
+    [
+      "repeat (2) { self.moveBy(1 + 1, 0, 0) }",
+      "var i = 0",
+      "while (i < 2) { i = i + 1; self.moveBy(1, 0, 0) }",
+      "for (var j = 0; j < 2; j = j + 1) { self.moveBy(1, 0, 0) }",
+      "self.setRotation(0, PI / 2, 0)"
+    ].join("\n"),
+    { object: mesh, threeJsonId: "tj-loop-math", eventName: "click" }
+  );
+  assert.equal(mesh.position.x, 8);
+  assert.ok(Math.abs(mesh.rotation.y - Math.PI / 2) < 1e-12);
+  clearObjectRegistry();
+});
+
 test("runEventScript applies unary minus variable in moveBy", async () => {
   clearObjectRegistry();
   const mesh = new THREE.Mesh();
@@ -126,6 +151,28 @@ test("resolveEventScriptSource resolves lib:// eventScript entries", async () =>
   }, { threeJsonId: "tj-lib" });
   assert.equal(resolved?.kind, "lib");
   assert.equal(resolved?.source, "self.moveBy(1,0,0)");
+});
+
+test("resolveEventScriptSource fetches a URL mounted by an eventScript library entry", async () => {
+  const originalFetch = globalThis.fetch;
+  registerAssetLibrary([{
+    threeJsonId: "script-external-move",
+    assetKind: "eventScript",
+    url: "https://example.invalid/move.eventscript"
+  }]);
+  globalThis.fetch = async (url) => ({
+    ok: String(url).includes("move.eventscript"),
+    text: async () => "self.moveBy(2,0,0)"
+  });
+  try {
+    const resolved = await resolveEventScriptSource({
+      script: "lib://script-external-move"
+    }, { threeJsonId: "tj-lib-url" });
+    assert.equal(resolved?.kind, "lib");
+    assert.equal(resolved?.source, "self.moveBy(2,0,0)");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("core binding executor runs JSON script binding", async () => {

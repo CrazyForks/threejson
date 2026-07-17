@@ -4,6 +4,7 @@
 import * as THREE from "three";
 
 import { applyVisibilityFromDescriptor } from "../../util/util.js";
+import { resolvePosition, resolveRotation, resolveScale } from "../../util/vectorValue.js";
 
 const TEXT_MODES = new Set(["texture", "sdf", "mesh"]);
 
@@ -93,27 +94,15 @@ export function resolveTextRecord(record = {}) {
 }
 
 function normalizePosition(position = {}) {
-  return {
-    x: Number(valueOr(position.x, 0)),
-    y: Number(valueOr(position.y, 0)),
-    z: Number(valueOr(position.z, 0))
-  };
+  return resolvePosition(position);
 }
 
 function normalizeRotation(rotation = {}) {
-  return {
-    rotationX: Number(valueOr(rotation.rotationX, 0)),
-    rotationY: Number(valueOr(rotation.rotationY, 0)),
-    rotationZ: Number(valueOr(rotation.rotationZ, 0))
-  };
+  return resolveRotation(rotation);
 }
 
 function normalizeScale(scale = {}) {
-  return {
-    scaleX: Number(valueOr(scale.scaleX, 1)),
-    scaleY: Number(valueOr(scale.scaleY, 1)),
-    scaleZ: Number(valueOr(scale.scaleZ, 1))
-  };
+  return resolveScale(scale);
 }
 
 /**
@@ -125,8 +114,8 @@ export function applyTextTransform(object3D, record) {
   const rotation = normalizeRotation(record?.rotation);
   const scale = normalizeScale(record?.scale);
   object3D.position.set(position.x, position.y, position.z);
-  object3D.rotation.set(rotation.rotationX, rotation.rotationY, rotation.rotationZ);
-  object3D.scale.set(scale.scaleX, scale.scaleY, scale.scaleZ);
+  object3D.rotation.set(rotation.x, rotation.y, rotation.z);
+  object3D.scale.set(scale.x, scale.y, scale.z);
   applyVisibilityFromDescriptor(object3D, record);
 }
 

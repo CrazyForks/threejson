@@ -12,6 +12,7 @@ import { resolvePointsBlending } from "../pointsBuilder.js";
 import { PARTICLE_EMITTER_DEFAULT_OPACITY } from "../../theme/runtimeVisualDefaults.js";
 import { resolveDriftVelocityFromRecord, resolveParticleTextureSize } from "./particleComputeUtil.js";
 import { resolveRuntimeContext } from "../../runtime/runtimeContext.js";
+import { resolvePosition, resolveRotation, resolveScale } from "../../util/vectorValue.js";
 
 export { resolveParticleTextureSize } from "./particleComputeUtil.js";
 
@@ -280,24 +281,12 @@ function buildParticleShaderMaterial(record) {
 }
 
 function applyObjectTransform(object3D, record = {}) {
-  const position = record.position && typeof record.position === "object" ? record.position : {};
-  const rotation = record.rotation && typeof record.rotation === "object" ? record.rotation : {};
-  const scale = record.scale && typeof record.scale === "object" ? record.scale : {};
-  object3D.position.set(
-    Number(valueOr(position.x, 0)),
-    Number(valueOr(position.y, 0)),
-    Number(valueOr(position.z, 0))
-  );
-  object3D.rotation.set(
-    Number(valueOr(rotation.rotationX, 0)),
-    Number(valueOr(rotation.rotationY, 0)),
-    Number(valueOr(rotation.rotationZ, 0))
-  );
-  object3D.scale.set(
-    Number(valueOr(scale.scaleX, 1)),
-    Number(valueOr(scale.scaleY, 1)),
-    Number(valueOr(scale.scaleZ, 1))
-  );
+  const position = resolvePosition(record.position);
+  const rotation = resolveRotation(record.rotation);
+  const scale = resolveScale(record.scale);
+  object3D.position.set(position.x, position.y, position.z);
+  object3D.rotation.set(rotation.x, rotation.y, rotation.z);
+  object3D.scale.set(scale.x, scale.y, scale.z);
   applyVisibilityFromDescriptor(object3D, record);
 }
 

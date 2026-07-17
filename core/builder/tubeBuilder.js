@@ -8,6 +8,7 @@ import { registerObject } from "../handler/objectRegistry.js";
 import { setUserDataObjJson } from "../handler/objectDescriptorAttach.js";
 import { applyVisibilityFromDescriptor } from "../util/util.js";
 import { buildCurveFromPathDef } from "../util/tubePath.js";
+import { resolvePosition, resolveRotation, resolveScale } from "../util/vectorValue.js";
 
 function hasValue(value) {
   return value !== undefined && value !== null;
@@ -18,27 +19,15 @@ function valueOr(value, fallback) {
 }
 
 function normalizePosition(position = {}) {
-  return {
-    x: Number(valueOr(position.x, 0)),
-    y: Number(valueOr(position.y, 0)),
-    z: Number(valueOr(position.z, 0))
-  };
+  return resolvePosition(position);
 }
 
 function normalizeRotation(rotation = {}) {
-  return {
-    rotationX: Number(valueOr(rotation.rotationX, 0)),
-    rotationY: Number(valueOr(rotation.rotationY, 0)),
-    rotationZ: Number(valueOr(rotation.rotationZ, 0))
-  };
+  return resolveRotation(rotation);
 }
 
 function normalizeScale(scale = {}) {
-  return {
-    scaleX: Number(valueOr(scale.scaleX, 1)),
-    scaleY: Number(valueOr(scale.scaleY, 1)),
-    scaleZ: Number(valueOr(scale.scaleZ, 1))
-  };
+  return resolveScale(scale);
 }
 
 function applyMeshTransform(mesh, record) {
@@ -46,8 +35,8 @@ function applyMeshTransform(mesh, record) {
   const rotation = normalizeRotation(record.rotation);
   const scale = normalizeScale(record.scale);
   mesh.position.set(position.x, position.y, position.z);
-  mesh.rotation.set(rotation.rotationX, rotation.rotationY, rotation.rotationZ);
-  mesh.scale.set(scale.scaleX, scale.scaleY, scale.scaleZ);
+  mesh.rotation.set(rotation.x, rotation.y, rotation.z);
+  mesh.scale.set(scale.x, scale.y, scale.z);
   applyVisibilityFromDescriptor(mesh, record);
 }
 

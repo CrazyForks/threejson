@@ -176,3 +176,14 @@ test("buildStructuredTurnEnvelope carries the negotiated compact generation stra
   assert.equal(envelope.generationConstraints.completeJsonInOneResponse, true);
   assert.match(envelope.generationConstraints.instruction, /instancedList\/transforms/);
 });
+
+test("buildStructuredTurnEnvelope carries negotiated capabilities", () => {
+  const envelope = JSON.parse(buildStructuredTurnEnvelope({
+    userPrompt: "animate it",
+    intent: "generate",
+    selectedCapabilityIds: ["events", "declarativeAnimation"],
+    requiresAnimation: true
+  }));
+  assert.deepEqual(envelope.selectedCapabilityIds, ["events", "declarativeAnimation"]);
+  assert.equal(envelope.requiresAnimation, true);
+});

@@ -6,6 +6,11 @@ const KEYWORDS = new Set([
   "var",
   "if",
   "else",
+  "while",
+  "repeat",
+  "for",
+  "break",
+  "continue",
   "await",
   "wait",
   "run",
@@ -107,7 +112,7 @@ export function tokenizeEventScript(source) {
       continue;
     }
 
-    if (/[0-9]/.test(ch) || (ch === "-" && /[0-9]/.test(peek(1)))) {
+    if (/[0-9]/.test(ch) || (ch === "." && /[0-9]/.test(peek(1)))) {
       const start = i;
       let value = ch;
       advance();
@@ -143,24 +148,18 @@ export function tokenizeEventScript(source) {
       advance(3);
       continue;
     }
-    if (two === "==" || two === "!=" || two === "<=" || two === ">=" || two === "&&" || two === "||") {
+    if (two === "**" || two === "==" || two === "!=" || two === "<=" || two === ">=" || two === "&&" || two === "||") {
       emit("op", two, start, i + 2);
       advance(2);
       continue;
     }
-    if (ch === "=" || ch === "!" || ch === "<" || ch === ">") {
+    if (ch === "=" || ch === "!" || ch === "<" || ch === ">" || ch === "+" || ch === "-" || ch === "*" || ch === "/" || ch === "%" || ch === "^") {
       emit("op", ch, start, i + 1);
       advance();
       continue;
     }
     if (ch === "(" || ch === ")" || ch === "{" || ch === "}" || ch === "," || ch === ";" || ch === ".") {
       emit("punct", ch, start, i + 1);
-      advance();
-      continue;
-    }
-
-    if (ch === "-" && !/[0-9]/.test(peek(1))) {
-      emit("op", "-", start, i + 1);
       advance();
       continue;
     }

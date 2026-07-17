@@ -140,14 +140,18 @@ export async function runThreeBoxGenerateTurn({
   onlineTextureHints,
   generationStrategy = "single",
   estimatedSegments,
-  maxSceneSegments
+  maxSceneSegments,
+  selectedCapabilityIds,
+  requiresAnimation
 }) {
   const envelope = buildStructuredTurnEnvelope({
     userPrompt,
     intent: "generate",
     globalPromptPrefix,
     includeReferenceLinks,
-    generationStrategy
+    generationStrategy,
+    selectedCapabilityIds,
+    requiresAnimation
   });
   if (agentOptions?.enabled) {
     const result = await runSceneAgent(
@@ -166,6 +170,8 @@ export async function runThreeBoxGenerateTurn({
         estimatedSegments,
         segmentedOutput: generationStrategy === "segmented",
         maxSceneSegments,
+        selectedCapabilityIds,
+        animationCapabilities: requiresAnimation === true,
         onGenerationPhase,
         applyDraftCommands: applyThreeBoxDraftCommands,
         locale,
@@ -187,6 +193,8 @@ export async function runThreeBoxGenerateTurn({
     estimatedSegments,
     segmentedOutput: generationStrategy === "segmented",
     maxSceneSegments,
+    selectedCapabilityIds,
+    animationCapabilities: requiresAnimation === true,
     locale
   });
   const sceneJson = parseSceneJsonString(sceneJsonString);
@@ -310,6 +318,8 @@ async function runThreeBoxAgentAdjustTurn({
   locale,
   capabilityLookup,
   onlineTextureHints,
+  selectedCapabilityIds,
+  animationCapabilities,
   signal
 }) {
   const mode = mapThreeBoxUpdateModeToAgentInput(updateOutputMode);
@@ -336,6 +346,9 @@ async function runThreeBoxAgentAdjustTurn({
         agent: { enabled: true, depth: agentOptions.depth || "medium" },
         resolveReferenceUrl: resolveThreeBoxReferenceUrl,
         capabilityLookup,
+        onlineTextureHints,
+        selectedCapabilityIds,
+        animationCapabilities,
         locale,
         signal,
         onProgress: onAgentProgress
@@ -389,6 +402,8 @@ async function runThreeBoxAgentAdjustTurn({
         resolveReferenceUrl: resolveThreeBoxReferenceUrl,
         capabilityLookup,
         onlineTextureHints,
+        selectedCapabilityIds,
+        animationCapabilities,
         locale,
         signal,
         applyCommands,
@@ -466,6 +481,8 @@ export async function runThreeBoxAdjustTurn({
   locale,
   capabilityLookup,
   onlineTextureHints,
+  selectedCapabilityIds,
+  animationCapabilities,
   signal
 }) {
   if (agentOptions?.enabled) {
@@ -481,6 +498,8 @@ export async function runThreeBoxAdjustTurn({
       locale,
       capabilityLookup,
       onlineTextureHints,
+      selectedCapabilityIds,
+      animationCapabilities,
       signal
     });
   }
@@ -499,6 +518,8 @@ export async function runThreeBoxAdjustTurn({
         resolveReferenceUrl: resolveThreeBoxReferenceUrl,
         capabilityLookup,
         onlineTextureHints,
+        selectedCapabilityIds,
+        animationCapabilities,
         locale
       }
     );
@@ -540,6 +561,9 @@ export async function runThreeBoxAdjustTurn({
       signal,
       resolveReferenceUrl: resolveThreeBoxReferenceUrl,
       capabilityLookup,
+      onlineTextureHints,
+      selectedCapabilityIds,
+      animationCapabilities,
       locale
     });
     return {
@@ -560,6 +584,9 @@ export async function runThreeBoxAdjustTurn({
     signal,
     resolveReferenceUrl: resolveThreeBoxReferenceUrl,
     capabilityLookup,
+    onlineTextureHints,
+    selectedCapabilityIds,
+    animationCapabilities,
     locale
   });
   return { stage: "json-full", sceneJson: parseSceneJsonString(fullJsonString), sceneJsonString: fullJsonString };

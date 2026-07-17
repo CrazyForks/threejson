@@ -47,7 +47,7 @@ Domains:
 
 Interaction and lifecycle:
 - Use events on deployable objects for click/dblclick/pointer/keyboard plus scene.ready, scene.dispose, object.ready, object.dispose.
-- Prefer actions for simple toggles/moves/patches; use EventScript DSL for short sequences: self.moveBy(...), wait(ms), ref("id"), run object.patch ...
+- Prefer actions for simple toggles/moves/patches; use EventScript DSL for finite sequences. Detailed animation/script syntax is injected only when pre-generation negotiation selects it.
 - sceneConfig.eventScript configures DSL/javascript mode, maxSteps, and allowed run commands. Keep scripts short and scene-local.
 - object lifecycle can be enabled with sceneConfig.interaction.enableObjectLifecycle when object.ready/object.dispose behavior matters.
 
@@ -74,7 +74,7 @@ const THREE_JSON_AGENT_EXAMPLE_INDEX = `
 Capability patterns:
 - Domain object: objectList item with objType domain + domain + handler + payload/items/options.
 - Interactive object: add events.click.actions with object.toggleVisible / object.moveBy, or events.click.script for short EventScript.
-- Lifecycle intro/spawn: use sceneConfig.intro.postLoad for a splash; use events["object.ready"] for per-object creation motion.
+- Lifecycle intro/spawn: use sceneConfig.intro.postLoad for a splash; use events["object.ready"] for finite per-object creation motion. Use declarative per-frame animation for continuous motion.
 - Animated imported model: externalModel with animationMode "mixer", renderLoop.updateAnimations true, and animationGraph { parameters, states, transitions }.
 - Dashboard: stat domain records for charts + infoPanel for static labels + css3dPanel only for interactive DOM.
 - Advanced shape: native geometry.type or shapeExtrude/irregularGeometry; do not approximate all curved/custom shapes as boxes.

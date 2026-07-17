@@ -889,6 +889,26 @@ test("classifyTurnIntent negotiates a compact strategy even when there are no pr
   assert.equal(result.estimatedSegments, 1);
 });
 
+test("classifyTurnIntent returns model-negotiated capability ids and animation decision", async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      choices: [{ message: { content: '{"intent":"generate","targetTurnId":null,"note":"motion requested","generationStrategy":"single","estimatedSegments":1,"selectedCapabilityIds":["events","lifecycle","declarativeAnimation"],"requiresAnimation":true}' } }]
+    })
+  });
+  try {
+    const result = await classifyTurnIntent(
+      { userPrompt: "make a character move", history: [] },
+      { provider: "chatgpt", apiKey: "test-key", animationCapabilityMode: "auto" }
+    );
+    assert.deepEqual(result.selectedCapabilityIds, ["events", "lifecycle", "declarativeAnimation"]);
+    assert.equal(result.requiresAnimation, true);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test("requestSceneRefinementStep recognizes done, JSON Patch, and commands", async () => {
   const scene = JSON.stringify({
     threeJsonId: "refinement-scene",

@@ -165,11 +165,11 @@ export function createTextureText(parent, record) {
     trackDisposableResource(mat);
     object3D = new THREE.Sprite(mat);
     trackDisposableResource(object3D);
-    const sx = hasValue(record.scale?.scaleX) ? Number(record.scale.scaleX) : planeWidth;
-    const sy = hasValue(record.scale?.scaleY) ? Number(record.scale.scaleY) : planeHeight;
+    const sx = hasValue(record.scale?.x ?? record.scale?.scaleX) ? Number(record.scale?.x ?? record.scale?.scaleX) : planeWidth;
+    const sy = hasValue(record.scale?.y ?? record.scale?.scaleY) ? Number(record.scale?.y ?? record.scale?.scaleY) : planeHeight;
     object3D.scale.set(sx, sy, 1);
     const pos = record.position && typeof record.position === "object" ? { ...record.position } : {};
-    const scale = record.scale && typeof record.scale === "object" ? { ...record.scale, scaleX: sx, scaleY: sy } : { scaleX: sx, scaleY: sy, scaleZ: 1 };
+    const scale = record.scale && typeof record.scale === "object" ? { ...record.scale, x: sx, y: sy } : { x: sx, y: sy, z: 1 };
     applyTextTransform(object3D, { ...record, position: pos, scale, rotation: record.rotation, visible: record.visible });
   } else {
     const geometry = new THREE.PlaneGeometry(planeWidth, planeHeight);

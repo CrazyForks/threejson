@@ -9,6 +9,7 @@ import { trackDisposableResource } from "../handler/trackedResourceRegistry.js";
 import { registerObject } from "../handler/objectRegistry.js";
 import { setUserDataObjJson } from "../handler/objectDescriptorAttach.js";
 import { applyVisibilityFromDescriptor } from "../util/util.js";
+import { resolvePosition, resolveScale } from "../util/vectorValue.js";
 
 const textureLoader = new THREE.TextureLoader(loadingManager);
 trackDisposableResource(textureLoader);
@@ -22,19 +23,11 @@ function valueOr(value, fallback) {
 }
 
 function normalizePosition(position = {}) {
-  return {
-    x: Number(valueOr(position.x, 0)),
-    y: Number(valueOr(position.y, 0)),
-    z: Number(valueOr(position.z, 0))
-  };
+  return resolvePosition(position);
 }
 
 function normalizeScale(scale = {}) {
-  return {
-    scaleX: Number(valueOr(scale.scaleX, 1)),
-    scaleY: Number(valueOr(scale.scaleY, 1)),
-    scaleZ: Number(valueOr(scale.scaleZ, 1))
-  };
+  return resolveScale(scale);
 }
 
 function applySpriteTransform(sprite, record) {
@@ -43,9 +36,10 @@ function applySpriteTransform(sprite, record) {
   const scale = normalizeScale(record.scale);
   const materialInfo = record.material && typeof record.material === "object" ? record.material : {};
   const size = Number(valueOr(materialInfo.size, valueOr(record.size, 20)));
-  const sx = hasValue(scale.scaleX) ? scale.scaleX : size;
-  const sy = hasValue(scale.scaleY) ? scale.scaleY : size;
-  const sz = hasValue(scale.scaleZ) ? scale.scaleZ : 1;
+  const hasExplicitScale = record.scale != null;
+  const sx = hasExplicitScale ? scale.x : size;
+  const sy = hasExplicitScale ? scale.y : size;
+  const sz = hasExplicitScale ? scale.z : 1;
   sprite.scale.set(sx, sy, sz);
   applyVisibilityFromDescriptor(sprite, record);
 }

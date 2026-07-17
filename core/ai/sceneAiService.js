@@ -546,9 +546,9 @@ function shouldRetryCompactSceneOutput(content, completionMetadata, options) {
   return String(content || "").length >= minChars;
 }
 
-function buildCompactSceneRetryMessage(prompt, referenceMaterial = "") {
+function buildCompactSceneRetryMessage(prompt, referenceMaterial = "", options = {}) {
   return [
-    buildGenerateUserMessage(prompt),
+    buildGenerateUserMessage(prompt, "", options),
     referenceMaterial,
     "COMPACT FULL-REGENERATION REQUIREMENT:",
     "The previous one-response attempt exceeded the provider output limit. Generate the complete scene again from the beginning; do not continue, quote, or repair the previous fragment.",
@@ -624,9 +624,12 @@ async function requestSegmentedSceneJsonContent(messages, options, maxTokens) {
  * @param {string} [outline]
  * @returns {string}
  */
-function buildGenerateUserMessage(prompt, outline = "") {
+function buildGenerateUserMessage(prompt, outline = "", options = {}) {
   const trimmed = String(prompt || "").trim();
-  const hints = buildIntentHints(trimmed);
+  const selectedIds = Array.isArray(options.selectedCapabilityIds) ? options.selectedCapabilityIds : null;
+  const hints = selectedIds
+    ? (selectedIds.length ? `Capabilities selected during model negotiation:\n${selectedIds.map((id) => `- ${id}`).join("\n")}` : "")
+    : buildIntentHints(trimmed);
   const parts = [`User prompt:\n${trimmed}`];
   if (hints) {
     parts.push(hints);
@@ -642,7 +645,9 @@ async function resolveReferenceMaterialForPrompt(prompt, options = {}) {
     return "";
   }
   try {
-    const signals = matchIntentSignals(prompt);
+    const signals = Array.isArray(options.selectedCapabilityIds)
+      ? options.selectedCapabilityIds.map((id) => ({ id }))
+      : matchIntentSignals(prompt);
     return await fetchReferenceMaterial(signals, {
       resolveUrl: options.resolveReferenceUrl,
       locale: options.locale
@@ -721,7 +726,9 @@ async function generateSceneJsonString(prompt, options = {}) {
   }
 
   const trimmedPrompt = String(prompt).trim();
-  const particleEffects = shouldAllowParticleEffects(trimmedPrompt);
+  const particleEffects = Array.isArray(options.selectedCapabilityIds)
+    ? options.selectedCapabilityIds.some((id) => ["particleEmitter", "weatherDomain"].includes(id))
+    : shouldAllowParticleEffects(trimmedPrompt);
   const effectivePrompt = await resolveEffectiveGeneratePrompt(trimmedPrompt, options);
   const maxTokens = options.maxTokens ?? DEFAULT_GENERATE_MAX_TOKENS;
   const referenceMaterial = await resolveReferenceMaterialForPrompt(effectivePrompt, options);
@@ -738,7 +745,7 @@ async function generateSceneJsonString(prompt, options = {}) {
     },
     {
       role: "user",
-      content: [buildGenerateUserMessage(effectivePrompt), referenceMaterial].filter(Boolean).join("\n\n")
+      content: [buildGenerateUserMessage(effectivePrompt, "", options), referenceMaterial].filter(Boolean).join("\n\n")
     }
   ];
   let content;
@@ -768,7 +775,7 @@ async function generateSceneJsonString(prompt, options = {}) {
         maxTokens,
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: buildCompactSceneRetryMessage(effectivePrompt, referenceMaterial) }
+          { role: "user", content: buildCompactSceneRetryMessage(effectivePrompt, referenceMaterial, options) }
         ],
         onCompletionMetadata: (metadata) => {
           retryMetadata = { ...retryMetadata, ...metadata };
@@ -848,7 +855,7 @@ async function generateSceneJsonFromImage(input = {}, options = {}) {
       {
         role: "user",
         content: [
-          { type: "text", text: [buildGenerateUserMessage(effectivePrompt), referenceMaterial].filter(Boolean).join("\n\n") },
+          { type: "text", text: [buildGenerateUserMessage(effectivePrompt, "", chatOptions), referenceMaterial].filter(Boolean).join("\n\n") },
           {
             type: "image_url",
             image_url: {
@@ -1040,10 +1047,12 @@ async function requestUpdatedSceneEditCommands(prompt, context = {}, options = {
     ? buildSceneCommandAutoUpdateSystemPrompt({
         agentRound: agentRound || iterativeApply,
         iterativeApply,
-        onlineTextureHints: options.onlineTextureHints
+        onlineTextureHints: options.onlineTextureHints,
+        animationCapabilities: options.animationCapabilities
       })
     : buildSceneCommandUpdateSystemPrompt({
-        onlineTextureHints: options.onlineTextureHints
+        onlineTextureHints: options.onlineTextureHints,
+        animationCapabilities: options.animationCapabilities
       });
 
   const content = await requestChatCompletion({
@@ -1157,7 +1166,8 @@ async function requestSceneRefinementStep(userPrompt, currentSceneJsonString, op
     buildSceneCommandAutoUpdateSystemPrompt({
       agentRound: true,
       iterativeApply: true,
-      onlineTextureHints: options.onlineTextureHints
+      onlineTextureHints: options.onlineTextureHints,
+      animationCapabilities: options.animationCapabilities
     }),
     "",
     "Optional draft-refinement protocol:",

@@ -5,6 +5,7 @@ import {
 } from "../../objectMutation/index.js";
 import { resolveEventTarget } from "../resolveEventTarget.js";
 import { registerEventAction } from "./actionRegistry.js";
+import { resolvePosition, resolveRotation, resolveScale } from "../../../util/vectorValue.js";
 
 function isObjectRecord(value) {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -16,18 +17,14 @@ function numberOr(value, fallback = 0) {
 }
 
 function readVector(value, fallback = { x: 0, y: 0, z: 0 }) {
-  if (!isObjectRecord(value)) {
-    return { ...fallback };
-  }
-  return {
-    x: numberOr(value.x, fallback.x),
-    y: numberOr(value.y, fallback.y),
-    z: numberOr(value.z, fallback.z)
-  };
+  return resolvePosition(value, fallback);
 }
 
 function readDescriptorVector(object3D, key, fallback = { x: 0, y: 0, z: 0 }) {
-  return readVector(object3D?.userData?.objJson?.[key], fallback);
+  const value = object3D?.userData?.objJson?.[key];
+  if (key === "rotation") return resolveRotation(value, fallback);
+  if (key === "scale") return resolveScale(value, fallback);
+  return resolvePosition(value, fallback);
 }
 
 function resolveTargetObject(action, ctx) {
@@ -130,7 +127,7 @@ function registerObjectActions() {
   });
 
   registerEventAction("object.setRotation", (action, ctx) => {
-    return applyPartial(action, ctx, partialForVector("rotation", resolveVectorFromAction(action, "rotation")));
+    return applyPartial(action, ctx, partialForVector("rotation", resolveRotation(action.rotation ?? action.value ?? action)));
   });
 
   registerEventAction("object.scaleBy", (action, ctx) => {
@@ -145,7 +142,7 @@ function registerObjectActions() {
   });
 
   registerEventAction("object.setScale", (action, ctx) => {
-    return applyPartial(action, ctx, partialForVector("scale", resolveVectorFromAction(action, "scale", { x: 1, y: 1, z: 1 })));
+    return applyPartial(action, ctx, partialForVector("scale", resolveScale(action.scale ?? action.value ?? action)));
   });
 
   registerEventAction("object.patch", patchObject);

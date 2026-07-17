@@ -380,8 +380,8 @@
     applyInfoPanelList,
     ensureThreeJsonIdsOnScenePayload,
     listOr,
-    attachHostedContainerDoorDblclick,
     openOrCloseProgressManager,
+    door,
     port,
     disposeTrackedResources,
     trackDisposableResource,
@@ -405,6 +405,72 @@
   let portShowPresentationFinalized = false;
   /** @type {(() => void)|null} */
   let detachHostedContainerDoorDblclick = null;
+
+  function findPortContainerRoot(node) {
+    let current = node;
+    while (current) {
+      const descriptor = current.userData?.objJson;
+      if (descriptor?.domain === "device.cabinet" || descriptor?.domain === "device.ups") return current;
+      current = current.parent;
+    }
+    return null;
+  }
+
+  function isPortDescendantOf(node, ancestor) {
+    let current = node;
+    while (current) {
+      if (current === ancestor) return true;
+      current = current.parent;
+    }
+    return false;
+  }
+
+  function pickPortContainerDoor(event, options) {
+    const currentScene = options.getScene();
+    const currentCamera = options.getCamera();
+    const canvas = options.getCanvas();
+    if (!currentScene || !currentCamera || !canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const pointer = new THREE.Vector2(
+      ((event.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1,
+      -((event.clientY - rect.top) / Math.max(1, rect.height)) * 2 + 1
+    );
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(pointer, currentCamera);
+    const hits = raycaster.intersectObjects(currentScene.children, true)
+      .map((hit) => hit.object)
+      .filter((object) => object?.visible);
+    for (const hit of hits) {
+      const container = findPortContainerRoot(hit);
+      if (!container || container.userData?.objJson?.pickThroughRaycast !== true) continue;
+      for (const candidate of hits) {
+        if (!isPortDescendantOf(candidate, container)) continue;
+        let current = candidate;
+        while (current) {
+          if (door.isDoorInteractable(current)) return current;
+          if (current === container) break;
+          current = current.parent;
+        }
+      }
+    }
+    return null;
+  }
+
+  function attachPortContainerDoorDblclick(options) {
+    const handler = (event) => {
+      const canvas = options.getCanvas();
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) return;
+      const target = pickPortContainerDoor(event, options);
+      if (!target) return;
+      door.openOrCloseDoor(target);
+      event.stopImmediatePropagation();
+    };
+    document.addEventListener("dblclick", handler, true);
+    return () => document.removeEventListener("dblclick", handler, true);
+  }
+
   let renderLoop;
   let alarmHighlightPaused = false;
   const ALARM_MOCK_IDS = {
@@ -676,7 +742,7 @@
   function initEventListener() {
     window.addEventListener("resize", windowResize);
     detachHostedContainerDoorDblclick?.();
-    detachHostedContainerDoorDblclick = attachHostedContainerDoorDblclick({
+    detachHostedContainerDoorDblclick = attachPortContainerDoorDblclick({
       getScene: () => scene,
       getCamera: () => camera,
       getCanvas: () => renderer?.domElement ?? canvasContainer

@@ -158,7 +158,7 @@ function buildGroupRulesFragment() {
     "Assembly / multi-part objects (command mode):",
     "- Robot, vehicle, kit, or any multi-part assembly: object.add objType group with explicit threeJsonId FIRST, then object.add parent=<that same threeJsonId> for EVERY part (2+ parts still use a group).",
     "- Mixed objTypes (box + sphere + cylinder + …) under the same parent= are supported.",
-    "- Move/rotate the whole assembly: object.patch id=<group threeJsonId> partial={\"rotation\":{\"rotationY\":3.14159}} — parts must already be parented under that group.",
+    "- Move/rotate the whole assembly: object.patch id=<group threeJsonId> partial={\"rotation\":{\"y\":3.14159}} — parts must already be parented under that group.",
     "- Micro DSL (ids must match within the script):",
     "  object.add descriptor={\"objType\":\"group\",\"name\":\"female-robot\",\"threeJsonId\":\"female-robot-grp\"}",
     "  object.add parent=female-robot-grp descriptor={\"objType\":\"box\",\"name\":\"female-robot-body\",...}",
@@ -288,6 +288,17 @@ function buildCommandPromptRulesFragment() {
   ].join("\n");
 }
 
+function buildCommandAnimationFragment(options = {}) {
+  if (options.animationCapabilities !== true) return "";
+  return [
+    "Negotiated animation/event capability:",
+    "- Runtime transform fields are position/rotation/scale {x,y,z}; arrays [x,y,z] are accepted. Rotation is radians and formula strings such as PI/2 are valid in full JSON.",
+    "- For smooth continuous motion in full JSON use animations type transform/tween or generic expression tracks; do not create endless lifecycle scripts.",
+    "- For edits, object.patch may add or replace an object's animations array and sceneConfig.renderLoop should update animations.",
+    "- EventScript/lifecycle details are used only when selected during negotiation; preserve existing scripts unless the user asks to change behavior."
+  ].join("\n");
+}
+
 /**
  * @param {Array<{ op?: string, ok?: boolean, data?: object }>} results
  * @returns {string}
@@ -401,6 +412,7 @@ export function buildSceneCommandAutoUpdateSystemPrompt(options = {}) {
     "Do NOT output editor.* commands or markdown prose outside the script/JSON.",
     "",
     buildCommandPromptRulesFragment(),
+    buildCommandAnimationFragment(options),
     "",
     buildCommandOnlineTextureFragment(options),
     "",
@@ -439,6 +451,7 @@ export function buildSceneCommandUpdateSystemPrompt(options = {}) {
     "- Lines starting with # are comments (optional).",
     "",
     buildCommandPromptRulesFragment(),
+    buildCommandAnimationFragment(options),
     "",
     buildCommandOnlineTextureFragment(options),
     "",

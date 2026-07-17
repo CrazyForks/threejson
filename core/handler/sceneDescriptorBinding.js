@@ -7,6 +7,7 @@
  */
 
 import { log } from "../util/logger.js";
+import { resolvePosition, resolveRotation, resolveScale } from "../util/vectorValue.js";
 import {
   applyBoxModelTransformToObject3D,
   createGroup,
@@ -175,19 +176,19 @@ function transformSignatureFromDescriptor(data) {
   if (!data || typeof data !== "object") {
     return "";
   }
-  const p = data.position || {};
-  const r = data.rotation || {};
-  const s = data.scale || {};
+  const p = resolvePosition(data.position);
+  const r = resolveRotation(data.rotation);
+  const s = resolveScale(data.scale);
   return [
     Number(p.x) || 0,
     Number(p.y) || 0,
     Number(p.z) || 0,
-    Number(r.rotationX) || 0,
-    Number(r.rotationY) || 0,
-    Number(r.rotationZ) || 0,
-    Number(s.scaleX) || 1,
-    Number(s.scaleY) || 1,
-    Number(s.scaleZ) || 1
+    Number(r.x) || 0,
+    Number(r.y) || 0,
+    Number(r.z) || 0,
+    Number(s.x) || 1,
+    Number(s.y) || 1,
+    Number(s.z) || 1
   ].join("|");
 }
 

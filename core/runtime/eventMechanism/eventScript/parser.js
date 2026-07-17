@@ -85,6 +85,32 @@ function parseEventScriptFromTokens(source) {
       }
       return { type: "IfStatement", test, consequent, alternate };
     }
+    if (match("keyword", "while")) {
+      eat("punct", "(");
+      const test = parseExpression();
+      eat("punct", ")");
+      return { type: "WhileStatement", test, body: parseBlock() };
+    }
+    if (match("keyword", "repeat")) {
+      eat("punct", "(");
+      const count = parseExpression();
+      eat("punct", ")");
+      return { type: "RepeatStatement", count, body: parseBlock() };
+    }
+    if (match("keyword", "for")) {
+      eat("punct", "(");
+      let init = null;
+      if (current().type === "keyword" && current().value === "var") init = parseVarDecl(false);
+      else if (!(current().type === "punct" && current().value === ";")) init = { type: "ExpressionStatement", expression: parseExpression() };
+      eat("punct", ";");
+      const test = current().type === "punct" && current().value === ";" ? null : parseExpression();
+      eat("punct", ";");
+      const update = current().type === "punct" && current().value === ")" ? null : parseExpression();
+      eat("punct", ")");
+      return { type: "ForStatement", init, test, update, body: parseBlock() };
+    }
+    if (match("keyword", "break")) return { type: "BreakStatement" };
+    if (match("keyword", "continue")) return { type: "ContinueStatement" };
     if (current().type === "keyword" && current().value === "var") {
       return parseVarDecl(false);
     }
@@ -161,10 +187,37 @@ function parseEventScriptFromTokens(source) {
   }
 
   function parseComparison() {
-    let node = parseUnary();
+    let node = parseAdditive();
     while (current().type === "op" && [">", "<", ">=", "<="].includes(String(current().value))) {
       const op = eat("op").value;
-      node = { type: "BinaryExpression", operator: op, left: node, right: parseUnary() };
+      node = { type: "BinaryExpression", operator: op, left: node, right: parseAdditive() };
+    }
+    return node;
+  }
+
+  function parseAdditive() {
+    let node = parseMultiplicative();
+    while (current().type === "op" && ["+", "-"].includes(current().value)) {
+      const op = eat("op").value;
+      node = { type: "BinaryExpression", operator: op, left: node, right: parseMultiplicative() };
+    }
+    return node;
+  }
+
+  function parseMultiplicative() {
+    let node = parsePower();
+    while (current().type === "op" && ["*", "/", "%"].includes(current().value)) {
+      const op = eat("op").value;
+      node = { type: "BinaryExpression", operator: op, left: node, right: parsePower() };
+    }
+    return node;
+  }
+
+  function parsePower() {
+    const node = parseUnary();
+    if (current().type === "op" && ["**", "^"].includes(current().value)) {
+      const op = eat("op").value;
+      return { type: "BinaryExpression", operator: op, left: node, right: parsePower() };
     }
     return node;
   }

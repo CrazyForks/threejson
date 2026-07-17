@@ -26,6 +26,7 @@ import {
 } from '../runtime/eventMechanism/bindEventRuntime.js';
 import { wireInfoPanelDismissTriggerForObject } from '../runtime/eventMechanism/wireInfoPanelDismissTriggers.js';
 import { resolveRuntimeContext } from '../runtime/runtimeContext.js';
+import { resolvePosition, resolveRotation, resolveScale } from '../util/vectorValue.js';
 
 const DEFAULT_INFO_PANEL_NAME = 'infoPanel';
 const INFO_PANEL_DEFAULT_FOREGROUND = '#E80000';
@@ -266,29 +267,17 @@ function normalizeColor(color, fallback = '#fff') {
 
 /** @param {object} [position] @returns {{x:number,y:number,z:number}} */
 function normalizePosition(position = {}) {
-	return {
-		x: valueOr(position.x, 0),
-		y: valueOr(position.y, 0),
-		z: valueOr(position.z, 0)
-	};
+	return resolvePosition(position);
 }
 
 /** @param {object} [rotation] @returns {{rotationX:number,rotationY:number,rotationZ:number}} */
 function normalizeRotation(rotation = {}) {
-	return {
-		rotationX: valueOr(rotation.rotationX, 0),
-		rotationY: valueOr(rotation.rotationY, 0),
-		rotationZ: valueOr(rotation.rotationZ, 0)
-	};
+	return resolveRotation(rotation);
 }
 
 /** @param {object} [scale] @returns {{scaleX:number,scaleY:number,scaleZ:number}} */
 function normalizeScale(scale = {}) {
-	return {
-		scaleX: valueOr(scale.scaleX, 1),
-		scaleY: valueOr(scale.scaleY, 1),
-		scaleZ: valueOr(scale.scaleZ, 1)
-	};
+	return resolveScale(scale);
 }
 
 function numberBetween(value, fallback, min, max) {
@@ -671,9 +660,9 @@ function applyTransform(object3D, infoPanel) {
 		infoPanel.panel.position.z
 	);
 	object3D.rotation.set(
-		infoPanel.panel.rotation.rotationX,
-		infoPanel.panel.rotation.rotationY,
-		infoPanel.panel.rotation.rotationZ
+		infoPanel.panel.rotation.x,
+		infoPanel.panel.rotation.y,
+		infoPanel.panel.rotation.z
 	);
 	const name = resolveInfoPanelRecordName(infoPanel);
 	infoPanel.name = name;
@@ -709,9 +698,9 @@ function createInfoBoxMesh(infoPanel, texture) {
 	));
 	applyTransform(boxMesh, infoPanel);
 	boxMesh.scale.set(
-		infoPanel.panel.scale.scaleX,
-		infoPanel.panel.scale.scaleY,
-		infoPanel.panel.scale.scaleZ
+		infoPanel.panel.scale.x,
+		infoPanel.panel.scale.y,
+		infoPanel.panel.scale.z
 	);
 	return boxMesh;
 }
@@ -767,9 +756,9 @@ function createInfoPlaneMesh(infoPanel, texture) {
 	));
 	applyTransform(planeMesh, infoPanel);
 	planeMesh.scale.set(
-		infoPanel.panel.scale.scaleX,
-		infoPanel.panel.scale.scaleY,
-		infoPanel.panel.scale.scaleZ
+		infoPanel.panel.scale.x,
+		infoPanel.panel.scale.y,
+		infoPanel.panel.scale.z
 	);
 	return planeMesh;
 }

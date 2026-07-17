@@ -1,5 +1,5 @@
 /** Player canvas double-click: selection highlight + hosted cabinet/UPS door toggle. */
-import { attachHostedContainerDoorDblclick } from "threejson";
+import { attachHostedContainerDoorDblclick } from "../../shared/js/hostedContainerDoor.js";
 
 export function createPlayerSceneInteraction({
   getScene,

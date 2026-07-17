@@ -3,6 +3,7 @@
  * Requires Three.js r179+ (official minimum) and several examples/jsm modules.
  */
 import * as THREE from 'three';
+import { resolvePosition, resolveRotation, resolveScale } from '../util/vectorValue.js';
 import { log } from "../util/logger.js";
 import TWEEN, { createTween } from '../compat/adapters/tween.js';
 import { deployByObjTypeExtension } from '../handler/sceneExtensionRegistry.js';
@@ -1089,11 +1090,7 @@ function meshReceiveShadowFromMaterials(materialsLike){
  * @returns {{ x: number, y: number, z: number }}
  */
 function normalizePosition(position = {}){
-    return {
-        x: valueOr(position.x, 0),
-        y: valueOr(position.y, 0),
-        z: valueOr(position.z, 0)
-    };
+    return resolvePosition(position);
 }
 
 /**
@@ -1102,11 +1099,7 @@ function normalizePosition(position = {}){
  * @returns {{ rotationX: number, rotationY: number, rotationZ: number }}
  */
 function normalizeRotation(rotation = {}){
-    return {
-        rotationX: valueOr(rotation.rotationX, 0),
-        rotationY: valueOr(rotation.rotationY, 0),
-        rotationZ: valueOr(rotation.rotationZ, 0)
-    };
+    return resolveRotation(rotation);
 }
 
 /**
@@ -1115,11 +1108,7 @@ function normalizeRotation(rotation = {}){
  * @returns {{ scaleX: number, scaleY: number, scaleZ: number }}
  */
 function normalizeScale(scale = {}){
-    return {
-        scaleX: valueOr(scale.scaleX, 1),
-        scaleY: valueOr(scale.scaleY, 1),
-        scaleZ: valueOr(scale.scaleZ, 1)
-    };
+    return resolveScale(scale);
 }
 
 /**
@@ -1133,8 +1122,8 @@ function applyObjectTransform(object3D, source = {}){
     const scale = normalizeScale(source.scale);
 
     object3D.position.set(position.x, position.y, position.z);
-    object3D.rotation.set(rotation.rotationX, rotation.rotationY, rotation.rotationZ);
-    object3D.scale.set(scale.scaleX, scale.scaleY, scale.scaleZ);
+    object3D.rotation.set(rotation.x, rotation.y, rotation.z);
+    object3D.scale.set(scale.x, scale.y, scale.z);
     applyVisibilityFromDescriptor(object3D, source);
 }
 
@@ -1458,14 +1447,14 @@ function syncBoxModelTransformFromObject3D(object3D) {
         z: Number(object3D.position.z) || 0
     };
     data.rotation = {
-        rotationX: Number(object3D.rotation.x) || 0,
-        rotationY: Number(object3D.rotation.y) || 0,
-        rotationZ: Number(object3D.rotation.z) || 0
+        x: Number(object3D.rotation.x) || 0,
+        y: Number(object3D.rotation.y) || 0,
+        z: Number(object3D.rotation.z) || 0
     };
     data.scale = {
-        scaleX: Number(object3D.scale.x) || 1,
-        scaleY: Number(object3D.scale.y) || 1,
-        scaleZ: Number(object3D.scale.z) || 1
+        x: Number(object3D.scale.x) || 1,
+        y: Number(object3D.scale.y) || 1,
+        z: Number(object3D.scale.z) || 1
     };
     return true;
 }
@@ -1502,14 +1491,14 @@ function snapshotBoxModelTransformFromObject3D(object3D) {
             z: Number(object3D.position.z) || 0
         },
         rotation: {
-            rotationX: Number(object3D.rotation.x) || 0,
-            rotationY: Number(object3D.rotation.y) || 0,
-            rotationZ: Number(object3D.rotation.z) || 0
+            x: Number(object3D.rotation.x) || 0,
+            y: Number(object3D.rotation.y) || 0,
+            z: Number(object3D.rotation.z) || 0
         },
         scale: {
-            scaleX: Number(object3D.scale.x) || 1,
-            scaleY: Number(object3D.scale.y) || 1,
-            scaleZ: Number(object3D.scale.z) || 1
+            x: Number(object3D.scale.x) || 1,
+            y: Number(object3D.scale.y) || 1,
+            z: Number(object3D.scale.z) || 1
         }
     };
 }
@@ -1564,24 +1553,21 @@ function createNormalBox(boxObj, options = {}) {
     boxMesh.receiveShadow = meshReceiveShadowFromMaterials(record.materials || faceJsonList);
     boxMesh.position.set(0, 0, 0)
     if (record.position) {
-        record.position.x = record.position.x ? record.position.x : 0;
-        record.position.y = record.position.y ? record.position.y : 0;
-        record.position.z = record.position.z ? record.position.z : 0;
-        boxMesh.position.set(record.position.x, record.position.y, record.position.z)
+        const position = normalizePosition(record.position);
+        record.position = position;
+        boxMesh.position.set(position.x, position.y, position.z)
     }
     boxMesh.rotation.set(0, 0, 0);
     if (record.rotation) {
-        record.rotation.rotationX = record.rotation.rotationX ? record.rotation.rotationX : 0;
-        record.rotation.rotationY = record.rotation.rotationY ? record.rotation.rotationY : 0;
-        record.rotation.rotationZ = record.rotation.rotationZ ? record.rotation.rotationZ : 0;
-        boxMesh.rotation.set(record.rotation.rotationX, record.rotation.rotationY, record.rotation.rotationZ);
+        const rotation = normalizeRotation(record.rotation);
+        record.rotation = rotation;
+        boxMesh.rotation.set(rotation.x, rotation.y, rotation.z);
     }
     boxMesh.scale.set(1, 1, 1);
     if (record.scale) {
-        record.scale.scaleX = record.scale.scaleX ? record.scale.scaleX : 1;
-        record.scale.scaleY = record.scale.scaleY ? record.scale.scaleY : 1;
-        record.scale.scaleZ = record.scale.scaleZ ? record.scale.scaleZ : 1;
-        boxMesh.scale.set(record.scale.scaleX, record.scale.scaleY, record.scale.scaleZ);
+        const scale = normalizeScale(record.scale);
+        record.scale = scale;
+        boxMesh.scale.set(scale.x, scale.y, scale.z);
     }
     // Handle merge
     if(record.joins && record.joins.length > 0){
@@ -1652,8 +1638,8 @@ function createInstanceBoxAsMeshGroup(record, options = {}) {
         delete one.combineArr;
         delete one.businessInfoArr;
         one.position = transform.position ? transform.position : { x: 0, y: 0, z: 0 };
-        one.rotation = transform.rotation ? transform.rotation : { rotationX: 0, rotationY: 0, rotationZ: 0 };
-        one.scale = transform.scale ? transform.scale : { scaleX: 1, scaleY: 1, scaleZ: 1 };
+        one.rotation = transform.rotation ? transform.rotation : { x: 0, y: 0, z: 0 };
+        one.scale = transform.scale ? transform.scale : { x: 1, y: 1, z: 1 };
         const mesh = createTextureBox(one);
         if (mesh) {
             group.add(mesh);
@@ -1748,8 +1734,8 @@ function colTransMatrix(transform){
     const rotation = normalizeRotation(transform.rotation);
     const position = normalizePosition(transform.position);
     const positionV = new THREE.Vector3(position.x, position.y, position.z);
-    const scaleV = new THREE.Vector3(scale.scaleX, scale.scaleY, scale.scaleZ);
-    const euler = new THREE.Euler(rotation.rotationX, rotation.rotationY, rotation.rotationZ, 'XYZ');
+    const scaleV = new THREE.Vector3(scale.x, scale.y, scale.z);
+    const euler = new THREE.Euler(rotation.x, rotation.y, rotation.z, 'XYZ');
     const quaternion = new THREE.Quaternion().setFromEuler(euler);
     matrix4.compose(positionV, quaternion, scaleV);
     return matrix4;
@@ -2363,9 +2349,9 @@ function finishTexturedPlane(planeObj, scene, materialInfo, geometryInfo, positi
     const plane = new THREE.Mesh(geometry, material);
     trackDisposableResource(plane);
     plane.position.set(position.x, position.y, position.z);
-    plane.rotation.set(rotation.rotationX, rotation.rotationY, rotation.rotationZ, "XYZ");
+    plane.rotation.set(rotation.x, rotation.y, rotation.z, "XYZ");
     const scale = normalizeScale(planeObj.scale);
-    plane.scale.set(scale.scaleX, scale.scaleY, scale.scaleZ);
+    plane.scale.set(scale.x, scale.y, scale.z);
     setUserDataObjJson(plane, planeObj);
     applyVisibilityFromDescriptor(plane, planeObj);
     scene.add(plane);
@@ -2441,9 +2427,9 @@ function createPlane(planeObj, scene){
         let plane = new THREE.Mesh( geometry, material );
         trackDisposableResource(plane)
         plane.position.set(position.x, position.y, position.z);
-        plane.rotation.set(rotation.rotationX, rotation.rotationY, rotation.rotationZ, 'XYZ');
+        plane.rotation.set(rotation.x, rotation.y, rotation.z, 'XYZ');
         const scale = normalizeScale(planeObj.scale);
-        plane.scale.set(scale.scaleX, scale.scaleY, scale.scaleZ);
+        plane.scale.set(scale.x, scale.y, scale.z);
         setUserDataObjJson(plane, planeObj);
         applyVisibilityFromDescriptor(plane, planeObj);
         scene.add(plane);

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { resolvePosition, resolveRotation, resolveScale } from "../util/vectorValue.js";
 import { log } from "../util/logger.js";
 
 import {
@@ -361,20 +362,12 @@ function applyRecordTransformToObject3D(object3D, record = {}) {
   if (!object3D || !record || typeof record !== "object") {
     return;
   }
-  const p = toVector3(record.position, { x: 0, y: 0, z: 0 });
+  const p = resolvePosition(record.position);
   object3D.position.set(p.x, p.y, p.z);
-  const r = record.rotation && typeof record.rotation === "object" ? record.rotation : {};
-  object3D.rotation.set(
-    Number.isFinite(r.rotationX) ? Number(r.rotationX) : 0,
-    Number.isFinite(r.rotationY) ? Number(r.rotationY) : 0,
-    Number.isFinite(r.rotationZ) ? Number(r.rotationZ) : 0
-  );
-  const s = record.scale && typeof record.scale === "object" ? record.scale : {};
-  object3D.scale.set(
-    Number.isFinite(s.scaleX) ? Number(s.scaleX) : 1,
-    Number.isFinite(s.scaleY) ? Number(s.scaleY) : 1,
-    Number.isFinite(s.scaleZ) ? Number(s.scaleZ) : 1
-  );
+  const r = resolveRotation(record.rotation);
+  object3D.rotation.set(r.x, r.y, r.z);
+  const s = resolveScale(record.scale);
+  object3D.scale.set(s.x, s.y, s.z);
   object3D.visible = record.visible !== false;
 }
 

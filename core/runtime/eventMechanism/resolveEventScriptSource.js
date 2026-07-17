@@ -56,7 +56,8 @@ async function resolveScriptUrl(scriptUrl, ctx = {}) {
   }
   if (url.toLowerCase().startsWith(LIB_PREFIX)) {
     const token = url.slice(LIB_PREFIX.length).trim();
-    const hit = resolveLibTokenToEventScript(token);
+    const runtimeScope = ctx.runtimeScope ?? ctx.scene ?? ctx.sceneRuntime?.scene ?? ctx.sceneRuntime ?? null;
+    const hit = resolveLibTokenToEventScript(token, runtimeScope);
     if (!hit) {
       return null;
     }

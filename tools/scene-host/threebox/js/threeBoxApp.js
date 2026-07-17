@@ -345,7 +345,9 @@ async function main() {
     conversationId,
     turnId,
     generationStrategy = "single",
-    estimatedSegments = 1
+    estimatedSegments = 1,
+    selectedCapabilityIds = [],
+    requiresAnimation = false
   }) {
     const settings = settingsModal.getSettings();
     const selectedProviderId = document.getElementById("composerModelSelect")?.value;
@@ -420,6 +422,8 @@ async function main() {
         generationStrategy,
         estimatedSegments,
         maxSceneSegments: settings.ai?.maxSceneSegments,
+        selectedCapabilityIds,
+        requiresAnimation,
         signal: abortController.signal
       });
       clearBusyIfCurrent();
@@ -537,14 +541,16 @@ async function main() {
           conversationId,
           turnId,
           generationStrategy,
-          estimatedSegments
+          estimatedSegments,
+          selectedCapabilityIds,
+          requiresAnimation
         }))
       );
       api.finishTurnScroll();
     }
   }
 
-  async function handleAdjustTurn(text, api, { conversationId, turnId, targetTurnId }) {
+  async function handleAdjustTurn(text, api, { conversationId, turnId, targetTurnId, selectedCapabilityIds = [], requiresAnimation = false }) {
     const settings = settingsModal.getSettings();
     const selectedProviderId = document.getElementById("composerModelSelect")?.value;
     const providerOptions = resolveProviderOptions(settings, selectedProviderId);
@@ -589,7 +595,9 @@ async function main() {
         targetTurnId,
         contextPayload,
         globalPromptPrefix: settings.ai?.globalPromptPrefix,
-        includeReferenceLinks: settings.ai?.attachReferenceLinks !== false
+        includeReferenceLinks: settings.ai?.attachReferenceLinks !== false,
+        selectedCapabilityIds,
+        requiresAnimation
       });
 
       const result = await runThreeBoxAdjustTurn({
@@ -608,6 +616,8 @@ async function main() {
         locale: getHostLocale(),
         capabilityLookup: settings.ai?.capabilityLookupEnabled !== false,
         onlineTextureHints: settings.ai?.onlineTextureHints !== false,
+        selectedCapabilityIds,
+        animationCapabilities: requiresAnimation === true,
         signal: abortController.signal
       });
       clearBusyIfCurrent();
@@ -835,15 +845,26 @@ async function main() {
     const priorTurns = allPriorTurns.filter(isSceneContextTurn);
 
     const history = priorTurns.map((t) => ({ turnId: t.id, summary: t.recapSummary || t.userPrompt }));
-    const classified = await classifyThreeBoxTurnIntent({ userPrompt: text, history }, providerOptions);
+    const classified = await classifyThreeBoxTurnIntent(
+      { userPrompt: text, history },
+      { ...providerOptions, animationCapabilityMode: settings.ai?.animationCapabilityMode || "auto" }
+    );
     if (classified.intent === "adjust" && classified.targetTurnId) {
-      await handleAdjustTurn(text, api, { conversationId, turnId, targetTurnId: classified.targetTurnId });
+      await handleAdjustTurn(text, api, {
+        conversationId,
+        turnId,
+        targetTurnId: classified.targetTurnId,
+        selectedCapabilityIds: classified.selectedCapabilityIds,
+        requiresAnimation: classified.requiresAnimation
+      });
     } else {
       await handleGenerateTurn(text, api, {
         conversationId,
         turnId,
         generationStrategy: classified.generationStrategy,
-        estimatedSegments: classified.estimatedSegments
+        estimatedSegments: classified.estimatedSegments,
+        selectedCapabilityIds: classified.selectedCapabilityIds,
+        requiresAnimation: classified.requiresAnimation
       });
     }
   }

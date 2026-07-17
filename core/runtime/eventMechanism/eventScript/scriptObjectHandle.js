@@ -4,9 +4,15 @@
 
 import { applyObjectPartial } from "../../objectMutation/index.js";
 import { resolveEventTarget } from "../resolveEventTarget.js";
+import { resolveRotation, resolveScale } from "../../../util/vectorValue.js";
 
 function normalizeObjType(value) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function finiteOr(value, fallback) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
 }
 
 function readPosition(descriptor) {
@@ -64,6 +70,24 @@ export function createScriptObjectHandle(object3D, ctx = {}) {
       const next = { x: Number(x) || 0, y: Number(y) || 0, z: Number(z) || 0 };
       applyObjectPartial(threeJsonId, { position: next }, ctx.mutationOptions);
       object3D.position.set(next.x, next.y, next.z);
+    },
+    rotateBy(dx = 0, dy = 0, dz = 0) {
+      const current = resolveRotation(descriptor?.rotation);
+      handle.setRotation(current.x + (Number(dx) || 0), current.y + (Number(dy) || 0), current.z + (Number(dz) || 0));
+    },
+    setRotation(x = 0, y = 0, z = 0) {
+      const next = { x: Number(x) || 0, y: Number(y) || 0, z: Number(z) || 0 };
+      applyObjectPartial(threeJsonId, { rotation: next }, ctx.mutationOptions);
+      object3D.rotation.set(next.x, next.y, next.z);
+    },
+    scaleBy(x = 1, y = 1, z = 1) {
+      const current = resolveScale(descriptor?.scale);
+      handle.setScale(current.x * finiteOr(x, 1), current.y * finiteOr(y, 1), current.z * finiteOr(z, 1));
+    },
+    setScale(x = 1, y = 1, z = 1) {
+      const next = { x: finiteOr(x, 1), y: finiteOr(y, 1), z: finiteOr(z, 1) };
+      applyObjectPartial(threeJsonId, { scale: next }, ctx.mutationOptions);
+      object3D.scale.set(next.x, next.y, next.z);
     }
   };
 

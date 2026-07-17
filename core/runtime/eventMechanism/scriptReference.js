@@ -24,6 +24,9 @@ export function isEventScriptReference(script) {
   if (/^https?:\/\//i.test(text)) {
     return true;
   }
+  if (/^(?:blob:|data:|pack:\/\/)/i.test(text)) {
+    return true;
+  }
   if (text.startsWith("./")) {
     return true;
   }
