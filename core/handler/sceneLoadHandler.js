@@ -768,7 +768,10 @@ function applyRendererConfig(renderer, config = {}, sceneConfig = {}) {
   const width = sceneConfig.canvasWidth;
   const height = sceneConfig.canvasHeight;
   if (isFiniteNumber(width) && isFiniteNumber(height)) {
-    renderer.setSize(width, height);
+    // updateStyle=false: see the matching comment in sceneRuntimeHandler.js's createRenderer.
+    // This runs on every scene (re)load, so leaving it at the default (true) would re-stick an
+    // inline pixel size on the canvas even after createRenderer's own call was fixed.
+    renderer.setSize(width, height, false);
   }
   const ratioRate = isFiniteNumber(config.ratioRate) ? config.ratioRate : 1;
   const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;

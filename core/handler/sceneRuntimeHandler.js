@@ -63,7 +63,13 @@ function createRenderer(canvas, rendererConfig = {}, width, height){
 	if(rendererConfig.shadowMapEnabled){
 		renderer.shadowMap.enabled = true;
 	}
-	renderer.setSize(width, height);
+	// updateStyle=false: the host owns the canvas' responsive CSS sizing (width:100%/height:100%).
+	// Letting WebGLRenderer write an inline pixel width/height here bakes in whatever size the
+	// canvas happened to have at scene-load time; later resizes that correctly pass
+	// updateStyle:false (e.g. the editor's Code-mode PiP) only skip touching style, they don't
+	// clear a stale one, so the canvas would stay pinned to its load-time size forever and just
+	// get clipped by a shrunk container instead of actually shrinking.
+	renderer.setSize(width, height, false);
 	if(Number.isFinite(rendererConfig.clearAlpha)){
 		renderer.setClearAlpha(rendererConfig.clearAlpha);
 	}
