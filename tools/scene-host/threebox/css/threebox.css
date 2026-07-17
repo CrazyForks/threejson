@@ -632,7 +632,7 @@ details[open] > .sidebarSectionTitle::before { transform: rotate(90deg); }
 .searchChatResultMeta { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
 .searchChatEmptyHint { padding: 14px; color: var(--muted); font-size: 12.5px; text-align: center; }
 
-/* ---- Context menu (history item pin/archive/move-to-project) ---- */
+/* ---- Context menu (history item pin/archive/move-to-project/delete) ---- */
 .contextMenu {
   position: fixed; z-index: 90; min-width: 170px; padding: 6px;
   border: 1px solid var(--line); border-radius: 10px; background: var(--panel2); box-shadow: 0 10px 26px rgba(0,0,0,0.32);
@@ -643,6 +643,10 @@ details[open] > .sidebarSectionTitle::before { transform: rotate(90deg); }
   background: transparent; color: var(--text); font-size: 13px; text-align: left; cursor: pointer;
 }
 .contextMenu button:hover { background: var(--button-hover); }
+.contextMenu button.contextMenuDanger {
+  color: #f56c6c; border-top: 1px solid var(--line); border-radius: 0 0 7px 7px; margin-top: 5px; padding-top: 10px;
+}
+.contextMenu button.contextMenuDanger:hover { background: rgba(245, 108, 108, 0.12); color: #ff8a8a; }
 .contextMenuSubLabel { padding: 8px 10px 2px; font-size: 10.5px; color: var(--muted); text-transform: uppercase; border-top: 1px solid var(--line); margin-top: 4px; }
 .contextMenuSubList { display: flex; flex-direction: column; max-height: 140px; overflow: auto; }
 .contextMenuSubList .contextMenuEmptyHint { padding: 6px 10px; color: var(--muted); font-size: 11.5px; }

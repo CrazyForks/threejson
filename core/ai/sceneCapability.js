@@ -75,11 +75,13 @@ const INTENT_SIGNALS = [
   {
     id: "sceneText",
     patterns: [
-      /3d text|floating text|scene text|floor label|title text|extruded text|sdf text|立体字|场景文字|悬浮文字|纯文字/i
+      /3d text|floating text|scene text|floor label|title text|extruded text|sdf text|written words?|caption text|立体字|场景文字|悬浮文字|纯文字|文字|文本|字样|标题文字/i,
+      /\b(?:add|show|display|write|place|render)\b.{0,24}\b(?:text|words?|title|caption|label)\b/i,
+      /(?:添加|增加|显示|写上|写入|放置|生成|创建|标注).{0,12}(?:文字|文本|字样|标题|名称)/i
     ],
     lists: ["objectList"],
     objTypes: ["text"],
-    note: "Use objectList objType text (mode sdf|texture|mesh). Not infoPanelList unless a panel is required."
+    note: "Use objectList objType text and prefer mode sdf for plain visible words. Use infoPanel only when a panel backing is requested; use mesh only for explicit extruded/solid typography."
   },
   {
     id: "group",

@@ -67,6 +67,23 @@ test("outline system prompt includes capability catalog", () => {
   assert.match(prompt, /Why any non-basic capability is necessary/);
 });
 
+test("scene text guidance prefers visible SDF TextItem records", () => {
+  const basePrompt = buildSceneGenerationSystemPrompt();
+  assert.match(basePrompt, /name.*label.*metadata.*do not render visible glyphs/i);
+  assert.match(basePrompt, /Default to mode:\"sdf\"/);
+  assert.match(basePrompt, /\"objType\":\"text\"/);
+
+  const selectedPrompt = buildSceneGenerationSystemPrompt({
+    selectedCapabilityIds: ["sceneText"]
+  });
+  assert.match(selectedPrompt, /Negotiated ThreeJSON scene-text capability/);
+  assert.match(selectedPrompt, /Preferred default is mode:\"sdf\"/);
+  assert.match(selectedPrompt, /infoPanel only when the user wants a board\/card\/screen\/background/);
+
+  const outline = buildSceneOutlineSystemPrompt({ selectedCapabilityIds: ["sceneText"] });
+  assert.match(outline, /Negotiated ThreeJSON scene-text capability/);
+});
+
 test("generation prompt hides particle capabilities when particle intent is absent", () => {
   const prompt = buildSceneGenerationSystemPrompt({ particleEffects: false });
   assert.equal((prompt.match(/particleEmitter/g) || []).length, 1);

@@ -158,7 +158,7 @@ Intent → capability:
 - Roads / cables / boundaries → lineList with points[]
 - Signs / HUD with panel backing (text/html/img) → infoPanelList (static texture; not clickable)
 - Interactive console / form / iframe overlay → css3dPanelList (objType css3dPanel)
-- Floating 3D labels / floor titles / extruded titles → objectList objType text (mode sdf|texture|mesh)
+- Requested visible words / floating labels / floor titles → objectList objType text, preferably mode sdf. Use mode mesh only when solid/extruded/beveled lettering is explicitly requested.
 - Multi-part buildings / rigs → groupList with subScene[] children (or subSceneList blocks)
 - Particles / stars / dust / sparks / visible solar halo → objectList or modelList objType particleEmitter (simulation cpu|gpuCompute). For round halos or star dust around a sun/planet, use distribution {type:"shell"|"halo", radius, thickness}; for volume dust, use {type:"sphere", radius}.
 - Rain / snow → domainModelList domain weather.* or objType particleEmitter with weather-style material
@@ -175,7 +175,7 @@ const THREE_JSON_SCENE_AUTHORING_RULES = `
 Scene authoring rules:
 1. Choose the objType that most faithfully and specifically matches the user's described shape or role. Use a specialized objType/domain/native geometry when it represents the object better; use a basic primitive when it genuinely is the best fit.
 2. Put every deployable content record in the single standard objectList and always set objType explicitly (box, sphere, line, group, infoPanel, css3dPanel, text, domain, externalModel, particleEmitter, etc.). Do not create worldInfo category lists in AI output.
-3. Use descriptor **name** for batch/page semantics (e.g. "room-wall", "air-conditioning"); use **label** for display text; do not invent unsupported objType strings like "container" or "ground" — use floor/wall/glass instead.
+3. Descriptor **name** and **label** are metadata and do not render visible glyphs. To show words in the scene, add an objectList record with objType:"text" and content, or use infoPanel only when a visible panel backing is intended. Do not invent unsupported objType strings like "container" or "ground" — use floor/wall/glass instead.
 4. AI output uses standard scheme B only: top-level threeJsonId + sceneConfig + objectList. Do not output worldInfo, friendlyMap, or category lists such as boxModelList/sphereModelList/modelList/lineList.
 5. Keep the primary scene, camera, renderer, controls, lights, renderLoop, helpers, intro, and extensions in sceneConfig. Keep deployable content in objectList. Include reasonable camera, lights, and controls for standalone scenes.
 6. Always set top-level threeJsonId (stable string or UUID). Do not use worldId or worldInfo.id.
@@ -185,6 +185,7 @@ Scene authoring rules:
 10. For edits and patches, preserve unspecified geometry/material/position fields. When changing box height, keep width/depth unchanged and update y only if needed to keep the base on the same ground.
 11. New grounded physical scenes should usually include exactly one unobtrusive support surface (floor/ground/road/slab/plinth) sized to the layout unless the prompt describes a floating, space, abstract, or supportless scene.
 12. URL-bearing fields (material.textureUrl, externalModel modelPath, audioUrl, css3dPanel url, text mesh fontJsonUrl, etc.) may be a full https:// URL — a real public image/model/audio/page online is valid and often exactly what the user wants, not just a repo-local path. When the user gives or implies a specific URL, use it verbatim. During repair/review/patch passes, never replace an existing valid URL (local or remote) with an invented placeholder path just to "normalize" it — only change a URL when the user's request calls for a different one.
+13. When the user asks to add/show/write text, words, a title, caption, name, or label in the 3D scene, actually create objType:"text" with content. Default to mode:"sdf" for clean pure text. Use infoPanel only for an explicitly panel-backed sign/card/screen, mode:"mesh" only for explicit solid/extruded/beveled TextGeometry, and mode:"texture" only when a canvas-text plane/sprite is specifically useful. Never satisfy visible-text intent with name/label metadata alone.
 14. Light intensity is on TWO DIFFERENT SCALES depending on type — using the wrong scale is the single most common cause of "geometry is correct but the scene renders pitch black": intensity values are used exactly as written, with NO automatic rescaling by the engine.
     - ambient/directional lights are NOT distance-attenuated: use small values, typically 0.4-1.3 (e.g. ambient 0.4-0.6, directional 0.8-1.3). This is the range you see in most reference scenes.
     - point/spot lights ARE distance-attenuated by inverse-square falloff ("decay" defaults to 2, i.e. physically correct) — at typical scene distances (a few meters to tens of meters) they need intensity roughly one to two orders of magnitude larger than ambient/directional, e.g. 20-60 for a light a few meters from what it's illuminating; use "unit":"candela" with a value like 2000-20000 if you want it explicitly photometric. NEVER give a point/spot light an intensity in the 0.4-1.3 range meant for ambient/directional — it will be effectively invisible.
@@ -274,7 +275,7 @@ GroupRecord, LineRecord, InfoPanelRecord, Css3dPanelRecord, ShaderSurfaceRecord,
 Css3dPanelRecord: { "objType": "css3dPanel", "html": string or "url": string, "panel": { "position", "geometry": { width, height, depth } } } — host must enable CSS3D rendering.
 ShaderSurfaceRecord: { "objType": "shaderSurface", "shaderSource" or material with ShaderMaterial, "geometry": plane/box dims, "position": {...} }
 ParticleEmitterItem: { "objType": "particleEmitter", "simulation": "cpu"|"gpuCompute", "count": number, "distribution": { "type": "box"|"sphere"|"shell"|"halo", "radius": number, "thickness": number }, "bounds": { "width", "height", "depth" }, "material": { "size", "opacity", "color", "blending": "additive", "depthWrite": false }, "position": {...} }
-TextItem (objectList only): { "objType": "text", "content": string, "mode": "sdf"|"texture"|"mesh", "fontSize": number, "color": "#RRGGBB", "align": "left"|"center"|"right", "billboard": boolean, "position": {x,y,z}, "mesh": { "fontJsonUrl": string } when mode is mesh }
+TextItem (objectList only): { "threeJsonId": string, "objType": "text", "content": string, "mode": "sdf"|"texture"|"mesh" (default/preferred "sdf"), "fontSize": number, "color": "#RRGGBB", "align": "left"|"center"|"right", "anchor": {"x":0..1,"y":0..1}, "billboard": boolean, "position": {x,y,z}, "sdf": {"outlineWidth"?:number,"outlineColor"?:"#RRGGBB"}, "mesh": { "fontJsonUrl": string, "depth"?:number, "bevelEnabled"?:boolean } only when mode is mesh }
 TubeItem: { "objType": "tube", "path": { "type": "catmullRom", "points": [{x,y,z},...] }, "geometry": { "radius", "tubularSegments" }, "material": {...} }
 InstancedItem: { "objType": "instanced", "geometry": { "width", "height", "depth" }, "transforms": [{ "position", "rotation", "scale" }] }
 
@@ -423,11 +424,24 @@ Compact standard-format reference patterns (copy only relevant patterns):
 A) Grounded primitives:
 {"version":"next","threeJsonId":"demo-primitives","sceneConfig":{"scene":{"background":"#222222"},"camera":{"fov":60,"position":{"x":18,"y":12,"z":22}},"controls":{"target":{"x":0,"y":2,"z":0}},"lights":[{"type":"ambient","intensity":0.5},{"type":"directional","intensity":1,"position":{"x":10,"y":16,"z":12}}]},"objectList":[{"threeJsonId":"floor-1","objType":"floor","geometry":{"width":20,"height":0.4,"depth":16},"position":{"x":0,"y":-0.2,"z":0},"material":{"type":"standard","color":"#3a4554"}},{"threeJsonId":"sphere-1","objType":"sphere","geometry":{"radius":2},"position":{"x":-3,"y":2,"z":0},"material":{"type":"standard","color":"#409eff"}},{"threeJsonId":"column-1","objType":"cylinder","geometry":{"radiusTop":1.2,"radiusBottom":1.2,"height":4},"position":{"x":3,"y":2,"z":0},"material":{"type":"standard","color":"#e6a23c"}}]}
 
-B) Domain object and static label:
+B) Domain object and explicitly panel-backed sign:
 {"version":"next","threeJsonId":"demo-cabinet","sceneConfig":{"camera":{"fov":55,"position":{"x":12,"y":9,"z":15}},"controls":{"target":{"x":0,"y":2,"z":0}},"lights":[{"type":"ambient","intensity":0.55},{"type":"directional","intensity":1,"position":{"x":8,"y":14,"z":10}}]},"objectList":[{"threeJsonId":"rack-a","objType":"domain","domain":"device.cabinet","handler":"createCabinet","payload":{"name":"rack-a","label":"Rack A","position":{"x":0,"y":0,"z":0}}},{"threeJsonId":"rack-label","objType":"infoPanel","text":"Rack A","panelBoxType":"box","panel":{"position":{"x":0,"y":5,"z":0},"geometry":{"width":3,"height":1,"depth":0.1}}}]}
 
 C) Interactive panel:
 {"version":"next","threeJsonId":"demo-panel","sceneConfig":{"scene":{"background":"#1a1a2e"},"camera":{"fov":55,"position":{"x":0,"y":6,"z":12}},"controls":{"target":{"x":0,"y":2,"z":0}},"lights":[{"type":"ambient","intensity":0.5},{"type":"directional","intensity":1,"position":{"x":5,"y":10,"z":8}}]},"objectList":[{"threeJsonId":"panel-1","objType":"css3dPanel","html":"<button>Start</button>","panel":{"position":{"x":0,"y":2,"z":0},"geometry":{"width":4,"height":3,"depth":0.1}}}]}
+
+D) Preferred pure scene text (SDF):
+{"version":"next","threeJsonId":"demo-sdf-text","sceneConfig":{"scene":{"background":"#18202b"},"camera":{"fov":50,"position":{"x":0,"y":6,"z":14}},"controls":{"target":{"x":0,"y":3,"z":0}},"lights":[{"type":"ambient","intensity":0.55},{"type":"directional","intensity":1,"position":{"x":6,"y":10,"z":8}}]},"objectList":[{"threeJsonId":"welcome-title","objType":"text","content":"Welcome","mode":"sdf","fontSize":1.4,"color":"#ffffff","align":"center","anchor":{"x":0.5,"y":0.5},"billboard":true,"position":{"x":0,"y":4,"z":0},"sdf":{"outlineWidth":0.04,"outlineColor":"#101820"}}]}
+`;
+
+const THREE_JSON_SCENE_TEXT_CAPABILITY = `
+Negotiated ThreeJSON scene-text capability:
+- For any requested visible words, titles, captions, names, labels, or written text, create an objectList item with objType:"text" and content. name/label metadata alone is invisible.
+- Preferred default is mode:"sdf" (Troika SDF/MSDF-style pure scene text): clean glyphs, transparent background, scalable, optional billboard, anchor, alignment and sdf outline. The runtime lazy-loads the text backend and falls back if unavailable; do not avoid SDF merely because it is implemented by an optional module.
+- Minimal standard record: {"threeJsonId":"title-1","objType":"text","content":"Requested words","mode":"sdf","fontSize":1.2,"color":"#ffffff","align":"center","anchor":{"x":0.5,"y":0.5},"billboard":true,"position":{"x":0,"y":3,"z":0}}.
+- Use infoPanel only when the user wants a board/card/screen/background carrying the text. An infoPanel is panel geometry with baked text, not the default for pure words.
+- Use mode:"mesh" only when the user explicitly requests extruded, beveled, solid, thick, or TextGeometry lettering; it requires mesh.fontJsonUrl (for example /assets/fonts/helvetiker_bold.typeface.json). Use mode:"texture" only for an intentional canvas-text plane/sprite.
+- Choose world-space fontSize and position that match the surrounding scene; add billboard:true for labels that should face the camera. Do not hide requested text inside businessInfo, name, label, HTML, or comments.
 `;
 
 const THREE_JSON_ANIMATION_CAPABILITY = `
@@ -476,6 +490,12 @@ function buildSceneCapabilityCatalog(options = {}) {
   if (options.animationCapabilities === true) {
     blocks.push(THREE_JSON_ANIMATION_CAPABILITY.trim());
   }
+  if (
+    options.sceneTextCapabilities === true ||
+    (Array.isArray(options.selectedCapabilityIds) && options.selectedCapabilityIds.includes("sceneText"))
+  ) {
+    blocks.push(THREE_JSON_SCENE_TEXT_CAPABILITY.trim());
+  }
   return blocks.map((block) => filterParticleCapabilityLines(block, options)).join("\n\n");
 }
 
@@ -494,8 +514,8 @@ function buildSceneAuthoringRules(options = {}) {
 function buildSceneOutlineSystemPrompt(options = {}) {
   return [
     "You are a ThreeJSON scene planner. The ThreeJSON engine supports basic primitives plus optional advanced features; plan only the capabilities needed for the requested scene.",
-    buildSceneCapabilityCatalog(),
-    buildSceneAuthoringRules(),
+    buildSceneCapabilityCatalog(options),
+    buildSceneAuthoringRules(options),
     "",
     "Output a concise bullet outline (English or Chinese) listing:",
     "- Major objects and spatial layout",
@@ -542,14 +562,15 @@ function buildSceneImageGenerationSystemPrompt(options = {}) {
 
 /** @returns {string} English system prompt for editing an existing scene. */
 function buildSceneUpdateSystemPrompt(options = {}) {
+  const promptOptions = { ...options, onlineTextureHints: false };
   return [
     "You are a ThreeJSON scene JSON editor.",
     "You will receive an existing JSON scene and a user modification request.",
     "Return the FULL updated JSON scene object after applying the requested changes.",
     "When adding objects, append standard objectList records with the most appropriate explicit objType and geometry fields.",
     "When editing existing objects, preserve every unrelated property. Size edits should change only the requested dimension(s); for a box height change, keep width/depth and material unchanged unless requested.",
-    buildSceneCapabilityCatalog(options),
-    buildSceneAuthoringRules(options),
+    buildSceneCapabilityCatalog(promptOptions),
+    buildSceneAuthoringRules(promptOptions),
     THREE_JSON_STANDARD_SCENE_SCHEMA_DESCRIPTION.trim(),
     THREE_JSON_OUTPUT_REQUIREMENT.trim()
   ].join("\n\n");
@@ -557,6 +578,7 @@ function buildSceneUpdateSystemPrompt(options = {}) {
 
 /** @returns {string} RFC 6902 patch output for incremental updates (smaller diffs). */
 function buildSceneIncrementalUpdateSystemPrompt(options = {}) {
+  const promptOptions = { ...options, onlineTextureHints: false };
   return [
     "You are a ThreeJSON scene editor. Apply the user request with minimal changes.",
     "Output ONLY a JSON array of RFC 6902 operations (add | replace | remove) against the scene root.",
@@ -564,8 +586,8 @@ function buildSceneIncrementalUpdateSystemPrompt(options = {}) {
     "Allowed path prefixes: /threeJsonId, /sceneConfig, /businessInfo, /objectList, /extensions.",
     "Use slash-separated JSON Pointer paths only (not dots). Example: [{\"op\":\"add\",\"path\":\"/objectList/-\",\"value\":{\"threeJsonId\":\"ball-2\",\"objType\":\"sphere\",...}}]",
     "Do NOT return the full scene object. No markdown fences unless wrapping the array.",
-    buildSceneCapabilityCatalog(options),
-    buildSceneAuthoringRules(options)
+    buildSceneCapabilityCatalog(promptOptions),
+    buildSceneAuthoringRules(promptOptions)
   ].join("\n\n");
 }
 

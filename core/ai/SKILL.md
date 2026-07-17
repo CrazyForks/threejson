@@ -92,7 +92,7 @@ AI output should satisfy:
 - Do not embed `alarmList` or page UI chrome in scene JSON.
 - Numeric values are finite and practical for scene rendering.
 - `position`, `rotation`, and `scale` accept `{ "x": ..., "y": ..., "z": ... }` or `[x, y, z]`. Rotation uses radians and numeric expressions such as `"PI / 2"`; generated JSON must not emit legacy `rotationX` or `scaleX` fields.
-- **Scene text** (`objType: "text"` in `objectList`): plain floating labels — not `infoPanelList`. Use `content`, `fontSize`, `color`, optional `mode` (`sdf` | `texture` | `mesh`).
+- **Scene text** (`objType: "text"` in `objectList`): when the user asks to add/show/write visible words, titles, captions, names, or labels, create a real text record with `content`; `name`/`label` metadata does not render glyphs. Prefer `mode: "sdf"` for clean pure text. Use `infoPanel` only for an explicitly panel-backed sign/card/screen, and `mode: "mesh"` only for explicitly extruded/beveled solid lettering with `mesh.fontJsonUrl`.
 - **Static panels** → `infoPanelList` (baked texture). **Interactive DOM** → `css3dPanelList` (host CSS3D required). **Particles** → prefer `objType: particleEmitter`.
 - Do not put panel chrome in `objType: text` records.
 

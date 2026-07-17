@@ -995,6 +995,17 @@ async function main() {
     },
     onSelectConversation: (conversationId) => {
       void switchToConversation(conversationId);
+    },
+    onDeleteConversation: (_conversation, { wasActive }) => {
+      if (!wasActive) {
+        return;
+      }
+      activeAbortController?.abort();
+      activeAbortController = null;
+      chatPanel.setBusy(false);
+      disposeAllSceneCards();
+      attachedContext.clear();
+      chatPanel.clear();
     }
   });
   await sidebar.init();

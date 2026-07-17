@@ -1,5 +1,12 @@
 import { showToast } from "./threeBoxUiFeedback.js";
-import { putConversation, getAllConversations, putProject, getAllProjects } from "./threeBoxSessionStore.js";
+import {
+  putConversation,
+  getAllConversations,
+  deleteConversation,
+  deleteTurnsForConversation,
+  putProject,
+  getAllProjects
+} from "./threeBoxSessionStore.js";
 import { t } from "../../shared/i18n/index.js";
 
 /**
@@ -32,7 +39,7 @@ function formatRelativeTime(ts) {
 }
 
 /**
- * @param {{ openAiConfig?: () => void, openSettings?: () => void, closeLeftDock?: () => void, onNewChat?: (conv: object) => void, onSelectConversation?: (id: string) => void }} [host]
+ * @param {{ openAiConfig?: () => void, openSettings?: () => void, closeLeftDock?: () => void, onNewChat?: (conv: object) => void, onSelectConversation?: (id: string) => void, onDeleteConversation?: (conv: object, detail: { wasActive: boolean }) => void|Promise<void> }} [host]
  */
 export function createThreeBoxSidebar(host = {}) {
   const templateSearchInput = document.getElementById("templateSearchInput");
@@ -264,6 +271,47 @@ export function createThreeBoxSidebar(host = {}) {
         );
       }
       closeHistoryContextMenu();
+    });
+    historyContextMenu?.querySelector('[data-action="delete"]')?.addEventListener("click", async () => {
+      const conv = findConversation(contextMenuTargetId);
+      if (!conv) {
+        closeHistoryContextMenu();
+        return;
+      }
+      const confirmed = window.confirm(
+        t(
+          "threebox.sidebar.deleteConfirm",
+          "确定删除聊天“{title}”吗？此操作无法撤销。",
+          { title: conv.title }
+        )
+      );
+      if (!confirmed) {
+        closeHistoryContextMenu();
+        return;
+      }
+
+      const wasActive = conv.id === activeConversationId;
+      closeHistoryContextMenu();
+      try {
+        await deleteTurnsForConversation(conv.id);
+        await deleteConversation(conv.id);
+        conversations = conversations.filter((item) => item.id !== conv.id);
+        if (wasActive) {
+          activeConversationId = null;
+        }
+        renderHistoryList();
+        renderSearchChatResults(searchChatInput?.value || "");
+        await host.onDeleteConversation?.(conv, { wasActive });
+        showToast(t("threebox.sidebar.toastDeleted", "聊天已删除。"), "success");
+      } catch (error) {
+        console.error("[threebox] failed to delete conversation:", error);
+        showToast(
+          t("threebox.sidebar.toastDeleteFailed", "删除聊天失败：{error}", {
+            error: error?.message || error
+          }),
+          "error"
+        );
+      }
     });
     document.addEventListener("pointerdown", (event) => {
       if (historyContextMenu && !historyContextMenu.hidden && !historyContextMenu.contains(event.target)) {

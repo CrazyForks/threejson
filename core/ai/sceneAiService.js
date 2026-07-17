@@ -916,7 +916,7 @@ async function requestUpdatedSceneJsonString(prompt, currentSceneJsonString, opt
       messages: [
         {
           role: "system",
-          content: buildSceneIncrementalUpdateSystemPrompt()
+          content: buildSceneIncrementalUpdateSystemPrompt(options)
         },
         {
           role: "user",
@@ -946,7 +946,7 @@ async function requestUpdatedSceneJsonString(prompt, currentSceneJsonString, opt
     messages: [
       {
         role: "system",
-        content: buildSceneUpdateSystemPrompt()
+        content: buildSceneUpdateSystemPrompt(options)
       },
       {
         role: "user",
@@ -1048,11 +1048,13 @@ async function requestUpdatedSceneEditCommands(prompt, context = {}, options = {
         agentRound: agentRound || iterativeApply,
         iterativeApply,
         onlineTextureHints: options.onlineTextureHints,
-        animationCapabilities: options.animationCapabilities
+        animationCapabilities: options.animationCapabilities,
+        selectedCapabilityIds: options.selectedCapabilityIds
       })
     : buildSceneCommandUpdateSystemPrompt({
         onlineTextureHints: options.onlineTextureHints,
-        animationCapabilities: options.animationCapabilities
+        animationCapabilities: options.animationCapabilities,
+        selectedCapabilityIds: options.selectedCapabilityIds
       });
 
   const content = await requestChatCompletion({

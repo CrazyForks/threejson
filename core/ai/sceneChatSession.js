@@ -80,6 +80,7 @@ function buildClassifyIntentSystemPrompt(animationCapabilityMode = "auto") {
     '- Complexity features are optional safeguards, not a quality setting. Never choose "segmented" merely to improve quality, reasoning, correctness, or visual detail. Never begin a large one-shot response expecting the host to repair an arbitrary cutoff later.',
     '- For "single" or "compact", estimatedSegments MUST be 1. For "segmented", use 2-16 and only when the requested JSON is clearly too large for one provider response. If you are not confident that strict segmented output is supported, choose "compact" instead.',
     '- selectedCapabilityIds lists only the capability ids whose detailed syntax/examples the generation model needs. Do semantic reasoning; do not select capabilities merely because a keyword appears.',
+    '- If the user asks to add, show, write, label, title, caption, or otherwise render visible words in the 3D scene, select "sceneText". Plain text defaults to SDF scene text. Select "infoPanel" instead only when the requested text needs a visible board/card/screen/panel backing; explicit extruded/beveled/solid lettering may use mesh text.',
     animationCapabilityMode === "on"
       ? '- Animation capability is explicitly enabled by the user: requiresAnimation MUST be true and selectedCapabilityIds MUST include events, lifecycle, or declarativeAnimation as appropriate.'
       : animationCapabilityMode === "off"

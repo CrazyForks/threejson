@@ -69,3 +69,27 @@ test("evaluateCapabilityFit does not force a particleEmitter gap for a plain way
   assert.ok(fit.ok, `expected no capability gaps, got: ${JSON.stringify(fit.gaps)}`);
   assert.ok(!fit.matchedSignals.includes("particles"));
 });
+
+test("ordinary requests to add visible words select sceneText and require a TextItem", () => {
+  const prompt = "在小木屋门口添加文字‘森林之家’";
+  const ids = matchIntentSignals(prompt).map((signal) => signal.id);
+  assert.ok(ids.includes("sceneText"));
+
+  const metadataOnly = evaluateCapabilityFit(prompt, {
+    objectList: [{ threeJsonId: "cabin", objType: "box", label: "森林之家" }]
+  });
+  assert.equal(metadataOnly.ok, false);
+  assert.match(metadataOnly.gaps.join("\n"), /objType text/i);
+
+  const withSdfText = evaluateCapabilityFit(prompt, {
+    objectList: [
+      {
+        threeJsonId: "cabin-title",
+        objType: "text",
+        content: "森林之家",
+        mode: "sdf"
+      }
+    ]
+  });
+  assert.equal(withSdfText.ok, true);
+});

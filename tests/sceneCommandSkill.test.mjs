@@ -61,6 +61,17 @@ test("buildSceneCommandUpdateSystemPrompt respects online texture hint toggle", 
   assert.doesNotMatch(disabled, /any public web source, not only a CDN/);
 });
 
+test("command update prompt adds requested visible text as SDF instead of metadata", () => {
+  const prompt = buildSceneCommandUpdateSystemPrompt({
+    selectedCapabilityIds: ["sceneText"]
+  });
+  assert.match(prompt, /object\.add descriptor=.*\"objType\":\"text\"/);
+  assert.match(prompt, /\"content\":\"\.\.\.\"/);
+  assert.match(prompt, /\"mode\":\"sdf\"/);
+  assert.match(prompt, /name\/label fields are metadata and do not display glyphs/);
+  assert.match(prompt, /sceneText was selected during negotiation/);
+});
+
 test("buildSceneCommandAutoUpdateSystemPrompt distinguishes agent vs single round", () => {
   const single = buildSceneCommandAutoUpdateSystemPrompt();
   assert.ok(single.includes("Single-round"));

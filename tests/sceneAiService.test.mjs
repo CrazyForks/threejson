@@ -909,6 +909,34 @@ test("classifyTurnIntent returns model-negotiated capability ids and animation d
   }
 });
 
+test("classifyTurnIntent teaches the model to select sceneText for visible words", async () => {
+  let requestBody;
+  globalThis.fetch = async (_url, init = {}) => {
+    requestBody = JSON.parse(init.body);
+    return {
+      ok: true,
+      async json() {
+        return {
+          choices: [{
+            message: {
+              content: '{"intent":"generate","targetTurnId":null,"note":"visible title","generationStrategy":"single","estimatedSegments":1,"selectedCapabilityIds":["sceneText"],"requiresAnimation":false}'
+            }
+          }]
+        };
+      }
+    };
+  };
+
+  const result = await classifyTurnIntent(
+    { userPrompt: "在门口添加文字‘森林之家’", history: [] },
+    { provider: "chatgpt", apiKey: "test-key" }
+  );
+
+  assert.match(requestBody.messages[0].content, /select \"sceneText\"/);
+  assert.match(requestBody.messages[0].content, /Plain text defaults to SDF scene text/);
+  assert.deepEqual(result.selectedCapabilityIds, ["sceneText"]);
+});
+
 test("requestSceneRefinementStep recognizes done, JSON Patch, and commands", async () => {
   const scene = JSON.stringify({
     threeJsonId: "refinement-scene",
@@ -1001,4 +1029,65 @@ test("requestUpdatedSceneJsonString does not carry proactive online texture prom
   const systemContent = requestBodies[0].messages[0].content;
   assert.doesNotMatch(systemContent, /Online texture rule/);
   assert.doesNotMatch(systemContent, /self-evidently incomplete as a flat color/);
+});
+
+test("requestUpdatedSceneJsonString forwards negotiated sceneText guidance", async () => {
+  const requestBodies = [];
+  globalThis.fetch = async (_url, init = {}) => {
+    requestBodies.push(JSON.parse(init.body));
+    return {
+      ok: true,
+      async json() {
+        return {
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  version: "next",
+                  threeJsonId: "text-update",
+                  objectList: [
+                    {
+                      threeJsonId: "title-1",
+                      objType: "text",
+                      content: "森林之家",
+                      mode: "sdf",
+                      fontSize: 1.2,
+                      color: "#ffffff",
+                      position: { x: 0, y: 3, z: 0 }
+                    }
+                  ]
+                })
+              }
+            }
+          ]
+        };
+      }
+    };
+  };
+
+  await requestUpdatedSceneJsonString(
+    "添加文字森林之家",
+    JSON.stringify({
+      version: "next",
+      threeJsonId: "base",
+      objectList: [
+        {
+          threeJsonId: "floor-1",
+          objType: "floor",
+          geometry: { width: 4, height: 0.1, depth: 4 },
+          material: { color: "#777777" }
+        }
+      ]
+    }),
+    {
+      provider: "chatgpt",
+      apiKey: "test-key",
+      selectedCapabilityIds: ["sceneText"]
+    }
+  );
+
+  assert.equal(requestBodies.length, 1);
+  const systemContent = requestBodies[0].messages[0].content;
+  assert.match(systemContent, /Negotiated ThreeJSON scene-text capability/);
+  assert.match(systemContent, /Preferred default is mode:\"sdf\"/);
 });

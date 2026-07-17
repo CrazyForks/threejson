@@ -257,6 +257,23 @@ function buildCommandUtilityFragment() {
   ].join("\n");
 }
 
+function buildCommandSceneTextFragment(options = {}) {
+  const selected = Array.isArray(options.selectedCapabilityIds)
+    ? options.selectedCapabilityIds.includes("sceneText")
+    : false;
+  const rules = [
+    "Visible scene text:",
+    "- To add visible words/title/caption/label, use object.add descriptor={\"threeJsonId\":\"...\",\"objType\":\"text\",\"content\":\"...\",\"mode\":\"sdf\",\"fontSize\":1.2,\"color\":\"#ffffff\",\"position\":{\"x\":0,\"y\":3,\"z\":0}}. Descriptor name/label fields are metadata and do not display glyphs.",
+    "- Prefer mode:sdf for pure text. Use infoPanel only for an explicitly panel-backed board/card/screen; use mode:mesh only for explicitly extruded/beveled/solid letters with mesh.fontJsonUrl."
+  ];
+  if (selected) {
+    rules.push(
+      "- sceneText was selected during negotiation: ensure the final applied scene really contains objType:text with the requested content; optional billboard, anchor, align and sdf outline are supported."
+    );
+  }
+  return rules.join("\n");
+}
+
 function buildCommandOnlineTextureFragment(options = {}) {
   if (options.onlineTextureHints === false) {
     return [
@@ -276,13 +293,15 @@ function buildCommandOnlineTextureFragment(options = {}) {
 /**
  * @returns {string}
  */
-function buildCommandPromptRulesFragment() {
+function buildCommandPromptRulesFragment(options = {}) {
   return [
     buildUserIntentPriorityFragment(),
     "",
     buildScaleMatchingFragment(),
     "",
     buildGroupRulesFragment(),
+    "",
+    buildCommandSceneTextFragment(options),
     "",
     buildCommandUtilityFragment()
   ].join("\n");
@@ -411,7 +430,7 @@ export function buildSceneCommandAutoUpdateSystemPrompt(options = {}) {
     "Use full JSON only when commands or JSON Patch would be impractical.",
     "Do NOT output editor.* commands or markdown prose outside the script/JSON.",
     "",
-    buildCommandPromptRulesFragment(),
+    buildCommandPromptRulesFragment(options),
     buildCommandAnimationFragment(options),
     "",
     buildCommandOnlineTextureFragment(options),
@@ -450,7 +469,7 @@ export function buildSceneCommandUpdateSystemPrompt(options = {}) {
     "- object.add descriptor must include objType and required geometry fields.",
     "- Lines starting with # are comments (optional).",
     "",
-    buildCommandPromptRulesFragment(),
+    buildCommandPromptRulesFragment(options),
     buildCommandAnimationFragment(options),
     "",
     buildCommandOnlineTextureFragment(options),

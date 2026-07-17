@@ -41,6 +41,7 @@ export const THREEBOX_SHELL_LABELS_EN = {
   "threebox.shell.close": "Close",
   "threebox.shell.pin": "Pin",
   "threebox.shell.archive": "Archive",
+  "threebox.shell.delete": "Delete",
   "threebox.shell.moveToProject": "Move to Project",
 
   "threebox.app.noModelConfigured": "No model configured",
@@ -80,6 +81,9 @@ export const THREEBOX_SHELL_LABELS_EN = {
   "threebox.sidebar.toastUnpinned": "Unpinned",
   "threebox.sidebar.toastArchived": "Archived",
   "threebox.sidebar.toastUnarchived": "Unarchived",
+  "threebox.sidebar.deleteConfirm": "Delete chat \"{title}\"? This action cannot be undone.",
+  "threebox.sidebar.toastDeleted": "Chat deleted.",
+  "threebox.sidebar.toastDeleteFailed": "Failed to delete chat: {error}",
   "threebox.sidebar.searchNoResults": "No matching chats found.",
   "threebox.sidebar.archivedSuffix": " · Archived",
   "threebox.sidebar.toastAiConfigComingSoon": "The AI settings panel is coming in a future milestone.",

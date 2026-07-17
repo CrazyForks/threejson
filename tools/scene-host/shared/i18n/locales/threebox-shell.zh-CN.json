@@ -41,6 +41,7 @@
   "threebox.shell.close": "关闭",
   "threebox.shell.pin": "置顶",
   "threebox.shell.archive": "归档",
+  "threebox.shell.delete": "删除",
   "threebox.shell.moveToProject": "移入项目",
 
   "threebox.app.noModelConfigured": "未配置模型",
@@ -80,6 +81,9 @@
   "threebox.sidebar.toastUnpinned": "已取消置顶",
   "threebox.sidebar.toastArchived": "已归档",
   "threebox.sidebar.toastUnarchived": "已取消归档",
+  "threebox.sidebar.deleteConfirm": "确定删除聊天“{title}”吗？此操作无法撤销。",
+  "threebox.sidebar.toastDeleted": "聊天已删除。",
+  "threebox.sidebar.toastDeleteFailed": "删除聊天失败：{error}",
   "threebox.sidebar.searchNoResults": "未找到匹配的聊天。",
   "threebox.sidebar.archivedSuffix": " · 已归档",
   "threebox.sidebar.toastAiConfigComingSoon": "AI 配置面板将在后续里程碑接入。",

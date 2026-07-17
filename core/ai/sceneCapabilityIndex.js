@@ -51,6 +51,10 @@ Interaction and lifecycle:
 - sceneConfig.eventScript configures DSL/javascript mode, maxSteps, and allowed run commands. Keep scripts short and scene-local.
 - object lifecycle can be enabled with sceneConfig.interaction.enableObjectLifecycle when object.ready/object.dispose behavior matters.
 
+Scene text (capability id: sceneText):
+- Visible words, titles, captions, object names, floor labels, and floating labels use objectList objType text. Prefer mode:"sdf" for requested plain text; use infoPanel only when a visible panel/card/sign backing is requested, and mode:"mesh" only for explicit extruded/beveled solid lettering.
+- TextItem uses content, fontSize, color, position, optional billboard/anchor/align and sdf styling. Do not substitute descriptor name/label for visible content.
+
 Command and patch editing:
 - Core command mode supports scene.list, scene.validate, scene.applyPatch, scene.export, object.get/add/remove/patch/reconcile, material.patch, camera.fit.
 - Use commands for small edits and full JSON for broad restructuring. Use JSON Patch for minimal document-level edits when paths are clear.
