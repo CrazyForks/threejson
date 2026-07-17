@@ -25,7 +25,8 @@ import {
 import {
   createViewportGizmoOverlay,
   disposeViewportGizmoOverlay,
-  renderViewportGizmoOverlay
+  renderViewportGizmoOverlay,
+  updateViewportGizmoOverlay
 } from "../../shared/js/viewportGizmoOverlay.js";
 import {
   jsonStringForScript,
@@ -973,6 +974,7 @@ function cycleViewMode() {
 
 function resizeRuntime() {
   runtime?.resize?.(Math.max(1, els.canvasWrap.clientWidth), Math.max(1, els.canvasWrap.clientHeight));
+  updateViewportGizmoOverlay();
 }
 
 function pickObject(event) {

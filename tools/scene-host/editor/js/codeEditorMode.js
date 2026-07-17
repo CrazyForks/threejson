@@ -8,6 +8,10 @@ import {
   buildFriendlyScenePayloadFromCanonical,
   normalizeScenePayload
 } from "threejson/core";
+import {
+  captureEditorCameraView,
+  restoreEditorCameraView
+} from "./editorCameraViewSnapshot.js";
 
 const PIP_MIN_WIDTH = 220;
 const PIP_MIN_HEIGHT = 140;
@@ -511,8 +515,17 @@ export function createCodeEditorMode(host) {
     host.windowResize?.();
   }
 
+  function captureCameraView() {
+    return captureEditorCameraView(host.getCamera?.(), host.getControls?.());
+  }
+
+  function restoreCameraView(view) {
+    restoreEditorCameraView(host.getCamera?.(), host.getControls?.(), view);
+  }
+
   async function enterCodeMode(options = {}) {
     const split = Boolean(options.split);
+    const preservedView = captureCameraView();
     if (modeSwitchInProgress) {
       return;
     }
@@ -524,6 +537,7 @@ export function createCodeEditorMode(host) {
       }
       syncEditModeToggleUi();
       await syncViewportAfterModeChange();
+      restoreCameraView(preservedView);
       return;
     }
     beginModeSwitch("正在切换到代码编辑模式…");
@@ -553,6 +567,7 @@ export function createCodeEditorMode(host) {
         restorePipGeometryForCodeMode();
       }
       await syncViewportAfterModeChange();
+      restoreCameraView(preservedView);
       if (codeMirrorView) {
         codeMirrorView.requestMeasure();
         codeMirrorView.focus();
@@ -585,6 +600,7 @@ export function createCodeEditorMode(host) {
     if (!isCodeEditMode() || modeSwitchInProgress) {
       return;
     }
+    const preservedView = captureCameraView();
     beginModeSwitch("正在切换到 3D 编辑模式…");
     try {
       cancelAutoRenderTimer();
@@ -593,6 +609,7 @@ export function createCodeEditorMode(host) {
       clearPipInlineGeometry();
       syncEditModeToggleUi();
       await syncViewportAfterModeChange();
+      restoreCameraView(preservedView);
     } finally {
       endModeSwitch();
     }

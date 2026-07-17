@@ -89,7 +89,8 @@ import { createEditorGridHelper } from "./editorGridHelper.js";
 import {
   createViewportGizmoOverlay,
   disposeViewportGizmoOverlay,
-  renderViewportGizmoOverlay
+  renderViewportGizmoOverlay,
+  updateViewportGizmoOverlay
 } from "../../shared/js/viewportGizmoOverlay.js";
 import { createEditorViewPreserve } from "./editorViewPreserve.js";
 import {
@@ -578,15 +579,15 @@ export async function bootstrapSceneHostEditor() {
     if (viewportGizmoContainer) {
       return viewportGizmoContainer;
     }
-    if (!stageShell) {
+    if (!canvasWrap) {
       return null;
     }
     const el = document.createElement("div");
     el.id = "viewportGizmoOverlayRoot";
-    // Sits above the docked side panels (.flyoutHost is z-index:55) so the gizmo isn't hidden
-    // behind the properties panel's top-right corner; stays below the top chrome bar (z-index:200).
+    // The gizmo must use the actual renderer canvas bounds. stageShell stays full-size
+    // in Code mode while canvasWrap becomes a PiP, which previously left stale bounds.
     el.style.cssText = "position:absolute;inset:0;pointer-events:none;z-index:60;";
-    stageShell.appendChild(el);
+    canvasWrap.appendChild(el);
     viewportGizmoContainer = el;
     return el;
   }
@@ -720,6 +721,7 @@ export async function bootstrapSceneHostEditor() {
     // the canvas' 100% sizing with a stale inline pixel width during mode changes.
     renderLoop?.resize({ width: myWidth, height: myHeight, updateStyle: false });
     editorThreeView?.onWindowResize?.();
+    updateViewportGizmoOverlay();
     return true;
   }
   host.windowResize = windowResize;
