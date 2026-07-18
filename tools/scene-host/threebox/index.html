@@ -153,17 +153,19 @@
             window.dispatchEvent(new Event("resize"));
           }
 
-          function onPointerDown(event) {
+          function onClick(event) {
             if (!mobileQuery.matches) return;
             event.preventDefault();
             event.stopPropagation();
             sync(!root.classList.contains("leftDockPeek"));
           }
 
-          button.addEventListener("pointerdown", onPointerDown, true);
+          // Do not open on pointerdown: on touch screens the drawer would slide underneath the
+          // still-pressed finger, and the later synthetic click could land on its brand link.
+          button.addEventListener("click", onClick, true);
           window.__threeBoxEarlyMobileMenu = {
             isOpen: () => root.classList.contains("leftDockPeek"),
-            dispose: () => button.removeEventListener("pointerdown", onPointerDown, true)
+            dispose: () => button.removeEventListener("click", onClick, true)
           };
         })();
       </script>

@@ -671,7 +671,7 @@ details[open] > .sidebarSectionTitle::before { transform: rotate(90deg); }
   display: none; position: absolute; top: 12px; left: 12px; z-index: 70;
   width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line);
   background: var(--panel2); color: var(--text); align-items: center; justify-content: center; cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24); touch-action: manipulation;
 }
 .mobileMenuBtn svg { width: 16px; height: 16px; }
 
@@ -703,6 +703,9 @@ details[open] > .sidebarSectionTitle::before { transform: rotate(90deg); }
   }
   #rootContainer.leftDockPinned .leftDock { transform: translateX(-100%); }
   #rootContainer.leftDockPeek .leftDock { transform: translateX(0); }
+  /* The drawer opens only after the menu-button click completes. Keep it non-interactive for a
+     brief guard window as a second line of defence against delayed synthetic touch clicks. */
+  #rootContainer.mobileDockInteractionGuard .leftDock { pointer-events: none; }
   #rootContainer.leftDockPeek .flyoutHostLeft::after {
     content: ""; position: absolute; inset: 0; left: min(88vw, 360px);
     background: rgba(0, 0, 0, 0.4); pointer-events: none;

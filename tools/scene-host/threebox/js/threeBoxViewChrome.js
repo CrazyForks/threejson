@@ -3,6 +3,7 @@ import { t } from "../../shared/i18n/index.js";
 const LEFT_DOCK_PINNED_STORAGE_KEY = "threejson.threebox.leftDockPinned";
 const PEEK_HIDE_DELAY_MS = 260;
 const MOBILE_MEDIA_QUERY = "(max-width: 720px)";
+const MOBILE_OPEN_GUARD_MS = 600;
 
 /** A permanently "pinned" 288px sidebar would eat most of a phone-width viewport, so mobile
  * ignores the persisted pin preference entirely and always starts collapsed — the sidebar only
@@ -47,8 +48,20 @@ export function createThreeBoxViewChrome() {
 
   let leftDockPinned = readPinnedFromStorage();
   let leftDockPeek = Boolean(rootContainer?.classList.contains("leftDockPeek") || window.__threeBoxMobileMenuPreopened);
-  let handledMobilePointer = false;
   let peekHideTimer = null;
+  let mobileOpenGuardTimer = null;
+
+  function clearMobileOpenGuard() {
+    clearTimeout(mobileOpenGuardTimer);
+    mobileOpenGuardTimer = null;
+    rootContainer?.classList.remove("mobileDockInteractionGuard");
+  }
+
+  function armMobileOpenGuard() {
+    clearMobileOpenGuard();
+    rootContainer?.classList.add("mobileDockInteractionGuard");
+    mobileOpenGuardTimer = window.setTimeout(clearMobileOpenGuard, MOBILE_OPEN_GUARD_MS);
+  }
 
   function syncClasses() {
     if (isMobileViewport()) {
@@ -94,6 +107,7 @@ export function createThreeBoxViewChrome() {
 
   function openMobilePeek() {
     clearTimeout(peekHideTimer);
+    armMobileOpenGuard();
     leftDockPeek = true;
     syncClasses();
   }
@@ -103,6 +117,7 @@ export function createThreeBoxViewChrome() {
       return;
     }
     clearTimeout(peekHideTimer);
+    clearMobileOpenGuard();
     leftDockPeek = false;
     syncClasses();
   }
@@ -117,6 +132,7 @@ export function createThreeBoxViewChrome() {
 
   function handleViewportChange() {
     clearTimeout(peekHideTimer);
+    clearMobileOpenGuard();
     if (isMobileViewport()) {
       leftDockPinned = false;
       leftDockPeek = false;
@@ -161,27 +177,14 @@ export function createThreeBoxViewChrome() {
       event.stopPropagation();
       togglePinned();
     });
-    mobileMenuBtn?.addEventListener("pointerdown", (event) => {
-      if (!isMobileViewport()) {
-        return;
-      }
-      handledMobilePointer = true;
-      event.preventDefault();
-      event.stopPropagation();
-      toggleMobilePeek();
-      window.setTimeout(() => {
-        handledMobilePointer = false;
-      }, 900);
-    });
     mobileMenuBtn?.addEventListener("click", (event) => {
-      if (handledMobilePointer) {
-        handledMobilePointer = false;
+      if (isMobileViewport()) {
         event.preventDefault();
         event.stopPropagation();
-        return;
+        toggleMobilePeek();
+      } else {
+        event.stopPropagation();
       }
-      event.stopPropagation();
-      toggleMobilePeek();
     });
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
