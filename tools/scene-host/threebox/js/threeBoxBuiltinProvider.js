@@ -168,7 +168,7 @@ function notifyBuiltinProviderUnavailable() {
  * before this feature existed. Nothing here blocks boot or throws past this function.
  * @param {{getSettings: () => object, updateSettings: (updater: (draft: object) => void, options?: object) => object}} settingsModal
  */
-export async function ensureBuiltinApiKey(settingsModal) {
+async function ensureBuiltinApiKeyInternal(settingsModal) {
   const settings = settingsModal.getSettings();
   const provider = findBuiltinProvider(settings);
   if (!provider) {
@@ -220,6 +220,26 @@ export async function ensureBuiltinApiKey(settingsModal) {
       notifyBuiltinProviderUnavailable();
     }
   }
+}
+
+let inFlightEnsurePromise = null;
+
+/**
+ * Public entry point for `ensureBuiltinApiKeyInternal` above — deduplicates concurrent callers
+ * into a single in-flight request/promise. This matters because `threeBoxApp.js`'s `main()` fires
+ * this once on boot (`void ensureBuiltinApiKey(...)`, not awaited so it never blocks first paint),
+ * and separately awaits it again from the send-message path if a key is still missing at send
+ * time (closing the race where a user types and hits Send before the boot-time issuance request
+ * has come back) — without dedup, that second call would fire a redundant `/v1/auth/issue`
+ * request (a second device registration attempt) instead of just waiting for the first one.
+ */
+export function ensureBuiltinApiKey(settingsModal) {
+  if (!inFlightEnsurePromise) {
+    inFlightEnsurePromise = ensureBuiltinApiKeyInternal(settingsModal).finally(() => {
+      inFlightEnsurePromise = null;
+    });
+  }
+  return inFlightEnsurePromise;
 }
 
 /**

@@ -837,9 +837,20 @@ async function main() {
   }
 
   async function handleUserMessageUnsafe(text, api) {
-    const settings = settingsModal.getSettings();
+    let settings = settingsModal.getSettings();
     const selectedProviderId = document.getElementById("composerModelSelect")?.value;
-    const providerOptions = resolveProviderOptions(settings, selectedProviderId);
+    let providerOptions = resolveProviderOptions(settings, selectedProviderId);
+    if (!providerOptions || !providerOptions.apiKey) {
+      // The built-in provider's trial key is issued asynchronously at boot (main() fires
+      // ensureBuiltinApiKey without awaiting it, so first paint isn't blocked on a network round
+      // trip) — a user who sends a message within that window would otherwise see "no provider
+      // configured" even though the built-in provider is about to become available. Give the
+      // (deduplicated, see threeBoxBuiltinProvider.js) issuance a chance to finish before giving
+      // up; for any other provider this just resolves immediately as a no-op.
+      await ensureBuiltinApiKey(settingsModal);
+      settings = settingsModal.getSettings();
+      providerOptions = resolveProviderOptions(settings, selectedProviderId);
+    }
     if (!providerOptions || !providerOptions.apiKey) {
       api.appendAssistantMessage(
         t(
