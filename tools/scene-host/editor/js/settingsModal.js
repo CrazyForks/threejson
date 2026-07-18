@@ -13,6 +13,7 @@ import {
 import { fetchBuiltinQuota } from "../../shared/js/builtinAiProvider.js";
 import { BUILTIN_PROVIDER_TYPE, getDisplayDeviceId } from "./editorBuiltinAiProvider.js";
 import { t } from "../../shared/i18n/index.js";
+import { isBuiltinPrivacyAccepted } from "../../shared/js/builtinProviderPrivacy.js";
 
 function createEditorProviderId() {
   return `provider-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -151,7 +152,28 @@ export function createSettingsModalController({ host, onSave, onReset }) {
     quotaRow.appendChild(quotaValue);
     card.appendChild(quotaRow);
 
-    if (provider.apiKey) {
+    if (!isBuiltinPrivacyAccepted("editor")) {
+      const consent = document.createElement("div");
+      consent.className = "editorProviderBuiltinConsentNotice";
+      const consentText = document.createElement("span");
+      consentText.textContent = settingsText(
+        "builtinPrivacy.required",
+        "您必须同意使用协议才能使用内置模型。"
+      );
+      const agreementBtn = document.createElement("button");
+      agreementBtn.type = "button";
+      agreementBtn.className = "editorSettingsActionBtn";
+      agreementBtn.textContent = settingsText("builtinPrivacy.viewAgreement", "查看协议");
+      agreementBtn.addEventListener("click", async () => {
+        await host.openBuiltinPrivacyAgreement?.();
+        renderProviderList();
+      });
+      consent.appendChild(consentText);
+      consent.appendChild(agreementBtn);
+      card.appendChild(consent);
+    }
+
+    if (provider.apiKey && isBuiltinPrivacyAccepted("editor")) {
       const base = String(draft?.ai?.builtinBackendUrl || "").replace(/\/$/, "");
       fetchBuiltinQuota(base, provider.apiKey)
         .then((body) => {
@@ -339,9 +361,27 @@ export function createSettingsModalController({ host, onSave, onReset }) {
       const opt = document.createElement("option");
       opt.value = provider.id;
       opt.textContent = provider.label || provider.id;
+      opt.disabled =
+        provider.provider === BUILTIN_PROVIDER_TYPE &&
+        !isBuiltinPrivacyAccepted("editor");
       defaultSelect.appendChild(opt);
     }
-    defaultSelect.value = draft.ai.defaultProviderId || providers[0].id;
+    const selectableDefault = providers.find(
+      (provider) => provider.provider !== BUILTIN_PROVIDER_TYPE || isBuiltinPrivacyAccepted("editor")
+    );
+    const configuredDefault = providers.find(
+      (provider) =>
+        provider.id === draft.ai.defaultProviderId &&
+        (provider.provider !== BUILTIN_PROVIDER_TYPE || isBuiltinPrivacyAccepted("editor"))
+    );
+    defaultSelect.value =
+      configuredDefault?.id
+      || selectableDefault?.id
+      || draft.ai.defaultProviderId
+      || providers[0].id;
+    if (selectableDefault && !configuredDefault) {
+      draft.ai.defaultProviderId = defaultSelect.value;
+    }
     defaultSelect.addEventListener("change", () => {
       draft.ai.defaultProviderId = defaultSelect.value;
     });

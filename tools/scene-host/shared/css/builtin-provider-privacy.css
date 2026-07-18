@@ -1,0 +1,206 @@
+.builtinPrivacyOpen {
+  overflow: hidden;
+}
+
+.builtinPrivacyOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(2, 6, 18, .72);
+  backdrop-filter: blur(4px);
+}
+
+.builtinPrivacyDialog {
+  width: min(680px, 100%);
+  max-height: min(820px, calc(100dvh - 40px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--text, #e8ecf4);
+  background: var(--panel2, var(--panel, #171c29));
+  border: 1px solid var(--line, #303849);
+  border-radius: 16px;
+  box-shadow: 0 24px 72px rgba(0, 0, 0, .48);
+}
+
+.builtinPrivacyHeader {
+  flex: 0 0 auto;
+  padding: 18px 22px 15px;
+  border-bottom: 1px solid var(--line, #303849);
+}
+
+.builtinPrivacyHeader h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+.builtinPrivacyBody {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--brand, #5b8cff) 62%, transparent) transparent;
+  padding: 18px 22px;
+  font-size: 13px;
+  line-height: 1.72;
+}
+
+.builtinPrivacyBody::-webkit-scrollbar {
+  width: 8px;
+}
+
+.builtinPrivacyBody::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.builtinPrivacyBody::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--brand, #5b8cff) 55%, var(--line, #303849));
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+.builtinPrivacyBody::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--brand, #5b8cff) 75%, var(--line, #303849));
+  background-clip: padding-box;
+}
+
+.builtinPrivacyBody p {
+  margin: 0;
+}
+
+.builtinPrivacyLead {
+  color: var(--text, #e8ecf4);
+  font-weight: 600;
+}
+
+.builtinPrivacySection {
+  margin-top: 17px;
+}
+
+.builtinPrivacySection h3 {
+  margin: 0 0 5px;
+  color: var(--text, #e8ecf4);
+  font-size: 14px;
+}
+
+.builtinPrivacySection p,
+.builtinPrivacyList {
+  color: var(--muted, #aab3c4);
+}
+
+.builtinPrivacyList {
+  margin: 7px 0;
+  padding-left: 22px;
+}
+
+.builtinPrivacyDeclineNote {
+  margin-top: 18px !important;
+  padding: 10px 12px;
+  color: var(--muted, #aab3c4);
+  background: color-mix(in srgb, var(--panel, #171c29) 75%, transparent);
+  border: 1px solid var(--line, #303849);
+  border-radius: 9px;
+}
+
+.builtinPrivacyFooter {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 22px 18px;
+  border-top: 1px solid var(--line, #303849);
+  background: var(--panel2, var(--panel, #171c29));
+}
+
+.builtinPrivacyButton {
+  min-width: 112px;
+  min-height: 38px;
+  padding: 8px 16px;
+  color: var(--text, #e8ecf4);
+  background: var(--button, var(--panel, #171c29));
+  border: 1px solid var(--line, #303849);
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.builtinPrivacyButton:hover,
+.builtinPrivacyButton:focus-visible {
+  border-color: var(--brand, #5b8cff);
+  outline: none;
+}
+
+.builtinPrivacyAccept {
+  color: #fff;
+  background: var(--brand, #5b8cff);
+  border-color: var(--brand, #5b8cff);
+}
+
+.providerBuiltinConsentNotice,
+.editorProviderBuiltinConsentNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  color: var(--muted, #aab3c4);
+  background: color-mix(in srgb, #d97706 10%, var(--panel, #171c29));
+  border: 1px solid color-mix(in srgb, #d97706 38%, var(--line, #303849));
+  border-radius: 9px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.providerBuiltinConsentNotice button,
+.editorProviderBuiltinConsentNotice button {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+  .builtinPrivacyOverlay {
+    align-items: stretch;
+    padding: 10px;
+  }
+
+  .builtinPrivacyDialog {
+    max-height: calc(100dvh - 20px);
+    border-radius: 13px;
+  }
+
+  .builtinPrivacyHeader {
+    padding: 15px 16px 12px;
+  }
+
+  .builtinPrivacyHeader h2 {
+    font-size: 16px;
+  }
+
+  .builtinPrivacyBody {
+    padding: 14px 16px;
+    font-size: 12.5px;
+    line-height: 1.65;
+  }
+
+  .builtinPrivacyFooter {
+    flex-direction: column-reverse;
+    gap: 8px;
+    padding: 11px 16px 14px;
+  }
+
+  .builtinPrivacyButton {
+    width: 100%;
+    min-height: 42px;
+  }
+
+  .providerBuiltinConsentNotice,
+  .editorProviderBuiltinConsentNotice {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

@@ -29,6 +29,11 @@ import {
 } from "./threeBoxTurnState.js";
 import { buildStructuredTurnEnvelope, createThreeBoxTurnContext, projectSceneJsonString } from "threejson";
 import { initHostI18n, applyShellI18n, getHostLocale, normalizeLocale, t } from "../../shared/i18n/index.js";
+import {
+  BUILTIN_PRIVACY_ACCEPTED,
+  createBuiltinProviderPrivacyController,
+  isBuiltinPrivacyAccepted
+} from "../../shared/js/builtinProviderPrivacy.js";
 
 function readRequestedLocaleFromUrl() {
   try {
@@ -93,7 +98,8 @@ function populateComposerModelSelect(settings) {
   if (!select) {
     return;
   }
-  const providers = Array.isArray(settings?.ai?.providers) ? settings.ai.providers : [];
+  const providers = (Array.isArray(settings?.ai?.providers) ? settings.ai.providers : [])
+    .filter((provider) => provider.provider !== "threebox-builtin" || isBuiltinPrivacyAccepted("threebox"));
   const previousValue = select.value;
   select.innerHTML = "";
   if (providers.length === 0) {
@@ -117,6 +123,7 @@ async function main() {
   // `createThreeBoxSettingsModal` reads persisted settings synchronously (no `.init()` needed to
   // call `.getSettings()`), so it's constructed first purely to read `general.locale` for the
   // locale bootstrap below — nothing about it renders yet.
+  let builtinPrivacyController = null;
   const settingsModal = createThreeBoxSettingsModal({
     onSave: (settings) => {
       populateComposerModelSelect(settings);
@@ -127,13 +134,9 @@ async function main() {
     // pattern as `applyHostLocaleFromSettings` above, safe because these only run in response to a
     // later button click, well after `templateGallery` has been assigned.
     onRebuildTemplateThumbnails: () => templateGallery?.rebuildThumbnailCache(),
-    onClearTemplateThumbnails: () => templateGallery?.clearThumbnailCache()
+    onClearTemplateThumbnails: () => templateGallery?.clearThumbnailCache(),
+    onOpenBuiltinPrivacy: () => builtinPrivacyController?.open()
   });
-  // Fire-and-forget: issues (or silently re-issues, ahead of expiry) the built-in trial provider's
-  // API key so a brand-new user can chat immediately without configuring anything. Never blocks
-  // first paint — a failure here just means the built-in provider stays unusable until retried on
-  // the next boot or a manual save in Settings.
-  void ensureBuiltinApiKey(settingsModal);
   const requestedLocale = readRequestedLocaleFromUrl();
   const currentSettingsLocale = settingsModal.getSettings()?.general?.locale || "auto";
   if (shouldPromptLocaleSwitch(currentSettingsLocale, requestedLocale) && confirmLocaleSwitch(currentSettingsLocale, requestedLocale)) {
@@ -163,6 +166,16 @@ async function main() {
   await initHostI18n(settingsModal.getSettings()?.general?.locale);
   applyShellI18n(document);
 
+  builtinPrivacyController = createBuiltinProviderPrivacyController({
+    scope: "threebox",
+    onDecision: async (decision) => {
+      populateComposerModelSelect(settingsModal.getSettings());
+      if (decision === BUILTIN_PRIVACY_ACCEPTED) {
+        await ensureBuiltinApiKey(settingsModal);
+        populateComposerModelSelect(settingsModal.getSettings());
+      }
+    }
+  });
   const viewChrome = createThreeBoxViewChrome();
   viewChrome.init();
 
@@ -179,6 +192,10 @@ async function main() {
   resourceLibrary.init();
   settingsModal.init();
   populateComposerModelSelect(settingsModal.getSettings());
+  const builtinPrivacyDecision = await builtinPrivacyController.promptIfNeeded();
+  if (builtinPrivacyDecision === BUILTIN_PRIVACY_ACCEPTED) {
+    void ensureBuiltinApiKey(settingsModal);
+  }
 
   let sidebar;
   // Each rendered scene card stays live in the DOM for the lifetime of the conversation (turns
@@ -862,6 +879,9 @@ async function main() {
     let settings = settingsModal.getSettings();
     const selectedProviderId = document.getElementById("composerModelSelect")?.value;
     let providerOptions = resolveProviderOptions(settings, selectedProviderId);
+    if (providerOptions?.provider === "threebox-builtin" && !isBuiltinPrivacyAccepted("threebox")) {
+      providerOptions = null;
+    }
     if (!providerOptions || !providerOptions.apiKey) {
       // The built-in provider's trial key is issued asynchronously at boot (main() fires
       // ensureBuiltinApiKey without awaiting it, so first paint isn't blocked on a network round
@@ -872,6 +892,9 @@ async function main() {
       await ensureBuiltinApiKey(settingsModal);
       settings = settingsModal.getSettings();
       providerOptions = resolveProviderOptions(settings, selectedProviderId);
+      if (providerOptions?.provider === "threebox-builtin" && !isBuiltinPrivacyAccepted("threebox")) {
+        providerOptions = null;
+      }
     }
     if (!providerOptions || !providerOptions.apiKey) {
       api.appendAssistantMessage(

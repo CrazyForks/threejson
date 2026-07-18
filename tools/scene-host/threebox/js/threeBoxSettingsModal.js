@@ -15,6 +15,7 @@ import {
 import { showToast } from "./threeBoxUiFeedback.js";
 import { getDisplayDeviceId, refreshBuiltinQuota } from "./threeBoxBuiltinProvider.js";
 import { t } from "../../shared/i18n/index.js";
+import { isBuiltinPrivacyAccepted } from "../../shared/js/builtinProviderPrivacy.js";
 
 function createProviderId() {
   return `provider-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -177,6 +178,27 @@ export function createThreeBoxSettingsModal(host = {}) {
     quotaRow.appendChild(quotaLabel);
     quotaRow.appendChild(quotaValue);
     card.appendChild(quotaRow);
+
+    if (!isBuiltinPrivacyAccepted("threebox")) {
+      const consent = document.createElement("div");
+      consent.className = "providerBuiltinConsentNotice";
+      const consentText = document.createElement("span");
+      consentText.textContent = t(
+        "builtinPrivacy.required",
+        "您必须同意使用协议才能使用内置模型。"
+      );
+      const agreementBtn = document.createElement("button");
+      agreementBtn.type = "button";
+      agreementBtn.className = "settingsActionBtn";
+      agreementBtn.textContent = t("builtinPrivacy.viewAgreement", "查看协议");
+      agreementBtn.addEventListener("click", async () => {
+        await host.onOpenBuiltinPrivacy?.();
+        renderActiveSection();
+      });
+      consent.appendChild(consentText);
+      consent.appendChild(agreementBtn);
+      card.appendChild(consent);
+    }
 
     refreshBuiltinQuota({ getSettings: () => settings, updateSettings }).then((freshQuota) => {
       if (freshQuota) {
@@ -400,9 +422,27 @@ export function createThreeBoxSettingsModal(host = {}) {
         const opt = document.createElement("option");
         opt.value = provider.id;
         opt.textContent = provider.label || provider.id;
+        opt.disabled =
+          provider.provider === THREEBOX_BUILTIN_PROVIDER_TYPE &&
+          !isBuiltinPrivacyAccepted("threebox");
         defaultSelect.appendChild(opt);
       }
-      defaultSelect.value = draft.ai.defaultProviderId || draft.ai.providers[0].id;
+      const selectableDefault = draft.ai.providers.find(
+        (provider) => provider.provider !== THREEBOX_BUILTIN_PROVIDER_TYPE || isBuiltinPrivacyAccepted("threebox")
+      );
+      const configuredDefault = draft.ai.providers.find(
+        (provider) =>
+          provider.id === draft.ai.defaultProviderId &&
+          (provider.provider !== THREEBOX_BUILTIN_PROVIDER_TYPE || isBuiltinPrivacyAccepted("threebox"))
+      );
+      defaultSelect.value =
+        configuredDefault?.id
+        || selectableDefault?.id
+        || draft.ai.defaultProviderId
+        || draft.ai.providers[0].id;
+      if (selectableDefault && !configuredDefault) {
+        draft.ai.defaultProviderId = defaultSelect.value;
+      }
       defaultSelect.addEventListener("change", () => {
         draft.ai.defaultProviderId = defaultSelect.value;
       });

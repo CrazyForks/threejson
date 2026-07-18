@@ -8,6 +8,7 @@ import {
 } from "../../shared/js/builtinAiProvider.js";
 import { showToast } from "./threeBoxUiFeedback.js";
 import { t } from "../../shared/i18n/index.js";
+import { isBuiltinPrivacyAccepted } from "../../shared/js/builtinProviderPrivacy.js";
 
 // Re-exported so existing ThreeBox imports of `getDisplayDeviceId` from this module keep working
 // unchanged — the actual fingerprinting/hashing now lives in the shared module (see
@@ -52,6 +53,9 @@ function notifyBuiltinProviderUnavailable() {
  * @param {{getSettings: () => object, updateSettings: (updater: (draft: object) => void, options?: object) => object}} settingsModal
  */
 async function ensureBuiltinApiKeyInternal(settingsModal) {
+  if (!isBuiltinPrivacyAccepted("threebox")) {
+    return;
+  }
   const settings = settingsModal.getSettings();
   const provider = findBuiltinProvider(settings);
   if (!provider) {
@@ -115,6 +119,9 @@ export function ensureBuiltinApiKey(settingsModal) {
  * resulting re-render then no-ops, ending the chain after at most one extra render).
  */
 export async function refreshBuiltinQuota(settingsModal) {
+  if (!isBuiltinPrivacyAccepted("threebox")) {
+    return null;
+  }
   const settings = settingsModal.getSettings();
   const provider = findBuiltinProvider(settings);
   if (!provider?.apiKey) {

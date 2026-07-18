@@ -88,6 +88,10 @@ import { createEditorHelpAndSceneJson } from "./editorHelpAndSceneJson.js";
 import { initTopMenubarExclusiveOpen } from "../../shared/js/topMenubarExclusiveOpen.js";
 import { createEditorChromeUi } from "./editorChromeUi.js";
 import { createEditorViewChrome } from "./editorViewChrome.js";
+import {
+  BUILTIN_PRIVACY_ACCEPTED,
+  createBuiltinProviderPrivacyController
+} from "../../shared/js/builtinProviderPrivacy.js";
 import { createEditorSceneReserialize } from "./editorSceneReserialize.js";
 import { createEditorGridHelper } from "./editorGridHelper.js";
 import {
@@ -282,6 +286,7 @@ export async function bootstrapSceneHostEditor() {
   let rightSidebarCache = null;
   let sceneLoadGeneration = 0;
   let editorChromeUi = null;
+  let builtinPrivacyController = null;
   let sceneTreeContextMenu = null;
   const suppressCanvasDirty = createEditorSuppressCanvasDirty();
 
@@ -302,6 +307,8 @@ export async function bootstrapSceneHostEditor() {
     },
     getEditorSettings: () => editorSettings,
     openEditorSettings: (sectionId) => settingsModal?.open?.(editorSettings, sectionId),
+    promptBuiltinPrivacyAgreement: () => builtinPrivacyController?.promptIfNeeded?.(),
+    openBuiltinPrivacyAgreement: () => builtinPrivacyController?.open?.(),
     showMessage: (...args) => ui.showMessage(...args),
     ingestScenePayload,
     runEditorCommands,
@@ -1799,6 +1806,24 @@ export async function bootstrapSceneHostEditor() {
       applyEditorSettings({ initial: true });
       settingsModal.populateForm(editorSettings);
       ui.showMessage(t("editor.message.settingsResetToFile", "Restored setting.json defaults."), "info");
+    }
+  });
+
+  builtinPrivacyController = createBuiltinProviderPrivacyController({
+    scope: "editor",
+    onDecision: async (decision) => {
+      aiGeneratePanel?.onSettingsSaved?.();
+      aiAdjustPanel?.onSettingsSaved?.();
+      if (decision === BUILTIN_PRIVACY_ACCEPTED) {
+        await ensureEditorBuiltinApiKey({
+          getEditorSettings: () => editorSettings,
+          persistSettings: () => host.persistSettingsRememberingAiKey?.(),
+          onIssued: () => {
+            aiGeneratePanel?.onSettingsSaved?.();
+            aiAdjustPanel?.onSettingsSaved?.();
+          }
+        });
+      }
     }
   });
 

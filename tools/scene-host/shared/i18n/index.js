@@ -6,6 +6,7 @@ import { EDITOR_SHELL_LABELS_EN } from "./editorShellLabels.en.js";
 import { PLAYER_SETTINGS_LABELS_EN } from "./playerSettingsLabels.en.js";
 import { PLAYER_SHELL_LABELS_EN } from "./playerShellLabels.en.js";
 import { THREEBOX_SHELL_LABELS_EN } from "./threeboxShellLabels.en.js";
+import { BUILTIN_PROVIDER_PRIVACY_LABELS_EN } from "./builtinProviderPrivacyLabels.en.js";
 import { applyShellI18n } from "./applyShellI18n.js";
 
 export { applyShellI18n };
@@ -65,7 +66,8 @@ export async function loadHostLocaleCatalog(locale) {
       ...EDITOR_SHELL_LABELS_EN,
       ...PLAYER_SETTINGS_LABELS_EN,
       ...PLAYER_SHELL_LABELS_EN,
-      ...THREEBOX_SHELL_LABELS_EN
+      ...THREEBOX_SHELL_LABELS_EN,
+      ...BUILTIN_PROVIDER_PRIVACY_LABELS_EN
     };
     currentLocale = loc;
     return catalog;

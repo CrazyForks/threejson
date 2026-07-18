@@ -9,6 +9,10 @@ import { BUILTIN_PROVIDER_TYPE, ensureEditorBuiltinApiKey } from "./editorBuilti
 import { appendAiChatTurn, getAiChatHistory, resolveSceneKeyFromLabel } from "./editorAiChatStore.js";
 import { createThreeBoxTurnContext, parseSceneJsonString } from "threejson";
 import { t } from "../../shared/i18n/index.js";
+import {
+  BUILTIN_PRIVACY_ACCEPTED,
+  isBuiltinPrivacyAccepted
+} from "../../shared/js/builtinProviderPrivacy.js";
 
 export function isAiAbortError(err) {
   const name = err?.name || "";
@@ -131,7 +135,8 @@ export function createAiChatHistoryController({ host, messagesEl }) {
  * SAME ai.defaultProviderId — there's one "current provider" for the editor, not one per tab. */
 export function getSelectedProvider(host) {
   const ai = host.getEditorSettings()?.ai || {};
-  const providers = Array.isArray(ai.providers) ? ai.providers : [];
+  const providers = (Array.isArray(ai.providers) ? ai.providers : [])
+    .filter((provider) => provider.provider !== BUILTIN_PROVIDER_TYPE || isBuiltinPrivacyAccepted("editor"));
   if (!providers.length) {
     return null;
   }
@@ -169,6 +174,10 @@ export function getAgentOptions(host) {
 }
 
 export async function ensureUsableCredentials(host) {
+  const privacyDecision = await host.promptBuiltinPrivacyAgreement?.();
+  if (privacyDecision && privacyDecision !== BUILTIN_PRIVACY_ACCEPTED) {
+    return getCredentials(host);
+  }
   let creds = getCredentials(host);
   if (!creds.apiKey && creds.provider === BUILTIN_PROVIDER_TYPE) {
     await ensureEditorBuiltinApiKey({
@@ -190,7 +199,8 @@ export function createProviderSelectSync({ host, selectEl, settingsBtnEl }) {
       return;
     }
     const ai = host.getEditorSettings()?.ai || {};
-    const providers = Array.isArray(ai.providers) ? ai.providers : [];
+    const providers = (Array.isArray(ai.providers) ? ai.providers : [])
+      .filter((provider) => provider.provider !== BUILTIN_PROVIDER_TYPE || isBuiltinPrivacyAccepted("editor"));
     selectEl.innerHTML = "";
     if (!providers.length) {
       const opt = document.createElement("option");
@@ -229,6 +239,8 @@ export function createProviderSelectSync({ host, selectEl, settingsBtnEl }) {
  * (deduped) ensure and — on failure — shows the same info-toast ThreeBox shows for an
  * unreachable built-in backend. Call on tab show. */
 export async function checkBuiltinProviderAvailability(host, onRefreshed) {
+  await host.promptBuiltinPrivacyAgreement?.();
+  onRefreshed?.();
   const provider = getSelectedProvider(host);
   if (provider?.provider !== BUILTIN_PROVIDER_TYPE || provider.apiKey) {
     return;

@@ -5,6 +5,7 @@ import {
   getDisplayDeviceId as getDisplayDeviceIdShared,
   issueBuiltinApiKey
 } from "../../shared/js/builtinAiProvider.js";
+import { isBuiltinPrivacyAccepted } from "../../shared/js/builtinProviderPrivacy.js";
 
 export { BUILTIN_PROVIDER_TYPE };
 
@@ -37,6 +38,9 @@ function backendUrl(settings) {
  * @param {{getEditorSettings: () => object, persistSettings: () => void, onIssued?: () => void, onUnavailable?: () => void}} deps
  */
 async function ensureEditorBuiltinApiKeyInternal({ getEditorSettings, persistSettings, onIssued, onUnavailable }) {
+  if (!isBuiltinPrivacyAccepted("editor")) {
+    return;
+  }
   const settings = getEditorSettings();
   const provider = findEditorBuiltinProvider(settings);
   if (!provider) {
@@ -91,6 +95,9 @@ export function ensureEditorBuiltinApiKey(deps) {
  * @param {{getEditorSettings: () => object, persistSettings: () => void}} deps
  */
 export async function refreshEditorBuiltinQuota({ getEditorSettings, persistSettings }) {
+  if (!isBuiltinPrivacyAccepted("editor")) {
+    return null;
+  }
   const settings = getEditorSettings();
   const provider = findEditorBuiltinProvider(settings);
   if (!provider?.apiKey) {
@@ -116,6 +123,9 @@ export async function refreshEditorBuiltinQuota({ getEditorSettings, persistSett
  * whether to show the "builtin unavailable" toast when the AI-edit tab is shown with the built-in
  * provider selected. */
 export function isEditorBuiltinProviderUsable(settings) {
+  if (!isBuiltinPrivacyAccepted("editor")) {
+    return false;
+  }
   const provider = findEditorBuiltinProvider(settings);
   return Boolean(provider?.apiKey);
 }
