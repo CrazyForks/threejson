@@ -236,6 +236,28 @@
     </div>
   </div>
 
+  <div id="helpModal" class="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle" hidden>
+    <div class="modalDialog">
+      <div class="modalHeader" id="helpModalTitle" data-i18n="threebox.shell.helpTitle">帮助</div>
+      <div class="modalBody">
+        <p data-i18n="threebox.help.intro">遇到问题？欢迎通过以下方式联系我们：</p>
+        <ul class="helpContactList">
+          <li>
+            <span data-i18n="threebox.help.emailLabel">邮箱反馈：</span>
+            <a href="mailto:threejson@outlook.com">threejson@outlook.com</a>
+          </li>
+          <li>
+            <span data-i18n="threebox.help.issuesLabel">或访问 GitHub 仓库提交 Issue：</span>
+            <a href="https://github.com/nnrj/threejson/issues" target="_blank" rel="noreferrer">github.com/nnrj/threejson/issues</a>
+          </li>
+        </ul>
+      </div>
+      <div class="modalFooter">
+        <button id="helpCloseBtn" type="button" data-i18n="threebox.shell.close">关闭</button>
+      </div>
+    </div>
+  </div>
+
   <div id="historyContextMenu" class="contextMenu" hidden>
     <button type="button" data-action="pin" data-i18n="threebox.shell.pin">置顶</button>
     <button type="button" data-action="archive" data-i18n="threebox.shell.archive">归档</button>

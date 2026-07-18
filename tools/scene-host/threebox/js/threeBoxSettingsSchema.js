@@ -21,6 +21,9 @@ export const THREEBOX_SETTINGS_DEFAULTS = {
     providers: [],
     defaultProviderId: "",
     rememberKeys: true,
+    // Base URL for the built-in trial provider's backend (tmpserver/threebox-server). Exposed as
+    // a setting rather than hardcoded because ThreeBox is open source — anyone can run their own.
+    builtinBackendUrl: "https://threebox.org/api",
     selfName: "ThreeBox",
     updateOutputMode: "commands",
     includeSpatialSummary: true,
@@ -57,8 +60,13 @@ export const THREEBOX_SETTINGS_SECTIONS = [
   { id: "general", title: "通用" },
   { id: "ai", title: "AI 配置" },
   { id: "agent", title: "Agent" },
-  { id: "io", title: "导入导出" }
+  { id: "io", title: "导入导出" },
+  { id: "about", title: "关于" }
 ];
+
+/** Displayed in the "关于" settings section — bump alongside the root package.json version on
+ * release (no build step wires this up automatically since threebox is a plain static app). */
+export const THREEBOX_VERSION = "0.1.0-alpha.5";
 
 /** Generic (non-"ai.providers") fields — rendered by the same simple field-loop the editor uses. */
 export const THREEBOX_SETTINGS_FIELDS = [
@@ -68,6 +76,13 @@ export const THREEBOX_SETTINGS_FIELDS = [
   { section: "general", path: "general.previewAuxiliaryLights", type: "checkbox", label: "ThreeBox 画布启用辅助光源" },
 
   { section: "ai", path: "ai.rememberKeys", type: "checkbox", label: "记住 API Key 到本地" },
+  {
+    section: "ai",
+    path: "ai.builtinBackendUrl",
+    type: "text",
+    label: "内置供应商后端地址",
+    placeholder: "https://threebox.org/api"
+  },
   { section: "ai", path: "ai.selfName", type: "text", label: "AI 自称" },
   { section: "ai", path: "ai.updateOutputMode", type: "select", label: "调整优先方式", options: [["commands", "操作命令"], ["json-incremental", "JSON Patch"], ["json-full", "完整 JSON"]] },
   { section: "ai", path: "ai.includeSpatialSummary", type: "checkbox", label: "调整时附带空间摘要" },
@@ -138,7 +153,14 @@ export const THREEBOX_SETTINGS_FIELDS = [
 ];
 
 export const THREEBOX_PROVIDER_TYPES = [
+  ["threebox-builtin", "内置供应商（限额体验）"],
   ["chatgpt", "ChatGPT (OpenAI)"],
   ["deepseek", "DeepSeek"],
   ["custom", "自定义 (OpenAI 兼容)"]
 ];
+
+/** The provider id/type reserved for the auto-seeded built-in trial provider — used by
+ * threeBoxSettingsStore.js (first-run seeding), threeBoxSettingsModal.js (special-cased card
+ * rendering) and threeBoxOrchestrator.js (baseUrl/key resolution). */
+export const THREEBOX_BUILTIN_PROVIDER_TYPE = "threebox-builtin";
+export const THREEBOX_BUILTIN_PROVIDER_ID = "builtin-default";

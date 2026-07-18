@@ -57,6 +57,8 @@ export function createThreeBoxSidebar(host = {}) {
   const searchChatInput = document.getElementById("searchChatInput");
   const searchChatResults = document.getElementById("searchChatResults");
   const searchChatCloseBtn = document.getElementById("searchChatCloseBtn");
+  const helpModal = document.getElementById("helpModal");
+  const helpCloseBtn = document.getElementById("helpCloseBtn");
   const historyContextMenu = document.getElementById("historyContextMenu");
   const moveToProjectList = document.getElementById("moveToProjectList");
   const templateGallerySection = document.getElementById("templateGallerySection");
@@ -376,6 +378,18 @@ export function createThreeBoxSidebar(host = {}) {
     }
   }
 
+  function openHelpModal() {
+    if (helpModal) {
+      helpModal.hidden = false;
+    }
+  }
+
+  function closeHelpModal() {
+    if (helpModal) {
+      helpModal.hidden = true;
+    }
+  }
+
   function createConversationRecord() {
     const id = `conv-${Date.now().toString(36)}`;
     const conv = {
@@ -449,6 +463,12 @@ export function createThreeBoxSidebar(host = {}) {
       }
     });
     searchChatInput?.addEventListener("input", () => renderSearchChatResults(searchChatInput.value));
+    helpCloseBtn?.addEventListener("click", closeHelpModal);
+    helpModal?.addEventListener("click", (event) => {
+      if (event.target === helpModal) {
+        closeHelpModal();
+      }
+    });
 
     newProjectBtn?.addEventListener("click", () => {
       const name = window.prompt(t("threebox.sidebar.newProjectPrompt", "新建项目名称："), "");
@@ -492,6 +512,10 @@ export function createThreeBoxSidebar(host = {}) {
           } else {
             showToast(t("threebox.sidebar.toastSettingsComingSoon", "设置面板将在后续里程碑接入。"), "info");
           }
+          return;
+        }
+        if (action === "help") {
+          openHelpModal();
           return;
         }
         showToast(t("threebox.sidebar.toastFeatureComingSoon", "该功能将在后续里程碑接入。"), "info");

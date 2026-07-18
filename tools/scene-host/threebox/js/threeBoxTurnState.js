@@ -22,6 +22,7 @@ export function createUnsuccessfulTurnRecord({
   targetTurnId = null,
   stopped = false,
   errorMessage = "",
+  errorCode = null,
   createdAt = Date.now()
 }) {
   return {
@@ -34,6 +35,7 @@ export function createUnsuccessfulTurnRecord({
     stage: "error",
     status: stopped ? "stopped" : "failed",
     errorMessage: stopped ? "" : String(errorMessage || ""),
+    errorCode: stopped ? null : errorCode || null,
     sceneJson: null,
     commands: null,
     patch: null,

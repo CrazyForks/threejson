@@ -60,6 +60,18 @@ const PROVIDERS = {
     apiBase: "",
     endpoint: "/chat/completions",
     defaultModel: "gpt-4o-mini"
+  },
+  // ThreeBox's built-in trial provider (tools/scene-host/threebox/js/threeBoxBuiltinProvider.js):
+  // a Cloudflare Worker proxy the user configures a base URL for (default https://threebox.org/api,
+  // see threebox-server's README), never a hardcoded upstream — behaves like "custom" except the
+  // frontend fills baseUrl automatically instead of asking the user to type it. Unlike the other
+  // entries, `endpoint` includes the "/v1" segment: threebox-server's chat-completions route lives
+  // at "{base}/v1/chat/completions", matching the same base its non-chat endpoints
+  // (threeBoxBuiltinProvider.js's "{base}/v1/auth/issue" and "{base}/v1/quota") are built from.
+  "threebox-builtin": {
+    apiBase: "",
+    endpoint: "/v1/chat/completions",
+    defaultModel: ""
   }
 };
 
@@ -71,7 +83,7 @@ function isObject(value) {
 function ensureProvider(provider) {
   const normalized = String(provider || "chatgpt").toLowerCase();
   if (!PROVIDERS[normalized]) {
-    throw new Error(`Unsupported provider "${provider}". Use "chatgpt", "deepseek", or "custom".`);
+    throw new Error(`Unsupported provider "${provider}". Use one of: ${Object.keys(PROVIDERS).join(", ")}.`);
   }
   return normalized;
 }
@@ -301,7 +313,8 @@ async function requestChatCompletion({
   stream = false,
   signal,
   onDelta,
-  onCompletionMetadata
+  onCompletionMetadata,
+  extraHeaders
 }) {
   const normalizedProvider = ensureProvider(provider);
   const providerConfig = PROVIDERS[normalizedProvider];
@@ -336,7 +349,8 @@ async function requestChatCompletion({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${normalizedApiKey}`
+      Authorization: `Bearer ${normalizedApiKey}`,
+      ...extraHeaders
     },
     signal,
     body: JSON.stringify({
@@ -350,7 +364,23 @@ async function requestChatCompletion({
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`AI request failed (${response.status}): ${detail}`);
+    // threebox-server (the built-in provider's backend, tmpserver/threebox-server) reports trial
+    // quota exhaustion as `{ "error": "QUOTA_EXCEEDED" }` — tag it so hosts can distinguish "buy
+    // your own key" from a generic failure without string-matching the message text.
+    let errorCode = null;
+    try {
+      const parsed = JSON.parse(detail);
+      if (parsed && parsed.error === "QUOTA_EXCEEDED") {
+        errorCode = "BUILTIN_QUOTA_EXCEEDED";
+      }
+    } catch {
+      /* not JSON, ignore */
+    }
+    const error = new Error(`AI request failed (${response.status}): ${detail}`);
+    if (errorCode) {
+      error.code = errorCode;
+    }
+    throw error;
   }
 
   if (stream === true && response.body) {

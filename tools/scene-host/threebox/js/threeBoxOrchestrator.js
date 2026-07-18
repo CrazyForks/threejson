@@ -47,7 +47,12 @@ export function resolveProviderOptions(settings, providerId) {
     provider: provider.provider || "chatgpt",
     apiKey: provider.apiKey || "",
     model: provider.model || undefined,
-    baseUrl: provider.provider === "custom" ? provider.baseUrl || undefined : undefined
+    baseUrl:
+      provider.provider === "custom"
+        ? provider.baseUrl || undefined
+        : provider.provider === "threebox-builtin"
+          ? settings?.ai?.builtinBackendUrl || undefined
+          : undefined
   };
 }
 

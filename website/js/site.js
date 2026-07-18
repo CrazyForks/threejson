@@ -50,6 +50,7 @@ const I18N = {
     "community.contribute": "如何贡献",
     "community.dependencies": "依赖项",
     "community.codeStyle": "代码规范",
+    "community.contact": "联系我们",
     "community.license": "许可协议",
     "community.licenseMit": "MIT 许可证（LICENSE）",
     "community.licenseTrademark": "商标声明（TRADEMARK）",
@@ -78,7 +79,11 @@ const I18N = {
     "examples.tools.autoBuild": "自动构建缩略图缓存",
     "download.title": "下载 ThreeJSON",
     "contributors.title": "贡献者",
-    "deps.title": "依赖项"
+    "deps.title": "依赖项",
+    "contact.title": "联系我们",
+    "contact.intro": "有问题可以联系邮箱反馈，或访问 ThreeJSON 的 GitHub 仓库提 issues。",
+    "contact.emailLabel": "邮箱反馈：",
+    "contact.issuesLabel": "GitHub Issues："
   },
   "en-US": {
     "nav.home": "Home",
@@ -107,6 +112,7 @@ const I18N = {
     "community.contribute": "How To Contribute",
     "community.dependencies": "Dependencies",
     "community.codeStyle": "Code Style",
+    "community.contact": "Contact Us",
     "community.license": "License Agreement",
     "community.licenseMit": "MIT License (LICENSE)",
     "community.licenseTrademark": "Trademark Notice (TRADEMARK)",
@@ -135,7 +141,11 @@ const I18N = {
     "examples.tools.autoBuild": "Auto-Build Thumbnail Cache",
     "download.title": "Download ThreeJSON",
     "contributors.title": "Contributors",
-    "deps.title": "Dependencies"
+    "deps.title": "Dependencies",
+    "contact.title": "Contact Us",
+    "contact.intro": "Have a question? Reach us by email, or file an issue on the ThreeJSON GitHub repository.",
+    "contact.emailLabel": "Email us:",
+    "contact.issuesLabel": "GitHub Issues:"
   }
 };
 
@@ -315,6 +325,7 @@ function renderRoute() {
   else if (route === "/download") renderDownload();
   else if (route === "/contributors") renderContributors();
   else if (route === "/dependencies") renderDependencies();
+  else if (route === "/contact") renderContact();
   else renderHome();
 }
 
@@ -337,7 +348,7 @@ function updateActiveNav(route) {
     activateTopLink("#/examples");
     return;
   }
-  if (route === "/docs-index" || route === "/download" || route === "/contributors" || route === "/dependencies") {
+  if (route === "/docs-index" || route === "/download" || route === "/contributors" || route === "/dependencies" || route === "/contact") {
     activateMenuByChildHref(`#${route}`);
     return;
   }
@@ -800,6 +811,18 @@ function renderContributors() {
         <img class="avatar" src="https://github.com/nnrj.png" alt="nnrj">
         <h3><a href="https://github.com/nnrj" target="_blank" rel="noreferrer">nnrj</a></h3>
         <p>ThreeJSON maintainer.</p>
+      </article>
+    </section>`;
+}
+
+function renderContact() {
+  app.innerHTML = `
+    <section class="page">
+      <h1>${t("contact.title")}</h1>
+      <article class="card">
+        <p>${t("contact.intro")}</p>
+        <p>${t("contact.emailLabel")} <a href="mailto:threejson@outlook.com">threejson@outlook.com</a></p>
+        <p>${t("contact.issuesLabel")} <a href="https://github.com/nnrj/threejson/issues" target="_blank" rel="noreferrer">github.com/nnrj/threejson/issues</a></p>
       </article>
     </section>`;
 }

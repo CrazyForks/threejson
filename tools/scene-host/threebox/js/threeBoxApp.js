@@ -18,6 +18,7 @@ import {
   resolveTurnSceneJsonString,
   resolveThreeBoxAgentOptions
 } from "./threeBoxOrchestrator.js";
+import { ensureBuiltinApiKey } from "./threeBoxBuiltinProvider.js";
 import { createThreeBoxAttachedContext } from "./threeBoxAttachedContext.js";
 import { wireThreeBoxComposerStub } from "./threeBoxComposerStub.js";
 import { createThreeBoxResourceLibrary } from "./threeBoxResourceLibrary.js";
@@ -128,6 +129,11 @@ async function main() {
     onRebuildTemplateThumbnails: () => templateGallery?.rebuildThumbnailCache(),
     onClearTemplateThumbnails: () => templateGallery?.clearThumbnailCache()
   });
+  // Fire-and-forget: issues (or silently re-issues, ahead of expiry) the built-in trial provider's
+  // API key so a brand-new user can chat immediately without configuring anything. Never blocks
+  // first paint — a failure here just means the built-in provider stays unusable until retried on
+  // the next boot or a manual save in Settings.
+  void ensureBuiltinApiKey(settingsModal);
   const requestedLocale = readRequestedLocaleFromUrl();
   const currentSettingsLocale = settingsModal.getSettings()?.general?.locale || "auto";
   if (shouldPromptLocaleSwitch(currentSettingsLocale, requestedLocale) && confirmLocaleSwitch(currentSettingsLocale, requestedLocale)) {
@@ -233,6 +239,12 @@ async function main() {
         "API Key 中包含中文、emoji 等无法用于请求头的字符。请确认只粘贴了供应商提供的 API Key；请求尚未发送给供应商。"
       );
     }
+    if (error?.code === "BUILTIN_QUOTA_EXCEEDED") {
+      return t(
+        "threebox.app.builtinQuotaExceeded",
+        "内置供应商的限额体验已用完。可以配置自己的供应商继续使用。"
+      );
+    }
     return error?.message || String(error || t("threebox.app.unknownError", "未知错误"));
   }
 
@@ -254,7 +266,8 @@ async function main() {
           mode,
           targetTurnId,
           stopped,
-          errorMessage: friendlyAiErrorMessage(error)
+          errorMessage: friendlyAiErrorMessage(error),
+          errorCode: error?.code || null
         })
       );
       sidebar.touchActiveConversation(userPrompt);
@@ -279,6 +292,28 @@ async function main() {
       void onRetry();
     });
     return btn;
+  }
+
+  /** Appended next to the retry button when a turn fails because the built-in trial provider's
+   * quota ran out (error.code === "BUILTIN_QUOTA_EXCEEDED") — a small-print user has no idea
+   * where "the settings" are, so this jumps straight to the AI section instead of making them
+   * find it themselves. */
+  function buildConfigureProviderButton() {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "chatRetryBtn";
+    btn.textContent = t("threebox.chat.configureProvider", "点此配置供应商");
+    btn.addEventListener("click", () => {
+      settingsModal.open("ai");
+    });
+    return btn;
+  }
+
+  function appendRetryControls(api, textEl, error, onRetry) {
+    api.appendToBody(textEl, buildRetryButton(onRetry));
+    if (error?.code === "BUILTIN_QUOTA_EXCEEDED") {
+      api.appendToBody(textEl, buildConfigureProviderButton());
+    }
   }
 
   function createAgentProgressUpdater(streaming, onScenePreview) {
@@ -535,17 +570,14 @@ async function main() {
       if (streamBuffer.trim()) {
         api.appendToBody(textEl, api.buildJsonCollapse(streamBuffer, { failed: true }));
       }
-      api.appendToBody(
-        textEl,
-        buildRetryButton(() => handleGenerateTurn(text, api, {
-          conversationId,
-          turnId,
-          generationStrategy,
-          estimatedSegments,
-          selectedCapabilityIds,
-          requiresAnimation
-        }))
-      );
+      appendRetryControls(api, textEl, error, () => handleGenerateTurn(text, api, {
+        conversationId,
+        turnId,
+        generationStrategy,
+        estimatedSegments,
+        selectedCapabilityIds,
+        requiresAnimation
+      }));
       api.finishTurnScroll();
     }
   }
@@ -740,10 +772,7 @@ async function main() {
       if (streamBuffer.trim()) {
         api.appendToBody(textEl, api.buildJsonCollapse(streamBuffer, { failed: true }));
       }
-      api.appendToBody(
-        textEl,
-        buildRetryButton(() => handleAdjustTurn(text, api, { conversationId, turnId, targetTurnId }))
-      );
+      appendRetryControls(api, textEl, error, () => handleAdjustTurn(text, api, { conversationId, turnId, targetTurnId }));
       api.finishTurnScroll();
     }
   }
@@ -924,20 +953,17 @@ async function main() {
               : t("threebox.app.generateFailed", "生成失败：{error}", { error: errorMessage })
           );
         }
-        chatPanel.appendToBody(
-          textEl,
-          buildRetryButton(() =>
-            turn.mode === "adjust" && turn.targetTurnId
-              ? handleAdjustTurn(turn.userPrompt, chatPanel, {
-                  conversationId,
-                  turnId: turn.id,
-                  targetTurnId: turn.targetTurnId
-                })
-              : handleGenerateTurn(turn.userPrompt, chatPanel, {
-                  conversationId,
-                  turnId: turn.id
-                })
-          )
+        appendRetryControls(chatPanel, textEl, { code: turn.errorCode || null }, () =>
+          turn.mode === "adjust" && turn.targetTurnId
+            ? handleAdjustTurn(turn.userPrompt, chatPanel, {
+                conversationId,
+                turnId: turn.id,
+                targetTurnId: turn.targetTurnId
+              })
+            : handleGenerateTurn(turn.userPrompt, chatPanel, {
+                conversationId,
+                turnId: turn.id
+              })
         );
         continue;
       }

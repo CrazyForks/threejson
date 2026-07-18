@@ -1,7 +1,9 @@
 import {
   THREEBOX_SETTINGS_SECTIONS,
   THREEBOX_SETTINGS_FIELDS,
-  THREEBOX_PROVIDER_TYPES
+  THREEBOX_PROVIDER_TYPES,
+  THREEBOX_BUILTIN_PROVIDER_TYPE,
+  THREEBOX_VERSION
 } from "./threeBoxSettingsSchema.js";
 import {
   cloneThreeBoxSettings,
@@ -11,6 +13,7 @@ import {
   persistThreeBoxSettings
 } from "./threeBoxSettingsStore.js";
 import { showToast } from "./threeBoxUiFeedback.js";
+import { getDisplayDeviceId, refreshBuiltinQuota } from "./threeBoxBuiltinProvider.js";
 import { t } from "../../shared/i18n/index.js";
 
 function createProviderId() {
@@ -107,7 +110,96 @@ export function createThreeBoxSettingsModal(host = {}) {
     return row;
   }
 
+  /** Special-cased card for the auto-seeded built-in trial provider (threeBoxBuiltinProvider.js):
+   * no editable base URL / model / API key (auto-managed) and no delete button (it's the
+   * zero-config fallback), instead showing the device's support ID and remaining trial quota so a
+   * confused user has something concrete to report back. */
+  function buildBuiltinProviderCard(provider) {
+    const card = document.createElement("div");
+    card.className = "providerCard providerCardBuiltin";
+
+    const heading = document.createElement("div");
+    heading.className = "providerCardRow providerBuiltinHeading";
+    heading.textContent = t("threebox.settings.provider.builtinLabel", "ThreeBox 内置供应商（限额体验）");
+    card.appendChild(heading);
+
+    const idRow = document.createElement("div");
+    idRow.className = "providerCardRow";
+    const idLabel = document.createElement("label");
+    idLabel.textContent = t("threebox.settings.provider.deviceIdLabel", "识别 ID");
+    const idControl = document.createElement("div");
+    idControl.className = "providerBuiltinIdControl";
+    const idValue = document.createElement("code");
+    idValue.textContent = t("threebox.settings.provider.deviceIdLoading", "获取中…");
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "settingsActionBtn";
+    copyBtn.textContent = t("threebox.settings.provider.copyDeviceId", "复制");
+    copyBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(idValue.textContent || "");
+        showToast(t("threebox.settings.provider.deviceIdCopied", "识别 ID 已复制。"), "success");
+      } catch {
+        showToast(t("threebox.settings.provider.deviceIdCopyFailed", "复制失败，请手动选中复制。"), "error");
+      }
+    });
+    getDisplayDeviceId().then((id) => {
+      idValue.textContent = id;
+    });
+    idControl.appendChild(idValue);
+    idControl.appendChild(copyBtn);
+    idRow.appendChild(idLabel);
+    idRow.appendChild(idControl);
+    card.appendChild(idRow);
+
+    const idHint = document.createElement("div");
+    idHint.className = "settingsFieldHint";
+    idHint.textContent = t(
+      "threebox.settings.provider.deviceIdHint",
+      "清除浏览器缓存后此 ID 保持不变；如遇问题请附带此 ID 反馈。"
+    );
+    card.appendChild(idHint);
+
+    const quotaRow = document.createElement("div");
+    quotaRow.className = "providerCardRow";
+    const quotaLabel = document.createElement("label");
+    quotaLabel.textContent = t("threebox.settings.provider.quotaLabel", "剩余额度");
+    const quotaValue = document.createElement("span");
+    const quota = provider.builtinQuota;
+    quotaValue.textContent = quota
+      ? t("threebox.settings.provider.quotaValue", "{used}/{limit} 轮，预估花费 {costUsed}/{costLimit} 美分", {
+          used: quota.roundsUsed,
+          limit: quota.roundsLimit,
+          costUsed: Math.round(quota.costUsedUsdCents),
+          costLimit: Math.round(quota.costLimitUsdCents)
+        })
+      : t("threebox.settings.provider.quotaUnknown", "尚未获取（保存设置后自动申请）");
+    quotaRow.appendChild(quotaLabel);
+    quotaRow.appendChild(quotaValue);
+    card.appendChild(quotaRow);
+
+    refreshBuiltinQuota({ getSettings: () => settings, updateSettings }).then((freshQuota) => {
+      if (freshQuota) {
+        quotaValue.textContent = t(
+          "threebox.settings.provider.quotaValue",
+          "{used}/{limit} 轮，预估花费 {costUsed}/{costLimit} 美分",
+          {
+            used: freshQuota.roundsUsed,
+            limit: freshQuota.roundsLimit,
+            costUsed: Math.round(freshQuota.costUsedUsdCents),
+            costLimit: Math.round(freshQuota.costLimitUsdCents)
+          }
+        );
+      }
+    });
+
+    return card;
+  }
+
   function buildProviderCard(provider) {
+    if (provider.provider === THREEBOX_BUILTIN_PROVIDER_TYPE) {
+      return buildBuiltinProviderCard(provider);
+    }
     const card = document.createElement("div");
     card.className = "providerCard";
 
@@ -131,7 +223,12 @@ export function createThreeBoxSettingsModal(host = {}) {
     const typeLabel = document.createElement("label");
     typeLabel.textContent = t("threebox.settings.provider.typeLabel", "供应商");
     const typeSelect = document.createElement("select");
+    // The built-in trial type is never user-selectable here — it only ever exists as the single
+    // auto-seeded entry rendered by buildBuiltinProviderCard above, never as something a manually
+    // added card can be switched into (that would create a second "builtin" entry with no issued
+    // key, and ensureBuiltinApiKey only manages the first one it finds).
     for (const [val, text] of THREEBOX_PROVIDER_TYPES) {
+      if (val === THREEBOX_BUILTIN_PROVIDER_TYPE) continue;
       const opt = document.createElement("option");
       opt.value = val;
       opt.textContent = t(`threebox.settings.providerType.${val}`, text);
@@ -376,6 +473,66 @@ export function createThreeBoxSettingsModal(host = {}) {
     return wrap;
   }
 
+  /** "关于" section: static version/attribution/contact info, no settings fields — doesn't fit
+   * the generic field loop (see buildGeneralSection's docblock above for the same reasoning). */
+  function buildAboutSection() {
+    const wrap = document.createElement("div");
+    wrap.className = "settingsSectionPanel";
+
+    const versionRow = document.createElement("p");
+    versionRow.textContent = t("threebox.settings.about.version", "ThreeBox v{version}", { version: THREEBOX_VERSION });
+    wrap.appendChild(versionRow);
+
+    const builtOnRow = document.createElement("p");
+    builtOnRow.textContent = t("threebox.settings.about.builtOn", "基于 ThreeJSON 与 Three.js 构建。");
+    wrap.appendChild(builtOnRow);
+
+    const websiteRow = document.createElement("p");
+    const websiteLabel = document.createElement("span");
+    websiteLabel.textContent = t("threebox.settings.about.websiteLabel", "ThreeJSON 官网：");
+    const websiteLink = document.createElement("a");
+    websiteLink.href = "https://threejson.org/website/";
+    websiteLink.target = "_blank";
+    websiteLink.rel = "noreferrer";
+    websiteLink.textContent = "threejson.org";
+    websiteRow.appendChild(websiteLabel);
+    websiteRow.appendChild(websiteLink);
+    wrap.appendChild(websiteRow);
+
+    const heading = document.createElement("div");
+    heading.className = "settingsSectionHeading";
+    heading.textContent = t("threebox.settings.about.contactHeading", "联系我们");
+    wrap.appendChild(heading);
+
+    const contactList = document.createElement("ul");
+    contactList.className = "helpContactList";
+
+    const emailItem = document.createElement("li");
+    const emailLabel = document.createElement("span");
+    emailLabel.textContent = t("threebox.help.emailLabel", "邮箱反馈：");
+    const emailLink = document.createElement("a");
+    emailLink.href = "mailto:threejson@outlook.com";
+    emailLink.textContent = "threejson@outlook.com";
+    emailItem.appendChild(emailLabel);
+    emailItem.appendChild(emailLink);
+    contactList.appendChild(emailItem);
+
+    const issuesItem = document.createElement("li");
+    const issuesLabel = document.createElement("span");
+    issuesLabel.textContent = t("threebox.help.issuesLabel", "或访问 GitHub 仓库提交 Issue：");
+    const issuesLink = document.createElement("a");
+    issuesLink.href = "https://github.com/nnrj/threejson/issues";
+    issuesLink.target = "_blank";
+    issuesLink.rel = "noreferrer";
+    issuesLink.textContent = "github.com/nnrj/threejson/issues";
+    issuesItem.appendChild(issuesLabel);
+    issuesItem.appendChild(issuesLink);
+    contactList.appendChild(issuesItem);
+
+    wrap.appendChild(contactList);
+    return wrap;
+  }
+
   function renderActiveSection() {
     if (!scroll) {
       return;
@@ -384,6 +541,7 @@ export function createThreeBoxSettingsModal(host = {}) {
     const panel =
       activeSectionId === "ai" ? buildAiSection()
       : activeSectionId === "general" ? buildGeneralSection()
+      : activeSectionId === "about" ? buildAboutSection()
       : buildGenericSection(activeSectionId);
     scroll.appendChild(panel);
   }
