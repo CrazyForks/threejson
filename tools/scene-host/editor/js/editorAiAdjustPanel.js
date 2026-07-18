@@ -8,6 +8,7 @@ import {
   applyScenePayload,
   checkBuiltinProviderAvailability,
   createAiChatHistoryController,
+  createEditorAiTurnContext,
   createProviderSelectSync,
   ensureUsableCredentials,
   formatAssemblyParentWarnings,
@@ -336,7 +337,13 @@ export function createEditorAiAdjustPanel(host) {
 
     try {
       const agentOptions = getAgentOptions(host);
-      const providerOptions = { provider: creds.provider, apiKey: creds.apiKey, model: creds.model, baseUrl: creds.baseUrl };
+      const providerOptions = {
+        provider: creds.provider,
+        apiKey: creds.apiKey,
+        model: creds.model,
+        baseUrl: creds.baseUrl,
+        threeBoxTurnContext: createEditorAiTurnContext(prompt)
+      };
       const targetSceneJsonString = await getSceneJsonText();
       const targetSceneJson = parseSceneJsonString(targetSceneJsonString);
       const contextPayload = resolveAiAdjustContextPayload(targetSceneJson, host.getEditorSettings()?.ai || {});

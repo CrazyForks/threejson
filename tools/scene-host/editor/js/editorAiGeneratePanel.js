@@ -4,6 +4,7 @@ import {
   applyScenePayload,
   checkBuiltinProviderAvailability,
   createAiChatHistoryController,
+  createEditorAiTurnContext,
   createProviderSelectSync,
   ensureUsableCredentials,
   friendlyAiEditError,
@@ -376,7 +377,13 @@ export function createEditorAiGeneratePanel(host) {
 
     try {
       const agentOptions = getAgentOptions(host);
-      const providerOptions = { provider: creds.provider, apiKey: creds.apiKey, model: creds.model, baseUrl: creds.baseUrl };
+      const providerOptions = {
+        provider: creds.provider,
+        apiKey: creds.apiKey,
+        model: creds.model,
+        baseUrl: creds.baseUrl,
+        threeBoxTurnContext: createEditorAiTurnContext(userText)
+      };
       let resultText;
 
       if (attachment?.kind === "image") {

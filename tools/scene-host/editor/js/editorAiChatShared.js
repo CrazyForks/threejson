@@ -7,12 +7,21 @@
  * call, tab-specific composer controls) stays in each panel's own file. */
 import { BUILTIN_PROVIDER_TYPE, ensureEditorBuiltinApiKey } from "./editorBuiltinAiProvider.js";
 import { appendAiChatTurn, getAiChatHistory, resolveSceneKeyFromLabel } from "./editorAiChatStore.js";
-import { parseSceneJsonString } from "threejson";
+import { createThreeBoxTurnContext, parseSceneJsonString } from "threejson";
 import { t } from "../../shared/i18n/index.js";
 
 export function isAiAbortError(err) {
   const name = err?.name || "";
   return name === "AbortError" || /aborted/i.test(String(err?.message || err));
+}
+
+/** One mutable moderation context per editor user action. All built-in-provider requests spawned
+ * by that action (Agent rounds, command/JSON fallbacks, compact retries) share the signed receipt
+ * written back into this object by core/ai. Custom providers simply ignore this transport option. */
+export function createEditorAiTurnContext(originalPrompt) {
+  const suffix = globalThis.crypto?.randomUUID?.()
+    || `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+  return createThreeBoxTurnContext(`editor-${suffix}`, originalPrompt);
 }
 
 export function formatAssemblyParentWarnings(batchOrResult) {
@@ -31,6 +40,12 @@ export function friendlyAiEditError(error) {
     return t(
       "editor.ai.error.invalidApiKeyHeader",
       "API Key 中包含无法用于请求头的字符，请确认只粘贴了供应商提供的 API Key。"
+    );
+  }
+  if (error?.code === "BUILTIN_MODERATION_BLOCKED") {
+    return t(
+      "editor.ai.error.builtinModerationBlocked",
+      "该请求未通过内置供应商的内容审核，请调整提示词后重试。"
     );
   }
   return error?.message || String(error || t("editor.ai.error.unknown", "未知错误"));
