@@ -83,11 +83,31 @@ export function createAiChatHistoryController({ host, messagesEl }) {
     return body;
   }
 
+  function appendActivityMessage(text) {
+    const body = appendMessage("assistant", text);
+    if (body) {
+      body.classList.add("aiEditMsgActivity");
+      body.setAttribute("role", "status");
+      body.setAttribute("aria-live", "polite");
+      body.setAttribute("aria-busy", "true");
+    }
+    return body;
+  }
+
   function updateMessage(bodyEl, text) {
     if (bodyEl) {
+      bodyEl.classList.remove("aiEditMsgActivity");
+      bodyEl.removeAttribute("role");
+      bodyEl.removeAttribute("aria-live");
+      bodyEl.removeAttribute("aria-busy");
       bodyEl.textContent = text;
       scrollToBottom();
     }
+  }
+
+  function removeMessage(bodyEl) {
+    bodyEl?.closest?.(".aiEditMsg")?.remove();
+    scrollToBottom();
   }
 
   async function renderHistoryForCurrentScene() {
@@ -127,7 +147,36 @@ export function createAiChatHistoryController({ host, messagesEl }) {
     }
   }
 
-  return { appendMessage, updateMessage, scrollToBottom, renderHistoryForCurrentScene, persistTurn, recentTurnSummaries };
+  return {
+    appendMessage,
+    appendActivityMessage,
+    updateMessage,
+    removeMessage,
+    scrollToBottom,
+    renderHistoryForCurrentScene,
+    persistTurn,
+    recentTurnSummaries
+  };
+}
+
+/** Gives the browser an actual paint opportunity before credential checks, moderation, intent
+ * negotiation, or scene serialization begins. Without this, a status element inserted in the
+ * same click task can remain invisible until a later network await finally yields. */
+export function waitForAiActivityPaint() {
+  if (typeof requestAnimationFrame !== "function") {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(fallbackTimer);
+      resolve();
+    };
+    const fallbackTimer = setTimeout(finish, 160);
+    requestAnimationFrame(() => requestAnimationFrame(finish));
+  });
 }
 
 /** Finds the ai.providers[] entry the quick-select currently points at, falling back to

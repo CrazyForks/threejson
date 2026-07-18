@@ -409,9 +409,13 @@ async function main() {
       threeBoxTurnContext: turnContext
     };
 
-    const textEl = api.appendAssistantMessage("");
-    const streaming = api.createStreamingBlock();
-    api.appendToBody(textEl, streaming.el);
+    const initialActivity = api.takeInitialActivity?.();
+    const textEl = initialActivity?.textEl || api.appendAssistantMessage("");
+    const streaming = initialActivity?.streaming || api.createStreamingBlock();
+    if (!initialActivity) {
+      api.appendToBody(textEl, streaming.el);
+    }
+    streaming.processing(t("threebox.chat.generating", "正在生成…"));
     let streamBuffer = "";
     const agentOptions = resolveThreeBoxAgentOptions(settings);
     const progressiveSceneCard = agentOptions.enabled ? createConfiguredSceneCard() : null;
@@ -633,9 +637,13 @@ async function main() {
     }
     const targetSceneJson = JSON.parse(targetSceneJsonString);
 
-    const textEl = api.appendAssistantMessage("");
-    const streaming = api.createStreamingBlock();
-    api.appendToBody(textEl, streaming.el);
+    const initialActivity = api.takeInitialActivity?.();
+    const textEl = initialActivity?.textEl || api.appendAssistantMessage("");
+    const streaming = initialActivity?.streaming || api.createStreamingBlock();
+    if (!initialActivity) {
+      api.appendToBody(textEl, streaming.el);
+    }
+    streaming.processing(t("threebox.chat.adjusting", "正在调整…"));
     let streamBuffer = "";
     const agentOptions = resolveThreeBoxAgentOptions(settings);
     const updateAgentProgress = createAgentProgressUpdater(streaming);
@@ -870,7 +878,10 @@ async function main() {
       // user instead of vanishing — an unhandled rejection here would otherwise leave the chat
       // looking like it did nothing at all after Send was clicked.
       console.error("[threebox] handleUserMessage failed:", error);
-      api.appendAssistantMessage(t("threebox.app.processingFailed", "处理失败：{error}", { error: error?.message || error }));
+      const message = t("threebox.app.processingFailed", "处理失败：{error}", { error: error?.message || error });
+      if (!api.finishInitialActivity?.(message)) {
+        api.appendAssistantMessage(message);
+      }
       api.finishTurnScroll();
     }
   }
@@ -897,12 +908,13 @@ async function main() {
       }
     }
     if (!providerOptions || !providerOptions.apiKey) {
-      api.appendAssistantMessage(
-        t(
-          "threebox.app.noProviderConfigured",
-          "尚未配置可用的 AI 供应商。请点击左侧「AI 配置」，添加一个供应商并填写 API Key 后再试。"
-        )
+      const message = t(
+        "threebox.app.noProviderConfigured",
+        "尚未配置可用的 AI 供应商。请点击左侧「AI 配置」，添加一个供应商并填写 API Key 后再试。"
       );
+      if (!api.finishInitialActivity?.(message)) {
+        api.appendAssistantMessage(message);
+      }
       api.finishTurnScroll();
       return;
     }
@@ -912,9 +924,10 @@ async function main() {
       seed = await consumeAttachedContextAsSeedTurn(api);
     } catch (error) {
       console.error("[threebox] consumeAttachedContextAsSeedTurn failed:", error);
-      api.appendAssistantMessage(
-        t("threebox.app.loadAttachedFailed", "加载已附加的场景失败：{error}", { error: error?.message || error })
-      );
+      const message = t("threebox.app.loadAttachedFailed", "加载已附加的场景失败：{error}", { error: error?.message || error });
+      if (!api.finishInitialActivity?.(message)) {
+        api.appendAssistantMessage(message);
+      }
       api.finishTurnScroll();
       return;
     }

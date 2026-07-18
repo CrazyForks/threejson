@@ -1090,6 +1090,33 @@ html, body {
       border-bottom-left-radius: 2px;
     }
 
+    .aiEditMsgActivity {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #b9c3d2;
+    }
+
+    .aiEditMsgActivity::before {
+      content: "";
+      width: 13px;
+      height: 13px;
+      flex: 0 0 auto;
+      box-sizing: border-box;
+      border: 2px solid rgba(185, 195, 210, 0.28);
+      border-top-color: #8eb7ff;
+      border-radius: 50%;
+      animation: editorAiActivitySpin 0.8s linear infinite;
+    }
+
+    @keyframes editorAiActivitySpin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .aiEditMsgActivity::before { animation-duration: 1.8s; }
+    }
+
     .aiEditAttachedRow {
       display: flex;
       flex-wrap: wrap;

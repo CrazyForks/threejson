@@ -20,6 +20,7 @@ export function createThreeBoxChatPanel(host = {}) {
   const scrollToBottomBtn = document.getElementById("scrollToBottomBtn");
 
   let busy = false;
+  let busyStoppable = false;
   let turnSpacer = null;
 
   /** Toggles the composer's send button into a stop button for the duration of an in-flight
@@ -27,14 +28,20 @@ export function createThreeBoxChatPanel(host = {}) {
    * sending, and Enter is ignored (the existing text stays in the composer rather than queuing a
    * second concurrent turn). The caller (threeBoxApp.js) is responsible for pairing every
    * `setBusy(true)` with a `setBusy(false)` once the turn settles (success, failure, or abort). */
-  function setBusy(isBusy) {
+  function setBusy(isBusy, options = {}) {
     busy = Boolean(isBusy);
+    busyStoppable = busy && options.stoppable !== false;
     if (!composerSendBtn) {
       return;
     }
-    composerSendBtn.innerHTML = busy ? STOP_ICON : SEND_ICON;
-    composerSendBtn.classList.toggle("composerSendBtnStop", busy);
-    const label = busy ? t("threebox.shell.stop", "停止") : t("threebox.shell.send", "发送");
+    composerSendBtn.disabled = busy && !busyStoppable;
+    composerSendBtn.innerHTML = busyStoppable ? STOP_ICON : SEND_ICON;
+    composerSendBtn.classList.toggle("composerSendBtnStop", busyStoppable);
+    const label = busyStoppable
+      ? t("threebox.shell.stop", "停止")
+      : busy
+        ? t("threebox.chat.preparingAction", "正在准备…")
+        : t("threebox.shell.send", "发送");
     composerSendBtn.title = label;
     composerSendBtn.setAttribute("aria-label", label);
   }
@@ -208,6 +215,8 @@ export function createThreeBoxChatPanel(host = {}) {
   function createStreamingBlock() {
     const el = document.createElement("pre");
     el.className = "streamingPreview streamingPreviewPending";
+    el.setAttribute("role", "status");
+    el.setAttribute("aria-live", "polite");
     // Show something immediately: with a slow model the first delta can take several seconds to
     // arrive, and an empty block during that wait reads as "nothing happened" after Send.
     el.textContent = t("threebox.chat.generating", "正在生成…");
@@ -215,12 +224,14 @@ export function createThreeBoxChatPanel(host = {}) {
     function update(text) {
       el.classList.remove("streamingPreviewPending");
       el.classList.remove("streamingPreviewProcessing");
+      el.removeAttribute("aria-busy");
       el.textContent = text;
       el.scrollTop = el.scrollHeight;
       revealBottomOf(el);
     }
     function processing(message = "") {
       el.classList.add("streamingPreviewPending", "streamingPreviewProcessing");
+      el.setAttribute("aria-busy", "true");
       el.textContent = message || t(
         "threebox.chat.preparingScene",
         "JSON 已生成，正在解析并准备场景预览（不消耗 Token）…"
@@ -228,6 +239,23 @@ export function createThreeBoxChatPanel(host = {}) {
       revealBottomOf(el);
     }
     return { el, update, processing, remove: () => el.remove() };
+  }
+
+  function waitForActivityPaint() {
+    if (typeof requestAnimationFrame !== "function") {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(fallbackTimer);
+        resolve();
+      };
+      const fallbackTimer = setTimeout(finish, 160);
+      requestAnimationFrame(() => requestAnimationFrame(finish));
+    });
   }
 
   const COPY_ICON =
@@ -433,6 +461,46 @@ export function createThreeBoxChatPanel(host = {}) {
     }
 
     if (host.onUserMessage) {
+      const initialTextEl = appendMessage("assistant", "");
+      const initialStreaming = createStreamingBlock();
+      initialStreaming.processing(
+        t("threebox.chat.preparingRequest", "正在分析需求并与 AI 协商生成方案…")
+      );
+      appendToBody(initialTextEl, initialStreaming.el);
+      let initialActivityState = "pending";
+
+      const moveInitialActivityToEnd = () => {
+        const row = initialTextEl?.closest?.(".chatMessage");
+        if (!row || !chatMessages) {
+          return;
+        }
+        if (turnSpacer?.parentElement === chatMessages) {
+          chatMessages.insertBefore(row, turnSpacer);
+        } else {
+          chatMessages.appendChild(row);
+        }
+        revealBottomOf(row);
+      };
+      const takeInitialActivity = () => {
+        if (initialActivityState !== "pending") {
+          return null;
+        }
+        initialActivityState = "claimed";
+        moveInitialActivityToEnd();
+        return { textEl: initialTextEl, streaming: initialStreaming };
+      };
+      const finishInitialActivity = (message) => {
+        if (initialActivityState === "finished") {
+          return false;
+        }
+        initialActivityState = "finished";
+        initialStreaming.remove();
+        updateAssistantMessage(initialTextEl, message);
+        return true;
+      };
+
+      setBusy(true, { stoppable: false });
+      await waitForActivityPaint();
       try {
         await host.onUserMessage(text, {
           appendAssistantMessage: (t) => appendMessage("assistant", t),
@@ -442,18 +510,30 @@ export function createThreeBoxChatPanel(host = {}) {
           buildJsonCollapse,
           buildDiffCollapse,
           buildSummaryBlock,
-          finishTurnScroll
+          finishTurnScroll,
+          takeInitialActivity,
+          finishInitialActivity
         });
+        if (initialActivityState === "pending") {
+          finishInitialActivity(
+            t("threebox.chat.noProcessingResult", "处理已结束，但没有返回可显示的结果。")
+          );
+          finishTurnScroll();
+        }
       } catch (error) {
         // Top-level safety net: onUserMessage is expected to handle its own errors, but an
         // uncaught rejection here must still surface something in the chat rather than leaving
         // the UI looking like Send did nothing at all.
         console.error("[threebox] onUserMessage failed:", error);
-        appendMessage(
-          "assistant",
-          t("threebox.app.processingFailed", "处理失败：{error}", { error: error?.message || error })
-        );
+        const message = t("threebox.app.processingFailed", "处理失败：{error}", { error: error?.message || error });
+        if (!finishInitialActivity(message)) {
+          appendMessage("assistant", message);
+        }
         finishTurnScroll();
+      } finally {
+        if (initialActivityState !== "claimed") {
+          setBusy(false);
+        }
       }
       return;
     }
@@ -473,7 +553,9 @@ export function createThreeBoxChatPanel(host = {}) {
   function init() {
     composerSendBtn?.addEventListener("click", () => {
       if (busy) {
-        host.onStopRequested?.();
+        if (busyStoppable) {
+          host.onStopRequested?.();
+        }
         return;
       }
       void sendMessage(composerInput?.value);

@@ -257,6 +257,7 @@ button { font: inherit; }
   cursor: pointer; transition: background 0.12s ease;
 }
 .composerSendBtn:hover { background: var(--brand-hover); }
+.composerSendBtn:disabled { opacity: .68; cursor: wait; background: var(--brand); }
 .composerSendBtn svg { width: 16px; height: 16px; }
 .composerSendBtnStop { background: #5a5f6b; }
 .composerSendBtnStop:hover { background: #6b7280; }

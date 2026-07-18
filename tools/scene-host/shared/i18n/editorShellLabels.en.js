@@ -377,6 +377,8 @@ export const EDITOR_SHELL_LABELS_EN = {
   "editor.sceneManage.bindSceneEvents.false": "Off",
   "editor.ai.generating": "Generating...",
   "editor.ai.imageGenerating": "Generating from image...",
+  "editor.ai.edit.preparingGenerate": "Connecting to AI and negotiating a generation plan…",
+  "editor.ai.edit.preparingAdjust": "Connecting to AI and analyzing the adjustment plan…",
   "editor.ai.error.apiKeyRequired": "Please enter an API Key first.",
   "editor.ai.error.customApiBaseRequired": "For a custom provider, enter an API base URL starting with http:// or https://.",
   "editor.ai.message.queryOnly": "AI only ran query commands; the scene was not changed.",

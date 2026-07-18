@@ -377,6 +377,8 @@
   "editor.sceneManage.bindSceneEvents.false": "关闭",
   "editor.ai.generating": "生成中...",
   "editor.ai.imageGenerating": "看图生成中...",
+  "editor.ai.edit.preparingGenerate": "正在连接 AI 并协商生成方案…",
+  "editor.ai.edit.preparingAdjust": "正在连接 AI 并分析调整方案…",
   "editor.ai.error.apiKeyRequired": "请先输入 API Key。",
   "editor.ai.error.customApiBaseRequired": "自定义 Provider 请填写接口根 URL（须以 http:// 或 https:// 开头）。",
   "editor.ai.message.queryOnly": "AI 仅执行查询命令，场景未修改。",

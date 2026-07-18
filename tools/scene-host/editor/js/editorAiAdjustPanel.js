@@ -15,7 +15,8 @@ import {
   friendlyAiEditError,
   getAgentOptions,
   isAiAbortError,
-  promptNoProviderConfigured
+  promptNoProviderConfigured,
+  waitForAiActivityPaint
 } from "./editorAiChatShared.js";
 import { t } from "../../shared/i18n/index.js";
 
@@ -311,31 +312,38 @@ export function createEditorAiAdjustPanel(host) {
       );
       return;
     }
-    const creds = await ensureUsableCredentials(host);
-    if (!creds.apiKey) {
-      void promptNoProviderConfigured(host);
-      return;
-    }
-
     const attachment = pendingAttachment;
     const effectivePrompt = buildPromptWithAttachmentNote(prompt, attachment);
-
-    if (dom.promptInput) {
-      dom.promptInput.value = "";
-    }
-    if (attachment) {
-      pendingAttachment = null;
-      if (dom.fileInput) dom.fileInput.value = "";
-      renderAttachedChip();
-    }
-    historyCtl.appendMessage("user", prompt);
-    void historyCtl.persistTurn("user", prompt);
-
-    const assistantBody = historyCtl.appendMessage("assistant", t("editor.ai.edit.working", "AI 正在处理..."));
+    const userBody = historyCtl.appendMessage("user", prompt);
+    const assistantBody = historyCtl.appendActivityMessage(
+      t("editor.ai.edit.preparingAdjust", "正在连接 AI 并分析调整方案…")
+    );
     setBusy(true);
     abortController = new AbortController();
+    let requestStarted = false;
+    await waitForAiActivityPaint();
 
     try {
+      abortController.signal.throwIfAborted?.();
+      const creds = await ensureUsableCredentials(host);
+      if (!creds.apiKey) {
+        historyCtl.removeMessage(userBody);
+        historyCtl.removeMessage(assistantBody);
+        void promptNoProviderConfigured(host);
+        return;
+      }
+      abortController.signal.throwIfAborted?.();
+      requestStarted = true;
+      if (dom.promptInput) {
+        dom.promptInput.value = "";
+      }
+      if (attachment) {
+        pendingAttachment = null;
+        if (dom.fileInput) dom.fileInput.value = "";
+        renderAttachedChip();
+      }
+      void historyCtl.persistTurn("user", prompt);
+
       const agentOptions = getAgentOptions(host);
       const providerOptions = {
         provider: creds.provider,
@@ -372,6 +380,14 @@ export function createEditorAiAdjustPanel(host) {
       historyCtl.updateMessage(assistantBody, resultText);
       void historyCtl.persistTurn("assistant", resultText);
     } catch (error) {
+      if (!requestStarted) {
+        historyCtl.removeMessage(userBody);
+        historyCtl.removeMessage(assistantBody);
+        if (!isAiAbortError(error)) {
+          host.showMessage(friendlyAiEditError(error), "error");
+        }
+        return;
+      }
       if (isAiAbortError(error)) {
         historyCtl.updateMessage(assistantBody, t("editor.ai.message.aborted", "已停止生成。"));
         void historyCtl.persistTurn("assistant", t("editor.ai.message.aborted", "已停止生成。"));

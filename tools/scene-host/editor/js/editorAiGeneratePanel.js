@@ -10,7 +10,8 @@ import {
   friendlyAiEditError,
   getAgentOptions,
   isAiAbortError,
-  promptNoProviderConfigured
+  promptNoProviderConfigured,
+  waitForAiActivityPaint
 } from "./editorAiChatShared.js";
 import { t } from "../../shared/i18n/index.js";
 
@@ -355,27 +356,35 @@ export function createEditorAiGeneratePanel(host) {
     if (!prompt && !attachment) {
       return;
     }
-    const creds = await ensureUsableCredentials(host);
-    if (!creds.apiKey) {
-      void promptNoProviderConfigured(host);
-      return;
-    }
-
-    if (dom.promptInput) {
-      dom.promptInput.value = "";
-    }
     const userText = prompt || t("editor.ai.edit.imageOnlyPrompt", "（看图生成）");
-    historyCtl.appendMessage("user", userText);
-    void historyCtl.persistTurn("user", userText);
-
-    const assistantBody = historyCtl.appendMessage("assistant", t("editor.ai.edit.working", "AI 正在处理..."));
+    const userBody = historyCtl.appendMessage("user", userText);
+    const assistantBody = historyCtl.appendActivityMessage(
+      t("editor.ai.edit.preparingGenerate", "正在连接 AI 并协商生成方案…")
+    );
     setBusy(true);
     abortController = new AbortController();
-    if (attachment) {
-      clearAttachment();
-    }
+    let requestStarted = false;
+    await waitForAiActivityPaint();
 
     try {
+      abortController.signal.throwIfAborted?.();
+      const creds = await ensureUsableCredentials(host);
+      if (!creds.apiKey) {
+        historyCtl.removeMessage(userBody);
+        historyCtl.removeMessage(assistantBody);
+        void promptNoProviderConfigured(host);
+        return;
+      }
+      abortController.signal.throwIfAborted?.();
+      requestStarted = true;
+      if (dom.promptInput) {
+        dom.promptInput.value = "";
+      }
+      void historyCtl.persistTurn("user", userText);
+      if (attachment) {
+        clearAttachment();
+      }
+
       const agentOptions = getAgentOptions(host);
       const providerOptions = {
         provider: creds.provider,
@@ -433,6 +442,14 @@ export function createEditorAiGeneratePanel(host) {
       historyCtl.updateMessage(assistantBody, resultText);
       void historyCtl.persistTurn("assistant", resultText);
     } catch (error) {
+      if (!requestStarted) {
+        historyCtl.removeMessage(userBody);
+        historyCtl.removeMessage(assistantBody);
+        if (!isAiAbortError(error)) {
+          host.showMessage(friendlyAiEditError(error), "error");
+        }
+        return;
+      }
       if (isAiAbortError(error)) {
         historyCtl.updateMessage(assistantBody, t("editor.ai.message.aborted", "已停止生成。"));
         void historyCtl.persistTurn("assistant", t("editor.ai.message.aborted", "已停止生成。"));
