@@ -245,7 +245,8 @@ a { color: inherit; text-decoration: none; }
   font-weight: 700;
 }
 
-.headerToolsToggle {
+.headerToolsToggle,
+.mainNavToggle {
   display: none;
   align-items: center;
   justify-content: center;
@@ -258,8 +259,11 @@ a { color: inherit; text-decoration: none; }
   cursor: pointer;
   flex: 0 0 auto;
 }
-.headerToolsToggle svg { width: 16px; height: 16px; }
-.headerToolsToggle:hover { color: var(--brand); border-color: var(--brand); }
+.headerToolsToggle svg,
+.mainNavToggle svg { width: 16px; height: 16px; }
+.headerToolsToggle:hover,
+.mainNavToggle:hover { color: var(--brand); border-color: var(--brand); }
+.mainNavToggle[aria-expanded="true"] { color: var(--brand); border-color: var(--brand); }
 
 .siteMain { min-height: calc(100vh - 64px); }
 
@@ -608,14 +612,92 @@ a { color: inherit; text-decoration: none; }
   color: var(--muted);
 }
 
+/* ---- Mobile: main nav collapses into a hamburger-triggered dropdown drawer instead of
+   stacking full-width under the header (submenus become inline accordions, opened via the
+   same click-to-pin logic already used for desktop hover menus). ---- */
 @media (max-width: 900px) {
   .siteHeader {
     height: auto;
     min-height: 64px;
-    flex-wrap: wrap;
-    padding: 12px 16px;
+    padding: 0 16px;
+    position: relative;
   }
-  .mainNav { order: 3; width: 100%; overflow-x: auto; }
+  .mainNavToggle { display: inline-flex; margin-left: auto; }
+
+  .mainNav {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    width: auto;
+    gap: 2px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 10px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    z-index: 25;
+  }
+  .mainNav.open { display: flex; }
+
+  .mainNav > a,
+  .navMenu > button {
+    width: 100%;
+    justify-content: flex-start;
+    min-height: 44px;
+    padding: 0 14px;
+  }
+  .mainNav > a::after,
+  .navMenu > button::after { display: none; }
+
+  .navMenu {
+    height: auto;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .navMenu > button { position: relative; padding-right: 34px; }
+  .navMenu > button::before {
+    content: "";
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    width: 7px;
+    height: 7px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: translateY(-70%) rotate(45deg);
+    transition: transform 0.15s ease;
+  }
+  .navMenu.hoverOpen > button::before,
+  .navMenu.pinnedOpen > button::before {
+    transform: translateY(-30%) rotate(-135deg);
+  }
+
+  .dropdown {
+    position: static;
+    display: none;
+    min-width: 0;
+    width: auto;
+    margin: 2px 0 6px 14px;
+    padding: 2px 0 2px 12px;
+    background: transparent;
+    border: 0;
+    border-left: 1px solid var(--line);
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .navMenu.hoverOpen .dropdown,
+  .navMenu.pinnedOpen .dropdown,
+  .navMenu:focus-within .dropdown { display: flex; flex-direction: column; }
+  .dropdown a { min-height: 40px; display: flex; align-items: center; }
+
   .hero { grid-template-columns: 1fr; padding-top: 42px; }
   .examplesPage { grid-template-columns: 1fr; }
   .examplesSideList {

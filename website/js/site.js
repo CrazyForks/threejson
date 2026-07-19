@@ -187,6 +187,7 @@ function init() {
   applyI18n();
   wireMenuHoverBehavior();
   wireHeaderToolsToggle();
+  wireMainNavToggle();
   wireDocLinks();
   wireLegalLinks();
   window.addEventListener("hashchange", renderRoute);
@@ -310,7 +311,7 @@ function switchDocPathLanguage(path, targetLang) {
 }
 
 function renderRoute() {
-  closeOpenMenus({ includePinned: true });
+  closeAllNav({ includePinned: true });
   teardownExamplesThumbnails();
   const hash = decodeURIComponent(location.hash || "#/");
   const route = hash.replace(/^#/, "") || "/";
@@ -946,6 +947,35 @@ function wireHeaderToolsToggle() {
   });
 }
 
+/** Mobile-only hamburger toggle: below 900px .mainNav collapses into a hidden dropdown drawer
+ * (see @media (max-width: 900px) in site.css) and this button shows/hides it. Above that
+ * breakpoint the toggle is hidden via CSS and .mainNav renders inline as normal, so this wiring
+ * is inert on desktop. Submenu accordion behavior inside the drawer reuses the existing
+ * click-to-pin logic in wireMenuHoverBehavior. */
+function wireMainNavToggle() {
+  const toggle = document.getElementById("mainNavToggle");
+  const nav = document.getElementById("mainNav");
+  if (!toggle || !nav) return;
+  toggle.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const open = nav.classList.toggle("open");
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    if (!open) closeOpenMenus({ includePinned: true });
+  });
+  document.addEventListener("click", (event) => {
+    if (!nav.classList.contains("open")) return;
+    if (nav.contains(event.target) || event.target === toggle || toggle.contains(event.target)) return;
+    closeMainNavDrawer();
+  });
+}
+
+function closeMainNavDrawer() {
+  const toggle = document.getElementById("mainNavToggle");
+  const nav = document.getElementById("mainNav");
+  nav?.classList.remove("open");
+  toggle?.setAttribute("aria-expanded", "false");
+}
+
 function wireMenuHoverBehavior() {
   const header = document.querySelector(".siteHeader");
   const menus = Array.from(document.querySelectorAll(".navMenu"));
@@ -960,10 +990,11 @@ function wireMenuHoverBehavior() {
       setHoverMenu(null);
       menus.forEach((node) => node.classList.toggle("pinnedOpen", node === pinnedMenu));
     });
-    menu.querySelector(".dropdown")?.addEventListener("click", () => {
+    menu.querySelector(".dropdown")?.addEventListener("click", (event) => {
       setHoverMenu(null);
       pinnedMenu?.classList.remove("pinnedOpen");
       pinnedMenu = null;
+      if (event.target.closest?.("a")) closeMainNavDrawer();
     });
   });
   header.addEventListener("mousemove", (event) => {
@@ -1001,6 +1032,7 @@ function wireMenuHoverBehavior() {
     }
     if (event.target.closest?.(".mainNav > a")) {
       setHoverMenu(null);
+      closeMainNavDrawer();
     }
   });
 }
@@ -1011,6 +1043,11 @@ function closeOpenMenus(options = {}) {
     pinnedMenu.classList.remove("pinnedOpen");
     pinnedMenu = null;
   }
+}
+
+function closeAllNav(options = {}) {
+  closeOpenMenus(options);
+  closeMainNavDrawer();
 }
 
 function setHoverMenu(menu) {

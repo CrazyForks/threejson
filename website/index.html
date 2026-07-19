@@ -27,7 +27,10 @@
     <a class="brand" href="#/" aria-label="ThreeJSON">
       <img src="../assets/img/threejson.png" alt="ThreeJSON">
     </a>
-    <nav class="mainNav" aria-label="Main">
+    <button type="button" id="mainNavToggle" class="mainNavToggle" aria-label="菜单" aria-expanded="false" aria-controls="mainNav">
+      <svg viewBox="0 0 20 16" aria-hidden="true" focusable="false"><rect y="0" width="20" height="2" rx="1" fill="currentColor"/><rect y="7" width="20" height="2" rx="1" fill="currentColor"/><rect y="14" width="20" height="2" rx="1" fill="currentColor"/></svg>
+    </button>
+    <nav class="mainNav" id="mainNav" aria-label="Main">
       <a href="#/" data-i18n="nav.home">首页</a>
       <div class="navMenu">
         <button type="button" data-i18n="nav.docs">文档</button>
