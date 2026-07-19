@@ -100,6 +100,7 @@ export const EDITOR_SHELL_LABELS_EN = {
   "editor.shell.debugSideView.label": "Side",
   "editor.shell.loadingMaskMessage": "Loading 3D scene…",
   "editor.shell.emptyStateOpenBtn": "Open",
+  "editor.shell.emptyStateNewBtn": "New",
   "editor.shell.emptyStateOpenDefaultBtn": "Open Sample Scene",
   "editor.shell.editorStartupRecentTitle": "Recently Opened",
   "editor.shell.codeEditorRenderBtn": "Render JSON to Canvas",

@@ -58,7 +58,7 @@ export function createPresetScenePanel(host) {
     contextMenu.style.top = `${Math.max(8, top)}px`;
   }
 
-  async function openPresetScene(entry) {
+  async function openPresetScene(entry, options = {}) {
     if (!entry?.id) {
       host.showMessage("场景预设配置无效。", "warning");
       return;
@@ -67,10 +67,13 @@ export function createPresetScenePanel(host) {
     if (!ok) {
       return;
     }
-    const parsed = await readPresetJson(entry.id);
+    let parsed = await readPresetJson(entry.id);
     if (!parsed) {
       host.showMessage("场景预设缓存不存在，请刷新页面后重试。", "warning");
       return;
+    }
+    if (typeof options.transformPayload === "function") {
+      parsed = options.transformPayload(parsed) || parsed;
     }
     host.toggleStartupEmptyState?.(false);
     host.getUi?.()?.setLoadingMessage?.("正在加载场景预设...");
@@ -214,7 +217,7 @@ export function createPresetScenePanel(host) {
   return {
     init,
     refresh,
-    async openPresetById(presetId) {
+    async openPresetById(presetId, options = {}) {
       const entries = await loadPresetSceneEntries();
       const entry = entries.find((item) => item.id === presetId);
       if (!entry) {
@@ -222,7 +225,7 @@ export function createPresetScenePanel(host) {
         return;
       }
       host.closeAllDropdowns?.();
-      await openPresetScene(entry);
+      await openPresetScene(entry, options);
     }
   };
 }

@@ -100,6 +100,7 @@
   "editor.shell.debugSideView.label": "Side",
   "editor.shell.loadingMaskMessage": "3D 场景加载中...",
   "editor.shell.emptyStateOpenBtn": "打开",
+  "editor.shell.emptyStateNewBtn": "新建",
   "editor.shell.emptyStateOpenDefaultBtn": "打开示例场景",
   "editor.shell.editorStartupRecentTitle": "最近打开",
   "editor.shell.codeEditorRenderBtn": "渲染 JSON 到画布",

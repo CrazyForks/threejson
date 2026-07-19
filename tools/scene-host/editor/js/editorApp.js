@@ -1827,6 +1827,27 @@ export async function bootstrapSceneHostEditor() {
     }
   });
 
+  /** Strips the blank-orbit preset's default "room-floor" object unless the user opted in via
+   * Settings → General → 新建场景默认添加地板 (general.newSceneIncludeFloor, default off). */
+  function stripDefaultFloorIfDisabled(payload) {
+    if (editorSettings?.general?.newSceneIncludeFloor) {
+      return payload;
+    }
+    if (!payload || !Array.isArray(payload.objectList)) {
+      return payload;
+    }
+    return {
+      ...payload,
+      objectList: payload.objectList.filter((entry) => entry?.objType !== "floor")
+    };
+  }
+
+  function openBlankScenePreset() {
+    return presetScenePanel?.openPresetById?.(BLANK_SCENE_PRESET_ID, {
+      transformPayload: stripDefaultFloorIfDisabled
+    });
+  }
+
   function wireMenus() {
     initTopMenubarExclusiveOpen(document, closeAllDropdowns);
     document.getElementById("menuOpenScene")?.addEventListener("click", () => {
@@ -1838,6 +1859,9 @@ export async function bootstrapSceneHostEditor() {
     });
     document.getElementById("emptyStateOpenBtn")?.addEventListener("click", () => {
       fileInputs.topBarOpen?.click();
+    });
+    document.getElementById("emptyStateNewBtn")?.addEventListener("click", () => {
+      void openBlankScenePreset();
     });
     document.getElementById("emptyStateOpenDefaultBtn")?.addEventListener("click", () => {
       void loadSceneFromUrl(getDefaultSceneJsonUrl(editorSettings), "示例场景");
@@ -1967,7 +1991,7 @@ export async function bootstrapSceneHostEditor() {
       closeAllDropdowns();
     });
     document.getElementById("menuNewBlankOrbit")?.addEventListener("click", () => {
-      void presetScenePanel?.openPresetById?.(BLANK_SCENE_PRESET_ID);
+      void openBlankScenePreset();
       closeAllDropdowns();
     });
     document.getElementById("menuUndo")?.addEventListener("click", () => {

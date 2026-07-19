@@ -27,6 +27,7 @@ export const EDITOR_SETTINGS_DEFAULTS = {
       baseTitle: "Scene Editor",
       defaultSceneUrl: "../../../../assets/json/portShow.json",
       openLastSceneOnStartup: false,
+      newSceneIncludeFloor: false,
       exitNavigateUrl: "../../../../examples/html-demo/demo.html",
       loadingMaskText: "Loading 3D scene…",
       loadingActivityIntervalMs: 120,
@@ -210,6 +211,13 @@ export const EDITOR_SETTINGS_FIELDS = [
       path: "general.openLastSceneOnStartup",
       type: "checkbox",
       label: "启动时打开上次打开的场景"
+    },
+    {
+      section: "general",
+      path: "general.newSceneIncludeFloor",
+      type: "checkbox",
+      label: "新建场景默认添加地板",
+      hint: "关闭后，「文件 → 新建 → 普通场景」与空状态「新建」按钮创建的场景不会自带地板对象。"
     },
     { section: "general", path: "general.exitNavigateUrl", type: "text", label: "退出编辑器跳转 URL" },
     { section: "general", path: "general.loadingMaskText", type: "text", label: "加载遮罩文案" },

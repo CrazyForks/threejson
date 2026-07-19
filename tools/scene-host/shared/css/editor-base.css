@@ -1631,6 +1631,13 @@ html, body {
       pointer-events: none;
     }
 
+    .editorStartupPrimaryActions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
     .editorStartupSampleBtn {
       color: #9ecbff;
       text-decoration: none;

@@ -154,9 +154,10 @@
         <button type="button" class="editModeSeg" data-trans-mode="rotate" aria-pressed="false" title="旋转">旋转</button>
         <button type="button" class="editModeSeg" data-trans-mode="scale" aria-pressed="false" title="缩放">缩放</button>
       </div>
-      <div class="editModeToggle" id="editModeToggle" role="group" aria-label="编辑模式：3D 图形 / Code 代码">
-        <button type="button" class="editModeSeg editModeSegActive" id="editModeSeg3d" aria-pressed="true" title="图形编辑模式（在画布中直接操作）">3D</button>
+      <div class="editModeToggle" id="editModeToggle" role="group" aria-label="编辑模式：Code / All / 3D">
         <button type="button" class="editModeSeg" id="editModeSegCode" aria-pressed="false" title="代码编辑模式（编辑场景 JSON，右上角预览）">Code</button>
+        <button type="button" class="editModeSeg" id="editModeSegAll" aria-pressed="false" title="分屏编辑模式（左侧 JSON，右侧画布）">All</button>
+        <button type="button" class="editModeSeg editModeSegActive" id="editModeSeg3d" aria-pressed="true" title="图形编辑模式（在画布中直接操作）">3D</button>
       </div>
       <button class="toolBtn secondary" id="topBarBtnRunScene" type="button" title="与「运行 → 运行场景」相同（Alt+F5）">▶ 运行</button>
       <button class="toolBtn secondary" id="topBarBtnOpenScene" type="button" title="与「文件 → 导入 ▸ 导入 ThreeJSON」相同">打开</button>
@@ -182,7 +183,10 @@
     </div>
     <div id="messageBox"></div>
     <div id="editorStartupEmptyState" class="editorStartupEmptyState" hidden>
-      <button class="toolBtn secondary" id="emptyStateOpenBtn" type="button">打开</button>
+      <div class="editorStartupPrimaryActions">
+        <button class="toolBtn secondary" id="emptyStateOpenBtn" type="button">打开</button>
+        <button class="toolBtn secondary" id="emptyStateNewBtn" type="button">新建</button>
+      </div>
       <button class="toolBtn linkLike editorStartupSampleBtn" id="emptyStateOpenDefaultBtn" type="button">打开示例场景</button>
       <div class="editorStartupRecentWrap">
         <div class="editorStartupRecentTitle">最近打开</div>
