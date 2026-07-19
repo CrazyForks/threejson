@@ -215,6 +215,9 @@ export const THREEBOX_SHELL_LABELS_EN = {
 
   "threebox.sceneCard.waitingForDraft": "Waiting for a scene draft…",
   "threebox.sceneCard.rendering": "Rendering scene (no tokens used)…",
+  "threebox.sceneCard.loadingContent": "Canvas ready; loading scene content (no tokens used)…",
+  "threebox.sceneCard.loadingProgress": "Loading scene content {done}/{total} (no tokens used)…",
+  "threebox.settings.provider.quotaValue": "Used {used} / {remaining} remaining",
   "threebox.sceneCard.downloadJson": "Download JSON",
   "threebox.sceneCard.exportTjz": "Export .tjz Package",
   "threebox.sceneCard.exportMesh": "Export Third-Party Model",

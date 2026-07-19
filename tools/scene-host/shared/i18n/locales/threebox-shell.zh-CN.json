@@ -215,6 +215,9 @@
 
   "threebox.sceneCard.waitingForDraft": "等待场景草稿…",
   "threebox.sceneCard.rendering": "场景渲染中（不消耗 Token）…",
+  "threebox.sceneCard.loadingContent": "画布已启动，正在装载场景内容（不消耗 Token）…",
+  "threebox.sceneCard.loadingProgress": "正在装载场景内容 {done}/{total}（不消耗 Token）…",
+  "threebox.settings.provider.quotaValue": "已用 {used} 轮 / 剩余 {remaining} 轮",
   "threebox.sceneCard.downloadJson": "下载 JSON",
   "threebox.sceneCard.exportTjz": "导出 .tjz 场景包",
   "threebox.sceneCard.exportMesh": "导出三方模型",

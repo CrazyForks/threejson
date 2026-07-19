@@ -296,42 +296,75 @@ export function createThreeBoxChatPanel(host = {}) {
     );
   }
 
-  function buildJsonCodeBlock(text) {
-    const { lineNumbers, highlight } = getJsonViewerOptions();
+  function buildPlainJsonCodeBlock(text) {
+    const pre = document.createElement("pre");
+    pre.className = "jsonCodeView";
+    const code = document.createElement("code");
+    code.textContent = text;
+    pre.appendChild(code);
+    return pre;
+  }
+
+  function scheduleJsonViewerWork(callback) {
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(callback, { timeout: 500 });
+      return;
+    }
+    window.setTimeout(() => callback({ timeRemaining: () => 6 }), 0);
+  }
+
+  /** Builds the line-number/highlight DOM in bounded idle chunks while a single-text-node view
+   * remains visible. This keeps opening a very large result from monopolising the main thread or
+   * delaying Three.js frames. */
+  function buildJsonCodeBlockIncrementally(text, options, onReady) {
+    const { lineNumbers, highlight } = options;
     const pre = document.createElement("pre");
     pre.className = "jsonCodeView";
     pre.classList.toggle("jsonCodeViewLineNumbers", lineNumbers);
     pre.classList.toggle("jsonCodeViewHighlighted", highlight);
     const lines = String(text || "").split(/\r?\n/);
-    if (!lineNumbers && !highlight) {
-      const code = document.createElement("code");
-      code.textContent = text;
-      pre.appendChild(code);
-      return pre;
-    }
     const table = document.createElement("code");
     table.className = "jsonCodeLines";
-    lines.forEach((line, index) => {
-      const row = document.createElement("span");
-      row.className = "jsonCodeLine";
-      if (lineNumbers) {
-        const gutter = document.createElement("span");
-        gutter.className = "jsonCodeLineNumber";
-        gutter.textContent = String(index + 1);
-        row.appendChild(gutter);
-      }
-      const content = document.createElement("span");
-      content.className = "jsonCodeLineContent";
-      if (highlight) {
-        content.innerHTML = highlightJsonLine(line);
-      } else {
-        content.textContent = line;
-      }
-      row.appendChild(content);
-      table.appendChild(row);
-    });
     pre.appendChild(table);
-    return pre;
+    let index = 0;
+
+    const appendChunk = (deadline) => {
+      const fragment = document.createDocumentFragment();
+      let chunkCount = 0;
+      while (index < lines.length && chunkCount < 240) {
+        if (chunkCount >= 32 && typeof deadline?.timeRemaining === "function" && deadline.timeRemaining() < 2) {
+          break;
+        }
+        const line = lines[index];
+        const row = document.createElement("span");
+        row.className = "jsonCodeLine";
+        if (lineNumbers) {
+          const gutter = document.createElement("span");
+          gutter.className = "jsonCodeLineNumber";
+          gutter.textContent = String(index + 1);
+          row.appendChild(gutter);
+        }
+        const content = document.createElement("span");
+        content.className = "jsonCodeLineContent";
+        if (highlight) {
+          content.innerHTML = highlightJsonLine(line);
+        } else {
+          content.textContent = line;
+        }
+        row.appendChild(content);
+        fragment.appendChild(row);
+        index += 1;
+        chunkCount += 1;
+      }
+      table.appendChild(fragment);
+      if (index < lines.length) {
+        scheduleJsonViewerWork(appendChunk);
+        return;
+      }
+      onReady(pre);
+    };
+
+    scheduleJsonViewerWork(appendChunk);
   }
 
   /** Wires a copy-to-clipboard button: click copies `getText()`'s current value, briefly swaps
@@ -377,18 +410,47 @@ export function createThreeBoxChatPanel(host = {}) {
     return summary;
   }
 
-  /** Defers the expensive per-line syntax-highlight DOM until the user actually opens a JSON
-   * disclosure. Generated scenes can contain thousands of lines; eagerly building several DOM
-   * nodes per line while the <details> is still collapsed used to block insertion of the scene
-   * canvas even though none of that code was visible. */
+  /** Shows an immediate, cheap plain-text view when opened, then upgrades it to line numbers and
+   * highlighting in idle chunks. Generated scenes can contain thousands of lines; eagerly
+   * building several DOM nodes per line used to block insertion and rendering of the canvas. */
   function attachLazyJsonCodeBlock(details, text) {
-    let codeBlock = null;
+    let plainBlock = null;
+    let richBlock = null;
+    let preparing = false;
     details.addEventListener("toggle", () => {
-      if (!details.open || codeBlock) {
+      if (!details.open) {
         return;
       }
-      codeBlock = buildJsonCodeBlock(text);
-      details.appendChild(codeBlock);
+      if (richBlock) {
+        if (!richBlock.parentNode) {
+          details.appendChild(richBlock);
+        }
+        return;
+      }
+      if (!plainBlock) {
+        plainBlock = buildPlainJsonCodeBlock(text);
+        details.appendChild(plainBlock);
+      }
+      if (preparing) {
+        return;
+      }
+      const viewerOptions = getJsonViewerOptions();
+      if (!viewerOptions.lineNumbers && !viewerOptions.highlight) {
+        richBlock = plainBlock;
+        return;
+      }
+      preparing = true;
+      buildJsonCodeBlockIncrementally(text, viewerOptions, (nextBlock) => {
+        richBlock = nextBlock;
+        if (plainBlock?.parentNode) {
+          const previousScrollTop = plainBlock.scrollTop;
+          plainBlock.replaceWith(richBlock);
+          richBlock.scrollTop = previousScrollTop;
+        } else if (details.open) {
+          details.appendChild(richBlock);
+        }
+        plainBlock = null;
+      });
     });
   }
 

@@ -420,6 +420,7 @@ async function main() {
     const agentOptions = resolveThreeBoxAgentOptions(settings);
     const progressiveSceneCard = agentOptions.enabled ? createConfiguredSceneCard() : null;
     let previewRenderQueue = Promise.resolve();
+    let previewQueueOpen = true;
     let lastQueuedPreviewJson = "";
     if (progressiveSceneCard) {
       api.appendToBody(textEl, progressiveSceneCard.el);
@@ -433,7 +434,12 @@ async function main() {
         .catch((error) => {
           console.warn("[threebox] previous agent preview render failed:", error);
         })
-        .then(() => progressiveSceneCard.render(JSON.parse(sceneJsonString), { label: text }));
+        .then(() => {
+          if (!previewQueueOpen) {
+            return null;
+          }
+          return progressiveSceneCard.render(JSON.parse(sceneJsonString), { label: text });
+        });
     };
     const updateAgentProgress = createAgentProgressUpdater(streaming, queueScenePreview);
 
@@ -534,13 +540,14 @@ async function main() {
         return title;
       });
       if (progressiveSceneCard) {
-        queueScenePreview(outputSceneJsonString);
-        try {
-          await previewRenderQueue;
-        } catch (error) {
-          console.warn("[threebox] final queued agent preview failed; retrying final scene:", error);
-          await sceneCard.render(outputSceneJson, { label: text });
-        }
+        // A finished JSON result must not sit behind obsolete draft renders. Closing the queue
+        // prevents previews that have not started yet from touching the card; render()'s sequence
+        // guard supersedes the one preview that may already be in flight.
+        previewQueueOpen = false;
+        void previewRenderQueue.catch((error) => {
+          console.warn("[threebox] superseded agent preview render failed:", error);
+        });
+        await sceneCard.render(outputSceneJson, { label: text });
       } else {
         await sceneCard.render(outputSceneJson, { label: text });
       }

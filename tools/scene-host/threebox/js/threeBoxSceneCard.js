@@ -145,6 +145,22 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
     });
   }
 
+  function showCompactLoadingProgress(deploy = null) {
+    loadingMask.classList.add("sceneCardLoadingMaskCompact");
+    const done = Number(deploy?.done);
+    const total = Number(deploy?.total);
+    loadingMask.textContent = Number.isFinite(done) && Number.isFinite(total) && total > 0
+      ? t(
+          "threebox.sceneCard.loadingProgress",
+          "正在装载场景内容 {done}/{total}（不消耗 Token）…",
+          { done, total }
+        )
+      : t(
+          "threebox.sceneCard.loadingContent",
+          "画布已启动，正在装载场景内容（不消耗 Token）…"
+        );
+  }
+
   async function render(sceneJsonPayload, options = {}) {
     const seq = ++renderSeq;
     liveResizeObserver?.disconnect();
@@ -156,6 +172,7 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
       options.label || sceneJsonPayload?.label || sceneJsonPayload?.name || t("threebox.sceneCard.defaultLabel", "ThreeBox 场景")
     );
     loadingMask.textContent = t("threebox.sceneCard.rendering", "场景渲染中（不消耗 Token）…");
+    loadingMask.classList.remove("sceneCardLoadingMaskCompact");
     loadingMask.hidden = false;
     const { createJsonScene } = await import("threejson");
     const { width, height } = await waitForStableSize(canvasWrap);
@@ -178,6 +195,30 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
       ...payload.sceneConfig,
       renderLoop: { ...payload.sceneConfig?.renderLoop, autoResize: false, firstAutoResize: false }
     };
+    let auxiliaryLightsSynced = false;
+    const syncAuxiliaryLights = (nextRuntime) => {
+      if (auxiliaryLightsSynced || seq !== renderSeq || !nextRuntime?.scene) {
+        return;
+      }
+      const auxiliaryLightsEnabled = typeof cardOptions.shouldUsePreviewAuxiliaryLights === "function"
+        ? cardOptions.shouldUsePreviewAuxiliaryLights() !== false
+        : cardOptions.previewAuxiliaryLights !== false;
+      syncThreeBoxPreviewAuxiliaryLights(nextRuntime.scene, auxiliaryLightsEnabled);
+      auxiliaryLightsSynced = true;
+    };
+    const activateRuntime = (nextRuntime) => {
+      if (!nextRuntime || seq !== renderSeq) {
+        return false;
+      }
+      if (runtime !== nextRuntime) {
+        runtime = nextRuntime;
+        runtime.start?.();
+        watchLiveResize();
+      }
+      runtime.resize?.({ width, height });
+      showCompactLoadingProgress();
+      return true;
+    };
     try {
       const nextRuntime = await enqueueThreeBoxSceneLoad(() =>
         createJsonScene(payload, {
@@ -186,24 +227,28 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
           assetsBase: sceneHostAssetUrl("assets/"),
           autoFillLights: true,
           autoFillCamera: true,
-          autoFitCamera: true
+          autoFitCamera: true,
+          onRuntimeReady: ({ runtime: readyRuntime }) => {
+            activateRuntime(readyRuntime);
+          },
+          onDeployProgress: ({ runtime: deployingRuntime, deploy }) => {
+            if (seq !== renderSeq) {
+              return;
+            }
+            syncAuxiliaryLights(deployingRuntime);
+            showCompactLoadingProgress(deploy);
+          },
+          onSceneReady: ({ runtime: readyRuntime }) => {
+            syncAuxiliaryLights(readyRuntime);
+          }
         })
       );
       if (seq !== renderSeq) {
         nextRuntime?.dispose?.();
         return null;
       }
-      runtime = nextRuntime;
-      const auxiliaryLightsEnabled = typeof cardOptions.shouldUsePreviewAuxiliaryLights === "function"
-        ? cardOptions.shouldUsePreviewAuxiliaryLights() !== false
-        : cardOptions.previewAuxiliaryLights !== false;
-      syncThreeBoxPreviewAuxiliaryLights(runtime.scene, auxiliaryLightsEnabled);
-      runtime.start?.();
-      // core/handler/frameLoopHandler.js's resize(size={}) reads size.width/size.height off a
-      // single options object — passing (width, height) as positional args silently falls back
-      // to window.innerWidth/innerHeight (size.width is undefined on a bare number).
-      runtime.resize?.({ width, height });
-      watchLiveResize();
+      activateRuntime(nextRuntime);
+      syncAuxiliaryLights(nextRuntime);
     } finally {
       if (seq === renderSeq) {
         loadingMask.hidden = true;

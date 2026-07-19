@@ -182,5 +182,6 @@
   "settings.fields.ai.textureBrowserMode": "纹理浏览器模式",
   "settings.options.ai.textureBrowserMode.directory": "目录",
   "settings.options.ai.textureBrowserMode.upload": "上传",
-  "settings.options.ai.textureBrowserMode.zip": "ZIP 下载"
+  "settings.options.ai.textureBrowserMode.zip": "ZIP 下载",
+  "settings.provider.quotaValue": "已用 {used} 轮 / 剩余 {remaining} 轮"
 }

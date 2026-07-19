@@ -1,4 +1,5 @@
 export const EDITOR_SETTINGS_LABELS_EN = {
+  "settings.provider.quotaValue": "Used {used} / {remaining} remaining",
   "settings.modal.title": "Editor Settings",
   "settings.modal.save": "Save",
   "settings.modal.cancel": "Cancel",

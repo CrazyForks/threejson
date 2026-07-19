@@ -166,15 +166,13 @@ export function createThreeBoxSettingsModal(host = {}) {
     const quotaLabel = document.createElement("label");
     quotaLabel.textContent = t("threebox.settings.provider.quotaLabel", "剩余额度");
     const quotaValue = document.createElement("span");
-    const quota = provider.builtinQuota;
-    quotaValue.textContent = quota
-      ? t("threebox.settings.provider.quotaValue", "{used}/{limit} 轮，预估花费 {costUsed}/{costLimit} 美分", {
-          used: quota.roundsUsed,
-          limit: quota.roundsLimit,
-          costUsed: Math.round(quota.costUsedUsdCents),
-          costLimit: Math.round(quota.costLimitUsdCents)
+    const formatQuota = (quota) => quota
+      ? t("threebox.settings.provider.quotaValue", "已用 {used} 轮 / 剩余 {remaining} 轮", {
+          used: Number(quota.roundsUsed) || 0,
+          remaining: Math.max(0, (Number(quota.roundsLimit) || 0) - (Number(quota.roundsUsed) || 0))
         })
       : t("threebox.settings.provider.quotaUnknown", "尚未获取（保存设置后自动申请）");
+    quotaValue.textContent = formatQuota(provider.builtinQuota);
     quotaRow.appendChild(quotaLabel);
     quotaRow.appendChild(quotaValue);
     card.appendChild(quotaRow);
@@ -202,16 +200,7 @@ export function createThreeBoxSettingsModal(host = {}) {
 
     refreshBuiltinQuota({ getSettings: () => settings, updateSettings }).then((freshQuota) => {
       if (freshQuota) {
-        quotaValue.textContent = t(
-          "threebox.settings.provider.quotaValue",
-          "{used}/{limit} 轮，预估花费 {costUsed}/{costLimit} 美分",
-          {
-            used: freshQuota.roundsUsed,
-            limit: freshQuota.roundsLimit,
-            costUsed: Math.round(freshQuota.costUsedUsdCents),
-            costLimit: Math.round(freshQuota.costLimitUsdCents)
-          }
-        );
+        quotaValue.textContent = formatQuota(freshQuota);
       }
     });
 

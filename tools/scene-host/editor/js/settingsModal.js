@@ -19,8 +19,8 @@ function createEditorProviderId() {
   return `provider-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-function settingsText(key, fallback) {
-  return t(key, fallback);
+function settingsText(key, fallback, params) {
+  return t(key, fallback, params);
 }
 
 function writeSettingsFieldValueToInput(field, inputEl, value) {
@@ -140,11 +140,10 @@ export function createSettingsModalController({ host, onSave, onReset }) {
     const quotaValue = document.createElement("span");
     function formatQuota(quota) {
       return quota
-        ? settingsText("settings.provider.quotaValue", "{used}/{limit} 轮，预估花费 {costUsed}/{costLimit} 美分")
-            .replace("{used}", quota.roundsUsed)
-            .replace("{limit}", quota.roundsLimit)
-            .replace("{costUsed}", Math.round(quota.costUsedUsdCents))
-            .replace("{costLimit}", Math.round(quota.costLimitUsdCents))
+        ? settingsText("settings.provider.quotaValue", "已用 {used} 轮 / 剩余 {remaining} 轮", {
+            used: Number(quota.roundsUsed) || 0,
+            remaining: Math.max(0, (Number(quota.roundsLimit) || 0) - (Number(quota.roundsUsed) || 0))
+          })
         : settingsText("settings.provider.quotaUnknown", "尚未获取（保存设置后自动申请）");
     }
     quotaValue.textContent = formatQuota(provider.builtinQuota);
