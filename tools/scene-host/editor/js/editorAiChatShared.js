@@ -5,10 +5,11 @@
  * by scene, not by tab) and share identical provider/credential resolution. This module holds
  * exactly that overlap; anything that differs between the two tabs (the actual generate/adjust AI
  * call, tab-specific composer controls) stays in each panel's own file. */
-import { BUILTIN_PROVIDER_TYPE, ensureEditorBuiltinApiKey } from "./editorBuiltinAiProvider.js";
+import { BUILTIN_PROVIDER_TYPE, ensureEditorBuiltinApiKey, getDisplayDeviceId } from "./editorBuiltinAiProvider.js";
 import { appendAiChatTurn, getAiChatHistory, resolveSceneKeyFromLabel } from "./editorAiChatStore.js";
 import { createThreeBoxTurnContext, parseSceneJsonString } from "threejson";
 import { t } from "../../shared/i18n/index.js";
+import { getAiErrorFeedback, renderAiErrorFeedback } from "../../shared/js/aiErrorFeedback.js";
 import {
   BUILTIN_PRIVACY_ACCEPTED,
   isBuiltinPrivacyAccepted
@@ -34,25 +35,7 @@ export function formatAssemblyParentWarnings(batchOrResult) {
 }
 
 export function friendlyAiEditError(error) {
-  if (error?.code === "BUILTIN_QUOTA_EXCEEDED") {
-    return t(
-      "editor.ai.error.builtinQuotaExceeded",
-      "内置供应商的限额体验已用完。可在「设置 → AI 助手」切换为自己的供应商。"
-    );
-  }
-  if (error?.code === "INVALID_API_KEY_HEADER_VALUE") {
-    return t(
-      "editor.ai.error.invalidApiKeyHeader",
-      "API Key 中包含无法用于请求头的字符，请确认只粘贴了供应商提供的 API Key。"
-    );
-  }
-  if (error?.code === "BUILTIN_MODERATION_BLOCKED") {
-    return t(
-      "editor.ai.error.builtinModerationBlocked",
-      "该请求未通过内置供应商的内容审核，请调整提示词后重试。"
-    );
-  }
-  return error?.message || String(error || t("editor.ai.error.unknown", "未知错误"));
+  return getAiErrorFeedback(error).message;
 }
 
 /** Renders into whichever `messagesEl` the caller passes in — each tab has its own message-list
@@ -105,6 +88,17 @@ export function createAiChatHistoryController({ host, messagesEl }) {
     }
   }
 
+  function updateErrorMessage(bodyEl, error) {
+    if (!bodyEl) return null;
+    bodyEl.classList.remove("aiEditMsgActivity");
+    bodyEl.removeAttribute("role");
+    bodyEl.removeAttribute("aria-live");
+    bodyEl.removeAttribute("aria-busy");
+    const feedback = renderAiErrorFeedback(bodyEl, error);
+    scrollToBottom();
+    return feedback;
+  }
+
   function removeMessage(bodyEl) {
     bodyEl?.closest?.(".aiEditMsg")?.remove();
     scrollToBottom();
@@ -151,6 +145,7 @@ export function createAiChatHistoryController({ host, messagesEl }) {
     appendMessage,
     appendActivityMessage,
     updateMessage,
+    updateErrorMessage,
     removeMessage,
     scrollToBottom,
     renderHistoryForCurrentScene,
@@ -225,7 +220,9 @@ export function getAgentOptions(host) {
 export async function ensureUsableCredentials(host) {
   const privacyDecision = await host.promptBuiltinPrivacyAgreement?.();
   if (privacyDecision && privacyDecision !== BUILTIN_PRIVACY_ACCEPTED) {
-    return getCredentials(host);
+    const declinedCreds = getCredentials(host);
+    if (declinedCreds.provider === "deepseek") declinedCreds.userId = await getDisplayDeviceId();
+    return declinedCreds;
   }
   let creds = getCredentials(host);
   if (!creds.apiKey && creds.provider === BUILTIN_PROVIDER_TYPE) {
@@ -235,6 +232,9 @@ export async function ensureUsableCredentials(host) {
       onIssued: () => {}
     });
     creds = getCredentials(host);
+  }
+  if (creds.provider === "deepseek") {
+    creds.userId = await getDisplayDeviceId();
   }
   return creds;
 }

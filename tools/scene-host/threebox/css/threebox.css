@@ -92,6 +92,19 @@ button { font: inherit; }
   white-space: pre-wrap; word-break: break-word; font-size: 14.5px; line-height: 1.55;
 }
 .chatMessageAssistant .chatMessageText { font-size: 14.5px; line-height: 1.65; color: var(--text); }
+.aiErrorFeedback { display: grid; gap: 9px; }
+.aiErrorFeedbackDetails {
+  border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--panel2) 72%, transparent);
+  color: var(--muted); font-size: 12px;
+}
+.aiErrorFeedbackDetails summary { padding: 7px 10px; cursor: pointer; user-select: none; }
+.aiErrorFeedbackDetails pre {
+  margin: 0; padding: 0 10px 9px; overflow-x: auto; white-space: pre-wrap; word-break: break-word;
+  background: transparent; font: 11.5px/1.5 "Cascadia Code", "SFMono-Regular", Consolas, monospace; color: var(--muted);
+}
+.aiErrorFeedbackMessage { font-weight: 650; }
+.aiErrorFeedbackWarning .aiErrorFeedbackMessage { color: #f2c94c; }
+.aiErrorFeedbackBanned .aiErrorFeedbackMessage { color: #ff6b6b; }
 .chatTurnSpacer {
   height: min(46vh, 420px);
   flex: 0 0 auto;

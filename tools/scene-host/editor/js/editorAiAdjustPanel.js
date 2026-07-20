@@ -350,6 +350,7 @@ export function createEditorAiAdjustPanel(host) {
         apiKey: creds.apiKey,
         model: creds.model,
         baseUrl: creds.baseUrl,
+        userId: creds.userId,
         threeBoxTurnContext: createEditorAiTurnContext(prompt)
       };
       const targetSceneJsonString = await getSceneJsonText();
@@ -393,10 +394,10 @@ export function createEditorAiAdjustPanel(host) {
         void historyCtl.persistTurn("assistant", t("editor.ai.message.aborted", "已停止生成。"));
       } else {
         console.error("[editor] AI adjust turn failed:", error);
-        const msg = friendlyAiEditError(error);
-        historyCtl.updateMessage(assistantBody, `${t("editor.ai.edit.failed", "失败：")}${msg}`);
+        const feedback = historyCtl.updateErrorMessage(assistantBody, error);
+        const msg = feedback?.message || friendlyAiEditError(error);
         host.showMessage(msg, "error");
-        void historyCtl.persistTurn("assistant", `${t("editor.ai.edit.failed", "失败：")}${msg}`);
+        void historyCtl.persistTurn("assistant", msg);
       }
     } finally {
       setBusy(false);

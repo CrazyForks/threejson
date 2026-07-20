@@ -1,6 +1,7 @@
 import { renderMarkdownToSafeHtml } from "./threeBoxMarkdown.js";
 import { showToast } from "./threeBoxUiFeedback.js";
 import { t } from "../../shared/i18n/index.js";
+import { renderAiErrorFeedback } from "../../shared/js/aiErrorFeedback.js";
 
 const SEND_ICON =
   '<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 3.5 16.5 16h-13L10 3.5z"/></svg>';
@@ -197,6 +198,13 @@ export function createThreeBoxChatPanel(host = {}) {
     textEl.classList.add("markdown-body");
     textEl.innerHTML = renderMarkdownToSafeHtml(text);
     revealBottomOf(textEl);
+  }
+
+  function updateAssistantError(textEl, error) {
+    if (!textEl) return null;
+    const feedback = renderAiErrorFeedback(textEl, error);
+    revealBottomOf(textEl);
+    return feedback;
   }
 
   /** Appends an arbitrary element (e.g. a collapsible JSON block, or the inline scene canvas) as
@@ -560,6 +568,15 @@ export function createThreeBoxChatPanel(host = {}) {
         updateAssistantMessage(initialTextEl, message);
         return true;
       };
+      const finishInitialActivityError = (error) => {
+        if (initialActivityState === "finished") {
+          return false;
+        }
+        initialActivityState = "finished";
+        initialStreaming.remove();
+        updateAssistantError(initialTextEl, error);
+        return true;
+      };
 
       setBusy(true, { stoppable: false });
       await waitForActivityPaint();
@@ -567,6 +584,7 @@ export function createThreeBoxChatPanel(host = {}) {
         await host.onUserMessage(text, {
           appendAssistantMessage: (t) => appendMessage("assistant", t),
           updateAssistantMessage,
+          updateAssistantError,
           appendToBody,
           createStreamingBlock,
           buildJsonCollapse,
@@ -574,7 +592,8 @@ export function createThreeBoxChatPanel(host = {}) {
           buildSummaryBlock,
           finishTurnScroll,
           takeInitialActivity,
-          finishInitialActivity
+          finishInitialActivity,
+          finishInitialActivityError
         });
         if (initialActivityState === "pending") {
           finishInitialActivity(
@@ -587,9 +606,9 @@ export function createThreeBoxChatPanel(host = {}) {
         // uncaught rejection here must still surface something in the chat rather than leaving
         // the UI looking like Send did nothing at all.
         console.error("[threebox] onUserMessage failed:", error);
-        const message = t("threebox.app.processingFailed", "处理失败：{error}", { error: error?.message || error });
-        if (!finishInitialActivity(message)) {
-          appendMessage("assistant", message);
+        if (!finishInitialActivityError(error)) {
+          const textEl = appendMessage("assistant", "");
+          updateAssistantError(textEl, error);
         }
         finishTurnScroll();
       } finally {

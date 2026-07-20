@@ -18,7 +18,7 @@ import {
   resolveTurnSceneJsonString,
   resolveThreeBoxAgentOptions
 } from "./threeBoxOrchestrator.js";
-import { ensureBuiltinApiKey } from "./threeBoxBuiltinProvider.js";
+import { ensureBuiltinApiKey, getDisplayDeviceId } from "./threeBoxBuiltinProvider.js";
 import { createThreeBoxAttachedContext } from "./threeBoxAttachedContext.js";
 import { wireThreeBoxComposerStub } from "./threeBoxComposerStub.js";
 import { createThreeBoxResourceLibrary } from "./threeBoxResourceLibrary.js";
@@ -35,6 +35,7 @@ import {
   createBuiltinProviderPrivacyController,
   isBuiltinPrivacyAccepted
 } from "../../shared/js/builtinProviderPrivacy.js";
+import { getAiErrorFeedback } from "../../shared/js/aiErrorFeedback.js";
 
 function readRequestedLocaleFromUrl() {
   try {
@@ -121,6 +122,7 @@ function populateComposerModelSelect(settings) {
 }
 
 async function main() {
+  const currentAiUserIdPromise = getDisplayDeviceId();
   // `createThreeBoxSettingsModal` reads persisted settings synchronously (no `.init()` needed to
   // call `.getSettings()`), so it's constructed first purely to read `general.locale` for the
   // locale bootstrap below — nothing about it renders yet.
@@ -233,6 +235,14 @@ async function main() {
     return isProviderVisionCapable(resolveProviderOptions(settings, selectedProviderId));
   }
 
+  async function resolveProviderOptionsForRequest(settings, providerId) {
+    const options = resolveProviderOptions(settings, providerId);
+    if (options?.provider === "deepseek") {
+      options.userId = await currentAiUserIdPromise;
+    }
+    return options;
+  }
+
   function stageResultLabel(stage) {
     if (stage === "commands") return t("threebox.app.stageCommands", "操作命令");
     if (stage === "json-incremental") return t("threebox.app.stageJsonPatch", "JSON Patch");
@@ -251,25 +261,7 @@ async function main() {
   }
 
   function friendlyAiErrorMessage(error) {
-    if (error?.code === "INVALID_API_KEY_HEADER_VALUE") {
-      return t(
-        "threebox.app.invalidApiKeyHeader",
-        "API Key 中包含中文、emoji 等无法用于请求头的字符。请确认只粘贴了供应商提供的 API Key；请求尚未发送给供应商。"
-      );
-    }
-    if (error?.code === "BUILTIN_QUOTA_EXCEEDED") {
-      return t(
-        "threebox.app.builtinQuotaExceeded",
-        "内置供应商的限额体验已用完。可以配置自己的供应商继续使用。"
-      );
-    }
-    if (error?.code === "THREEBOX_INTENT_CLASSIFICATION_FAILED") {
-      return t(
-        "threebox.app.intentClassificationFailed",
-        "未能可靠判断本次请求是新建场景还是调整现有场景，已停止本轮操作以避免错误地生成新场景。请重试。"
-      );
-    }
-    return error?.message || String(error || t("threebox.app.unknownError", "未知错误"));
+    return getAiErrorFeedback(error).message;
   }
 
   async function persistUnsuccessfulTurn({
@@ -412,7 +404,7 @@ async function main() {
     const settings = settingsModal.getSettings();
     const selectedProviderId = document.getElementById("composerModelSelect")?.value;
     const providerOptions = {
-      ...resolveProviderOptions(settings, selectedProviderId),
+      ...await resolveProviderOptionsForRequest(settings, selectedProviderId),
       threeBoxTurnContext: turnContext
     };
 
@@ -604,7 +596,7 @@ async function main() {
         api.updateAssistantMessage(textEl, t("threebox.app.generateStopped", "已停止生成。"));
       } else {
         console.error("[threebox] generate turn failed:", error);
-        api.updateAssistantMessage(textEl, t("threebox.app.generateFailed", "生成失败：{error}", { error: friendlyAiErrorMessage(error) }));
+        api.updateAssistantError(textEl, error);
       }
       if (streamBuffer.trim()) {
         api.appendToBody(textEl, api.buildJsonCollapse(streamBuffer, { failed: true }));
@@ -633,7 +625,7 @@ async function main() {
     const settings = settingsModal.getSettings();
     const selectedProviderId = document.getElementById("composerModelSelect")?.value;
     const providerOptions = {
-      ...resolveProviderOptions(settings, selectedProviderId),
+      ...await resolveProviderOptionsForRequest(settings, selectedProviderId),
       threeBoxTurnContext: turnContext
     };
 
@@ -821,7 +813,7 @@ async function main() {
         api.updateAssistantMessage(textEl, t("threebox.app.adjustStopped", "已停止调整。"));
       } else {
         console.error("[threebox] adjust turn failed:", error);
-        api.updateAssistantMessage(textEl, t("threebox.app.adjustFailed", "调整失败：{error}", { error: friendlyAiErrorMessage(error) }));
+        api.updateAssistantError(textEl, error);
       }
       if (streamBuffer.trim()) {
         api.appendToBody(textEl, api.buildJsonCollapse(streamBuffer, { failed: true }));
@@ -892,9 +884,9 @@ async function main() {
       // user instead of vanishing — an unhandled rejection here would otherwise leave the chat
       // looking like it did nothing at all after Send was clicked.
       console.error("[threebox] handleUserMessage failed:", error);
-      const message = t("threebox.app.processingFailed", "处理失败：{error}", { error: friendlyAiErrorMessage(error) });
-      if (!api.finishInitialActivity?.(message)) {
-        api.appendAssistantMessage(message);
+      if (!api.finishInitialActivityError?.(error)) {
+        const textEl = api.appendAssistantMessage("");
+        api.updateAssistantError(textEl, error);
       }
       api.finishTurnScroll();
     }
@@ -903,7 +895,7 @@ async function main() {
   async function handleUserMessageUnsafe(text, api) {
     let settings = settingsModal.getSettings();
     const selectedProviderId = document.getElementById("composerModelSelect")?.value;
-    let providerOptions = resolveProviderOptions(settings, selectedProviderId);
+    let providerOptions = await resolveProviderOptionsForRequest(settings, selectedProviderId);
     if (providerOptions?.provider === "threebox-builtin" && !isBuiltinPrivacyAccepted("threebox")) {
       providerOptions = null;
     }
@@ -916,7 +908,7 @@ async function main() {
       // up; for any other provider this just resolves immediately as a no-op.
       await ensureBuiltinApiKey(settingsModal);
       settings = settingsModal.getSettings();
-      providerOptions = resolveProviderOptions(settings, selectedProviderId);
+      providerOptions = await resolveProviderOptionsForRequest(settings, selectedProviderId);
       if (providerOptions?.provider === "threebox-builtin" && !isBuiltinPrivacyAccepted("threebox")) {
         providerOptions = null;
       }

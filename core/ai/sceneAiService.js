@@ -290,6 +290,8 @@ function resolveVisionImageUrl(image) {
  * @param {number} [params.temperature=0.2]
  * @param {number} [params.maxTokens=4000]
  * @param {string} [params.baseUrl] Override default apiBase
+ * @param {string} [params.userId] Anonymous application user identifier. Sent only to providers
+ * whose documented API supports an isolation field (currently DeepSeek's `user_id`).
  */
 /**
  * @param {ReadableStream<Uint8Array>} body
@@ -357,7 +359,8 @@ async function requestChatCompletion({
   onDelta,
   onCompletionMetadata,
   extraHeaders,
-  threeBoxTurnContext
+  threeBoxTurnContext,
+  userId
 }) {
   const normalizedProvider = ensureProvider(provider);
   const providerConfig = PROVIDERS[normalizedProvider];
@@ -388,6 +391,10 @@ async function requestChatCompletion({
     );
   }
   const url = `${endpointBase}${providerConfig.endpoint}`;
+  const normalizedUserId = String(userId || "").trim();
+  if (normalizedUserId && !/^[a-zA-Z0-9_-]{1,512}$/.test(normalizedUserId)) {
+    throw new Error("userId must contain only letters, digits, hyphens, or underscores (maximum 512 characters).");
+  }
   const threeBoxContext = normalizedProvider === "threebox-builtin"
     ? buildThreeBoxRequestContext(threeBoxTurnContext)
     : undefined;
@@ -405,6 +412,7 @@ async function requestChatCompletion({
       max_tokens: maxTokens,
       messages,
       stream: stream === true,
+      ...(normalizedProvider === "deepseek" && normalizedUserId ? { user_id: normalizedUserId } : {}),
       ...(threeBoxContext ? { threebox_context: threeBoxContext } : {})
     })
   });
@@ -416,17 +424,27 @@ async function requestChatCompletion({
     // quota exhaustion as `{ "error": "QUOTA_EXCEEDED" }` — tag it so hosts can distinguish "buy
     // your own key" from a generic failure without string-matching the message text.
     let errorCode = null;
+    let providerError = null;
     try {
       const parsed = JSON.parse(detail);
+      providerError = parsed && typeof parsed === "object" ? parsed : null;
       if (parsed && parsed.error === "QUOTA_EXCEEDED") {
         errorCode = "BUILTIN_QUOTA_EXCEEDED";
-      } else if (parsed && ["DEVICE_BANNED", "DEVICE_MUTED", "SAFETY_POLICY_WARNING"].includes(parsed.error)) {
-        errorCode = "BUILTIN_MODERATION_BLOCKED";
+      } else if (parsed?.error === "SAFETY_POLICY_WARNING") {
+        errorCode = "BUILTIN_SAFETY_WARNING";
+      } else if (parsed?.error === "DEVICE_BANNED") {
+        errorCode = "BUILTIN_DEVICE_BANNED";
+      } else if (parsed?.error === "DEVICE_PERMANENTLY_BANNED") {
+        errorCode = "BUILTIN_DEVICE_PERMANENTLY_BANNED";
+      } else if (parsed?.error === "DEVICE_MUTED") {
+        errorCode = "BUILTIN_DEVICE_MUTED";
       }
     } catch {
       /* not JSON, ignore */
     }
     const error = new Error(`AI request failed (${response.status}): ${detail}`);
+    error.httpStatus = response.status;
+    error.providerError = providerError;
     if (errorCode) {
       error.code = errorCode;
     }

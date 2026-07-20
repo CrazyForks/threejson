@@ -371,6 +371,84 @@ test("requestChatCompletion trims a header-compatible API key without restrictin
   assert.equal(authorization, "Bearer custom.key_123");
 });
 
+test("requestChatCompletion sends an anonymous user_id only to DeepSeek", async () => {
+  const bodies = [];
+  globalThis.fetch = async (_url, init) => {
+    bodies.push(JSON.parse(init.body));
+    return {
+      ok: true,
+      async json() {
+        return { choices: [{ message: { content: "ok" } }] };
+      }
+    };
+  };
+
+  await requestChatCompletion({
+    provider: "deepseek",
+    apiKey: "test-key",
+    userId: "TB-ABC1234567",
+    messages: [{ role: "user", content: "x" }]
+  });
+  await requestChatCompletion({
+    provider: "custom",
+    baseUrl: "https://compatible.example/v1",
+    apiKey: "test-key",
+    userId: "TB-ABC1234567",
+    messages: [{ role: "user", content: "x" }]
+  });
+
+  assert.equal(bodies[0].user_id, "TB-ABC1234567");
+  assert.equal("user_id" in bodies[1], false);
+});
+
+test("requestChatCompletion rejects an unsafe provider userId before fetch", async () => {
+  let fetchCalled = false;
+  globalThis.fetch = async () => {
+    fetchCalled = true;
+  };
+  await assert.rejects(
+    requestChatCompletion({
+      provider: "deepseek",
+      apiKey: "test-key",
+      userId: "private user@example.com",
+      messages: [{ role: "user", content: "x" }]
+    }),
+    /userId must contain only/
+  );
+  assert.equal(fetchCalled, false);
+});
+
+test("requestChatCompletion preserves structured built-in moderation errors for host UI", async () => {
+  globalThis.fetch = async () => ({
+    ok: false,
+    status: 422,
+    headers: new Headers(),
+    async text() {
+      return JSON.stringify({
+        error: "SAFETY_POLICY_WARNING",
+        message: "Prompt blocked for violating the safety policy.",
+        safety_enforcement: { action: "warning", warning_count: 3 }
+      });
+    }
+  });
+
+  await assert.rejects(
+    requestChatCompletion({
+      provider: "threebox-builtin",
+      baseUrl: "https://builtin.example/v1",
+      apiKey: "test-key",
+      messages: [{ role: "user", content: "x" }],
+      threeBoxTurnContext: createThreeBoxTurnContext("turn-error", "x")
+    }),
+    (error) => {
+      assert.equal(error.code, "BUILTIN_SAFETY_WARNING");
+      assert.equal(error.httpStatus, 422);
+      assert.equal(error.providerError.safety_enforcement.warning_count, 3);
+      return true;
+    }
+  );
+});
+
 test("generateSceneJsonString injects capability reference material when enabled", async () => {
   const requestBodies = [];
   globalThis.fetch = async (url, init = {}) => {

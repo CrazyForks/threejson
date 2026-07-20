@@ -536,5 +536,19 @@ export const EDITOR_SHELL_LABELS_EN = {
   "editor.session.bootRestore.snapshotMessage": "Unsaved edits were detected from the previous session.\nRestore from the automatic snapshot? ({age})",
   "editor.session.bootRestore.restoreFromSnapshot": "Restore from Snapshot",
   "editor.session.bootRestore.snapshotLabel": "Snapshot Restore",
-  "editor.session.bootRestore.restoreFailed": "Restore failed: {error}"
+  "editor.session.bootRestore.restoreFailed": "Restore failed: {error}",
+  "ai.error.safetyWarningCount": "You violated our content safety policy and have received {count} warnings.",
+  "ai.error.safetyWarning": "You violated our content safety policy and have received a warning.",
+  "ai.error.deviceBanned": "You violated our content safety policy and have been banned.",
+  "ai.error.devicePermanentlyBanned": "You have been permanently banned.",
+  "ai.error.deviceMuted": "Your access has been temporarily restricted. Please try again later.",
+  "ai.error.builtinQuotaExceeded": "The built-in provider trial quota is exhausted. Please switch to your own provider.",
+  "ai.error.invalidApiKey": "The API key is invalid or expired. Check the configuration and try again.",
+  "ai.error.revokedApiKey": "The access credential is no longer valid. Refresh and try again.",
+  "ai.error.invalidApiKeyHeader": "The API key contains characters that cannot be sent in a request header. Check the configuration and try again.",
+  "ai.error.intentClassificationFailed": "The requested operation could not be classified reliably, so this turn was stopped to avoid modifying the scene incorrectly. Please try again.",
+  "ai.error.failed": "Processing failed due to an error.",
+  "ai.error.unknown": "Processing failed: unknown error.",
+  "ai.error.unknownDetail": "Unknown error",
+  "ai.error.details": "Error details"
 };
