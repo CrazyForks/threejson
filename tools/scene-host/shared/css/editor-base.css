@@ -2149,34 +2149,6 @@ html, body {
       cursor: nesw-resize;
     }
 
-    #threeViewDebugLayer {
-      position: absolute;
-      inset: 0;
-      z-index: 16;
-      display: none;
-      pointer-events: none;
-    }
-
-    .viewportDebugBox {
-      position: absolute;
-      border: 1px solid rgba(140, 210, 255, 0.85);
-      background: rgba(15, 25, 35, 0.08);
-      overflow: hidden;
-    }
-
-    .viewportDebugBoxLabel {
-      position: absolute;
-      top: 2px;
-      left: 4px;
-      padding: 1px 5px;
-      border-radius: 3px;
-      color: #d6f1ff;
-      background: rgba(0, 0, 0, 0.45);
-      font-size: 10px;
-      line-height: 14px;
-      letter-spacing: 0.3px;
-    }
-
     .topMenuNestedWrap {
       position: relative;
       margin: 2px 0;

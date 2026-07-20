@@ -8,6 +8,7 @@ export function createEditorChromeUi(host) {
   const eventNoticeEl = document.getElementById("eventNotice");
   const bottomBarToggleAxesBtn = document.getElementById("bottomBarToggleAxes");
   const bottomBarToggleGridBtn = document.getElementById("bottomBarToggleGrid");
+  const bottomBarToggleViewportGizmoBtn = document.getElementById("bottomBarToggleViewportGizmo");
 
   function setEventNotice(message) {
     if (eventNoticeEl) {
@@ -31,8 +32,19 @@ export function createEditorChromeUi(host) {
     syncBottomBarHelperToggles();
   }
 
+  function syncBottomBarViewportGizmoToggle() {
+    bottomBarToggleViewportGizmoBtn?.setAttribute(
+      "aria-pressed",
+      host.isViewportGizmoVisible?.() ? "true" : "false"
+    );
+  }
+
   bottomBarToggleAxesBtn?.addEventListener("click", () => toggleBottomBarHelper("axes"));
   bottomBarToggleGridBtn?.addEventListener("click", () => toggleBottomBarHelper("grid"));
+  bottomBarToggleViewportGizmoBtn?.addEventListener("click", () => {
+    host.toggleViewportGizmoRuntime?.();
+    syncBottomBarViewportGizmoToggle();
+  });
 
   function syncEditorMuteUi() {
     const muted = host.getAudioMuted?.() ?? false;
@@ -102,6 +114,7 @@ export function createEditorChromeUi(host) {
     syncEditorMuteUi();
     syncFullscreenToggleLabels();
     syncBottomBarHelperToggles();
+    syncBottomBarViewportGizmoToggle();
     document.addEventListener("fullscreenchange", syncFullscreenToggleLabels);
   }
 
@@ -120,6 +133,7 @@ export function createEditorChromeUi(host) {
     toggleEditorSceneAudioMute,
     syncFullscreenToggleLabels,
     toggleFullscreen,
-    syncBottomBarHelperToggles
+    syncBottomBarHelperToggles,
+    syncBottomBarViewportGizmoToggle
   };
 }

@@ -57,8 +57,26 @@
   background: rgba(0, 0, 0, 0.45);
 }
 
-/* #viewportGizmoOverlayRoot wrapper is pointer-events:none (spans the whole stage so it never
-   blocks clicks); the gizmo's own small corner div needs pointer-events re-enabled to be clickable. */
+#viewportGizmoOverlayRoot {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+
+/* In 3D mode the canvas intentionally runs behind the floating editor chrome. Keep the gizmo in
+   the visible canvas corner instead of underneath the pinned top/right bars. Code and All modes
+   already size/position canvasWrap around their visible viewport, so they need no extra offset. */
+#rootContainer:not(.codeEditMode) #viewportGizmoOverlayRoot {
+  top: var(--dockInsetTop, 0px);
+}
+
+#rootContainer:not(.codeEditMode).rightDockPinned #viewportGizmoOverlayRoot,
+#rootContainer:not(.codeEditMode).rightDockPeek #viewportGizmoOverlayRoot {
+  right: var(--rightDockWidth, 238px);
+}
+
+/* The wrapper spans the viewport and never blocks canvas clicks; only the widget is interactive. */
 #viewportGizmoOverlay {
   pointer-events: auto;
 }

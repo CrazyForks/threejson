@@ -66,7 +66,6 @@ import { createEventEditorPanel } from "./eventEditorPanel.js";
 import { createAssetLibraryPanel } from "./assetLibraryPanel.js";
 import { createRecentScenesController } from "./recentScenes.js";
 import { createCodeEditorMode } from "./codeEditorMode.js";
-import { createEditorThreeView } from "./editorThreeView.js";
 import { createEditorDocumentState } from "./editorDocumentState.js";
 import { createModelGroupPanel } from "./modelGroupPanel.js";
 import { createPresetScenePanel } from "./presetScenePanel.js";
@@ -267,7 +266,6 @@ export async function bootstrapSceneHostEditor() {
   let presetScenePanel = null;
   let modelGroupPanel = null;
   let editorDocumentState = null;
-  let editorThreeView = null;
   let editorSessionRecovery = null;
   let editorCacheClear = null;
   let editorDomainExport = null;
@@ -350,13 +348,14 @@ export async function bootstrapSceneHostEditor() {
     getAiGeneratePanel: () => aiGeneratePanel,
     getAiAdjustPanel: () => aiAdjustPanel,
     getLeftDockPanel: () => leftDockPanel,
-    getEditorThreeView: () => editorThreeView,
     getEditorInteraction: () => editorInteraction,
     getSceneReserialize: () => sceneReserialize,
     getGridHelper: () => gridHelper,
     getViewPreserve: () => viewPreserve,
     getScenePayloadFormat: () => scenePayloadFormat,
     getRightSidebarCache: () => rightSidebarCache,
+    isViewportGizmoVisible: () => isViewportGizmoVisible(),
+    toggleViewportGizmoRuntime: () => toggleViewportGizmoRuntime(),
     getRightDockPanel: () => rightDockPanel,
     getSceneLoadGeneration: () => sceneLoadGeneration,
     buildSceneToJsonOptionsForDisplay: (extra) =>
@@ -571,12 +570,9 @@ export async function bootstrapSceneHostEditor() {
         : undefined;
     const format = extra.format ?? committedFormat;
     return {
-      basePayload,
       shouldSkipObject: (obj) => sceneTree?.isRuntimeOnlyObject?.(obj) ?? false,
       merge: extra.merge !== false,
       ...(format ? { format } : {}),
-      subSceneLayout,
-      subSceneNormalizePolicy,
       ...extra,
       basePayload,
       subSceneLayout,
@@ -601,6 +597,7 @@ export async function bootstrapSceneHostEditor() {
   }
 
   let viewportGizmoContainer = null;
+  let viewportGizmoRuntimeOverride = null;
 
   function ensureViewportGizmoContainer() {
     if (viewportGizmoContainer) {
@@ -613,20 +610,31 @@ export async function bootstrapSceneHostEditor() {
     el.id = "viewportGizmoOverlayRoot";
     // The gizmo must use the actual renderer canvas bounds. stageShell stays full-size
     // in Code mode while canvasWrap becomes a PiP, which previously left stale bounds.
-    el.style.cssText = "position:absolute;inset:0;pointer-events:none;z-index:60;";
     canvasWrap.appendChild(el);
     viewportGizmoContainer = el;
     return el;
   }
 
+  function isViewportGizmoVisible() {
+    return viewportGizmoRuntimeOverride ?? editorSettings?.editing?.showViewportGizmo !== false;
+  }
+
   function syncViewportGizmoFromSettings() {
     disposeViewportGizmoOverlay();
-    if (editorSettings?.editing?.showViewportGizmo === false) {
+    if (!isViewportGizmoVisible()) {
+      editorChromeUi?.syncBottomBarViewportGizmoToggle?.();
       return;
     }
     createViewportGizmoOverlay({ camera, renderer, controls }, ensureViewportGizmoContainer(), {
       id: "viewportGizmoOverlay"
     });
+    editorChromeUi?.syncBottomBarViewportGizmoToggle?.();
+  }
+
+  function toggleViewportGizmoRuntime() {
+    viewportGizmoRuntimeOverride = !isViewportGizmoVisible();
+    syncViewportGizmoFromSettings();
+    return isViewportGizmoVisible();
   }
 
   function clearEditorCanvasSurface() {
@@ -747,7 +755,6 @@ export async function bootstrapSceneHostEditor() {
     // canvasWrap owns the responsive CSS size. Do not let WebGLRenderer replace
     // the canvas' 100% sizing with a stale inline pixel width during mode changes.
     renderLoop?.resize({ width: myWidth, height: myHeight, updateStyle: false });
-    editorThreeView?.onWindowResize?.();
     updateViewportGizmoOverlay();
     return true;
   }
@@ -798,7 +805,6 @@ export async function bootstrapSceneHostEditor() {
       renderLoopUserPolicy,
       subSceneNormalizePolicy: editorSettings?.sceneJson?.subSceneNormalizePolicy ?? "warn",
       afterRender: () => {
-        editorThreeView?.afterRender?.();
         renderViewportGizmoOverlay();
       },
       async onRuntimeReady(ctx) {
@@ -1078,14 +1084,10 @@ export async function bootstrapSceneHostEditor() {
   }
 
   function getEditorFitViewAspectHints() {
-    return (
-      editorThreeView?.getFitViewAspectHints?.() ?? {
-        rendererDomElement: renderer?.domElement,
-        threeViewActive: false,
-        mainViewRect: null,
-        canvasWrap
-      }
-    );
+    return {
+      rendererDomElement: renderer?.domElement,
+      canvasWrap
+    };
   }
 
   function applyFitViewToBounds(bounds, options = {}) {
@@ -1101,13 +1103,10 @@ export async function bootstrapSceneHostEditor() {
       return false;
     }
     const aspectHints = getEditorFitViewAspectHints();
-    const viewport = aspectHints.threeViewActive && aspectHints.mainViewRect?.width > 2
-      && aspectHints.mainViewRect?.height > 2
-      ? aspectHints.mainViewRect
-      : {
-          width: canvasWrap?.clientWidth || renderer?.domElement?.clientWidth,
-          height: canvasWrap?.clientHeight || renderer?.domElement?.clientHeight
-        };
+    const viewport = {
+      width: canvasWrap?.clientWidth || renderer?.domElement?.clientWidth,
+      height: canvasWrap?.clientHeight || renderer?.domElement?.clientHeight
+    };
     if (camera && Number(viewport?.width) > 2 && Number(viewport?.height) > 2) {
       camera.aspect = Number(viewport.width) / Number(viewport.height);
       camera.updateProjectionMatrix?.();
@@ -1120,9 +1119,6 @@ export async function bootstrapSceneHostEditor() {
         ui.showMessage("包围盒为空，无法进行自适应。", "warning");
       }
       return false;
-    }
-    if (editorThreeView?.isEnabled?.()) {
-      editorThreeView.updateThreeViewCameras?.();
     }
     if (!silent) {
       ui.showMessage(successMessage, "success");
@@ -1138,7 +1134,6 @@ export async function bootstrapSceneHostEditor() {
       return false;
     }
     return suppressCanvasDirty.run(() => {
-      editorThreeView?.updateViewRects?.();
       const ignoreHelper = editorInteraction?.getBoxEdgeHelper?.() ?? null;
       const bounds = buildAdaptiveContentBoundingBoxTHREE(scene, { ignoreHelper });
       if (!bounds) {
@@ -1171,7 +1166,6 @@ export async function bootstrapSceneHostEditor() {
       return false;
     }
     return suppressCanvasDirty.run(() => {
-      editorThreeView?.updateViewRects?.();
       const bounds = new THREE.Box3().setFromObject(targetObj);
       return applyFitViewToBounds(bounds, {
         silent,
@@ -1767,6 +1761,7 @@ export async function bootstrapSceneHostEditor() {
     editorInteraction?.syncDragControlsFromSettings?.();
     gridHelper?.syncEditorGridHelperFromSettings?.();
     editorChromeUi?.syncBottomBarHelperToggles?.();
+    viewportGizmoRuntimeOverride = null;
     syncViewportGizmoFromSettings();
     editorInteraction?.refreshBoxEdgeColor?.();
     editorTjzExportModal?.applyDefaultsFromSettings?.();
@@ -1884,10 +1879,6 @@ export async function bootstrapSceneHostEditor() {
     });
     document.getElementById("menuSaveScene")?.addEventListener("click", () => {
       void sceneDocumentOps?.saveCurrentSceneDocument?.();
-      closeAllDropdowns();
-    });
-    document.getElementById("menuToggleThreeView")?.addEventListener("click", () => {
-      editorThreeView?.switchView?.();
       closeAllDropdowns();
     });
     document.getElementById("menuExportThreeJSON")?.addEventListener("click", () => {
@@ -2098,7 +2089,6 @@ export async function bootstrapSceneHostEditor() {
   bindProgressElement(document.getElementById("loadingMaskMessage") || document.getElementById("loadingMask"));
   openOrCloseProgressManager(sysConfig.progressFlag);
   editorDocumentState = createEditorDocumentState(host);
-  editorThreeView = createEditorThreeView(host);
   sceneTree = createSceneTreePanel(host);
   commandLayer = createCommandLayer(host);
   commandLayer.ensure();

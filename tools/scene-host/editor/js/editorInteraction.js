@@ -53,7 +53,6 @@ export function createEditorInteraction(host) {
   let objectEditActive = false;
   let dragSnapshot = null;
   let listenersBound = false;
-  let controlsTemporarilyBlocked = false;
 
   function isCanvasDirtySuppressed() {
     return host.getSuppressCanvasDirty?.()?.isSuppressed?.() ?? false;
@@ -304,16 +303,11 @@ export function createEditorInteraction(host) {
     if (!canvasContainer) {
       return null;
     }
-    const threeView = host.getEditorThreeView?.();
-    const metrics = threeView?.canvasPickMetrics?.(event.clientX, event.clientY);
-    if (metrics && !metrics.inMain) {
-      return null;
-    }
     const rect = canvasContainer.getBoundingClientRect();
-    const localX = metrics?.localX ?? event.clientX - rect.left;
-    const localY = metrics?.localY ?? event.clientY - rect.top;
-    const width = metrics?.width ?? rect.width;
-    const height = metrics?.height ?? rect.height;
+    const localX = event.clientX - rect.left;
+    const localY = event.clientY - rect.top;
+    const width = rect.width;
+    const height = rect.height;
     if (width <= 0 || height <= 0) {
       return null;
     }
@@ -425,10 +419,6 @@ export function createEditorInteraction(host) {
     if (event.button !== 0 || !selectionVisual?.isHighlightActive?.()) {
       return;
     }
-    const threeView = host.getEditorThreeView?.();
-    if (threeView?.isEnabled?.() && !threeView.isPointInMainViewport(event.clientX, event.clientY)) {
-      return;
-    }
     const hit = mouseClickObj(event);
     if (!hit) {
       return;
@@ -438,44 +428,6 @@ export function createEditorInteraction(host) {
     if (onSelected || isHitOnTransformControlsHelper(hit, transformControlsHelper)) {
       selectionVisual.clearHighlight();
     }
-  }
-
-  function handleCanvasPointerDown(event) {
-    dismissEditorHighlightOnCanvasPointerDown(event);
-    const threeView = host.getEditorThreeView?.();
-    const controls = getControls();
-    if (!threeView?.isEnabled?.() || !controls) {
-      return;
-    }
-    if (threeView.isPointInMainViewport(event.clientX, event.clientY)) {
-      return;
-    }
-    controlsTemporarilyBlocked = true;
-    controls.enabled = false;
-    event.stopPropagation();
-  }
-
-  function handleCanvasPointerUp() {
-    if (!controlsTemporarilyBlocked) {
-      return;
-    }
-    controlsTemporarilyBlocked = false;
-    const controls = getControls();
-    if (controls) {
-      controls.enabled = true;
-    }
-  }
-
-  function handleCanvasWheel(event) {
-    const threeView = host.getEditorThreeView?.();
-    if (!threeView?.isEnabled?.()) {
-      return;
-    }
-    if (threeView.isPointInMainViewport(event.clientX, event.clientY)) {
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
   }
 
   function onCanvasDoubleClick(event) {
@@ -515,9 +467,7 @@ export function createEditorInteraction(host) {
     listenersBound = true;
     document.addEventListener("dblclick", onCanvasDoubleClick);
     canvasContainer?.addEventListener("contextmenu", onCanvasContextMenu);
-    canvasContainer?.addEventListener("pointerdown", handleCanvasPointerDown, true);
-    canvasContainer?.addEventListener("wheel", handleCanvasWheel, true);
-    window.addEventListener("pointerup", handleCanvasPointerUp, true);
+    canvasContainer?.addEventListener("pointerdown", dismissEditorHighlightOnCanvasPointerDown, true);
   }
 
   document.querySelectorAll("[data-trans-mode]").forEach((btn) => {
@@ -537,9 +487,7 @@ export function createEditorInteraction(host) {
     listenersBound = false;
     document.removeEventListener("dblclick", onCanvasDoubleClick);
     canvasContainer?.removeEventListener("contextmenu", onCanvasContextMenu);
-    canvasContainer?.removeEventListener("pointerdown", handleCanvasPointerDown, true);
-    canvasContainer?.removeEventListener("wheel", handleCanvasWheel, true);
-    window.removeEventListener("pointerup", handleCanvasPointerUp, true);
+    canvasContainer?.removeEventListener("pointerdown", dismissEditorHighlightOnCanvasPointerDown, true);
   }
 
   function refreshMeshList() {

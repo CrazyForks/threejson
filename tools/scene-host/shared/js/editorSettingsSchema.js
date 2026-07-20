@@ -115,7 +115,6 @@ export const EDITOR_SETTINGS_DEFAULTS = {
       deployAutoFitCamera: true,
       deployAutoFitOverrideExplicitCamera: false
     },
-    threeView: { warnAfterFailCount: 24, fallbackAfterFailCount: 120 },
     io: {
       optimizeJsonOnSave: true,
       objectImportFitViewDefault: true,
@@ -186,7 +185,6 @@ export const EDITOR_SETTINGS_SECTIONS = [
     { id: "domainEdit", title: "Domain editing" },
     { id: "render", title: "Rendering & camera" },
     { id: "interaction", title: "Events & preview" },
-    { id: "threeView", title: "Three views" },
     { id: "io", title: "Import & export" },
     { id: "capture", title: "Capture & recording" },
     { id: "ai", title: "AI assistant" }
@@ -509,7 +507,7 @@ export const EDITOR_SETTINGS_FIELDS = [
       path: "editing.showViewportGizmo",
       type: "checkbox",
       label: "显示视角指示器",
-      hint: "画布右上角的坐标轴 Gizmo，点击可切换视角。"
+      hint: "持久化控制默认显示。画布右上角的坐标轴 Gizmo 可点击切换视角；状态栏开关仅影响本次运行。"
     },
     {
       section: "editing",
@@ -703,22 +701,6 @@ export const EDITOR_SETTINGS_FIELDS = [
       path: "interaction.previewHotReload",
       type: "checkbox",
       label: "预览热更新"
-    },
-    {
-      section: "threeView",
-      path: "threeView.warnAfterFailCount",
-      type: "number",
-      label: "辅视口异常警告阈值",
-      min: 1,
-      max: 200
-    },
-    {
-      section: "threeView",
-      path: "threeView.fallbackAfterFailCount",
-      type: "number",
-      label: "自动切回普通视图阈值",
-      min: 10,
-      max: 500
     },
     { section: "io", path: "io.optimizeJsonOnSave", type: "checkbox", label: "保存时优化 JSON" },
     {
