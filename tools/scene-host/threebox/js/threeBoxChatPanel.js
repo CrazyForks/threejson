@@ -600,6 +600,7 @@ export function createThreeBoxChatPanel(host = {}) {
           updateAssistantMessage,
           updateAssistantError,
           appendToBody,
+          insertBeforeBody,
           createStreamingBlock,
           buildJsonCollapse,
           buildDiffCollapse,

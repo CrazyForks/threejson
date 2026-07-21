@@ -737,7 +737,7 @@ async function main() {
       } else if (result.stage === "json-incremental" && result.patch) {
         api.appendToBody(textEl, api.buildDiffCollapse("patch", JSON.stringify(result.patch, null, 2)));
       }
-      api.insertBeforeBody(textEl, api.buildJsonCollapse(outputSceneJsonString), sceneCard.el);
+      api.appendToBody(textEl, api.buildJsonCollapse(outputSceneJsonString));
 
       // Match handleGenerateTurn: title + recap start together, while the scene card is inserted
       // and rendered immediately. A later title response only updates the card label/file name.

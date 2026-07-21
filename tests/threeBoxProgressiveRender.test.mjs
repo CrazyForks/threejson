@@ -4,6 +4,7 @@ import { test } from "node:test";
 
 const appUrl = new URL("../tools/scene-host/threebox/js/threeBoxApp.js", import.meta.url);
 const cardUrl = new URL("../tools/scene-host/threebox/js/threeBoxSceneCard.js", import.meta.url);
+const panelUrl = new URL("../tools/scene-host/threebox/js/threeBoxChatPanel.js", import.meta.url);
 
 test("ThreeBox skips intent negotiation for a conversation without scene context", async () => {
   const source = await readFile(appUrl, "utf8");
@@ -12,10 +13,11 @@ test("ThreeBox skips intent negotiation for a conversation without scene context
 });
 
 test("ThreeBox can start a draft preview before final AI post-processing completes", async () => {
-  const [appSource, cardSource, coreSource] = await Promise.all([
+  const [appSource, cardSource, coreSource, panelSource] = await Promise.all([
     readFile(appUrl, "utf8"),
     readFile(cardUrl, "utf8"),
-    readFile(new URL("../core/ai/sceneAiService.js", import.meta.url), "utf8")
+    readFile(new URL("../core/ai/sceneAiService.js", import.meta.url), "utf8"),
+    readFile(panelUrl, "utf8")
   ]);
   assert.match(appSource, /onSceneDraft:/);
   assert.match(appSource, /draftPreviewPromise/);
@@ -23,6 +25,7 @@ test("ThreeBox can start a draft preview before final AI post-processing complet
   assert.match(cardSource, /onRuntimeReady:/);
   assert.match(cardSource, /showCompactLoadingProgress\(\)/);
   assert.match(appSource, /insertBeforeBody\(textEl, api\.buildJsonCollapse\(outputSceneJsonString\), sceneCard\.el\)/);
+  assert.match(panelSource, /insertBeforeBody,\s*createStreamingBlock/);
 });
 
 test("ThreeBox scene-card size startup has a bounded fallback", async () => {
