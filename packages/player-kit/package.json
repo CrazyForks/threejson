@@ -23,7 +23,7 @@
     "README.md"
   ],
   "peerDependencies": {
-    "threejson": "^0.1.0-alpha.8",
+    "threejson": "^0.1.0-alpha.9",
     "@threejson/host-kit": "^0.1.0-alpha.1",
     "three": ">=0.179.0"
   },

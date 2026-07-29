@@ -361,7 +361,7 @@ ThreeJSON resolves `/assets/...` and `assets/...` against the active asset base.
 ```js
 await createJsonScene(sceneJson, {
   canvas,
-  assetsBase: "https://cdn.jsdelivr.net/npm/@threejson/assets@1.0.0",
+  assetsBase: "https://cdn.jsdelivr.net/npm/@threejson/assets@1.1.3",
   assetsBaseMode: "cdn-first"
 });
 ```

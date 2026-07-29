@@ -30,7 +30,7 @@
     "README.md"
   ],
   "peerDependencies": {
-    "threejson": "^0.1.0-alpha.8",
+    "threejson": "^0.1.0-alpha.9",
     "three": ">=0.179.0",
     "three-viewport-gizmo": ">=2.0.0"
   },

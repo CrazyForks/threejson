@@ -28,7 +28,7 @@
     "@threejson/player-kit": "^0.1.0-alpha.1",
     "react": ">=18",
     "three": ">=0.179.0",
-    "threejson": "^0.1.0-alpha.8"
+    "threejson": "^0.1.0-alpha.9"
   },
   "devDependencies": {
     "@threejson/host-kit": "file:../host-kit",
