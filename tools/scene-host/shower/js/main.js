@@ -73,7 +73,6 @@ const labels = {
     export: "导出",
     nativeJson: "原生JSON",
     modelExport: "三方模型",
-    threeView: "三视图",
     fit: "自适应",
     fullscreen: "全屏",
     loading: "加载中...",
@@ -130,7 +129,6 @@ const labels = {
     export: "Export",
     nativeJson: "Native JSON",
     modelExport: "Model",
-    threeView: "Three Views",
     fit: "Fit",
     fullscreen: "Fullscreen",
     loading: "Loading...",
@@ -221,19 +219,15 @@ let highlightHelper = null;
 let audioMuted = false;
 let runTimer = 0;
 let suppressAutoRender = false;
-let viewModeIndex = 0;
 let currentJsonFormat = "friendly";
 let messageTimer = 0;
 let hoverMenu = null;
 let demoManifest = [];
 let currentJsonUrl = "";
 
-const viewModes = [
-  { name: "iso", dir: new THREE.Vector3(1, 0.72, 1) },
-  { name: "top", dir: new THREE.Vector3(0, 1, 0.001) },
-  { name: "front", dir: new THREE.Vector3(0, 0.08, 1) },
-  { name: "side", dir: new THREE.Vector3(1, 0.08, 0) }
-];
+// Default fit direction (isometric). The former per-axis "three views" cycling was removed — that
+// role now belongs to the viewport navigation gizmo (three-viewport-gizmo).
+const ISO_VIEW = { name: "iso", dir: new THREE.Vector3(1, 0.72, 1) };
 
 init();
 
@@ -374,8 +368,7 @@ function wireControls() {
     if (event.target === els.templateExportModal) closeTemplateExportModal();
   });
   els.templateExportType?.addEventListener("change", syncTemplateExportDefaults);
-  document.getElementById("fitBtn").addEventListener("click", () => fitView(viewModes[0]));
-  document.getElementById("threeViewBtn").addEventListener("click", cycleViewMode);
+  document.getElementById("fitBtn").addEventListener("click", () => fitView(ISO_VIEW));
   document.getElementById("fullscreenBtn").addEventListener("click", () => {
     if (document.fullscreenElement) document.exitFullscreen();
     else els.canvasWrap.requestFullscreen?.();
@@ -950,7 +943,7 @@ function clearHighlight() {
   highlightHelper = null;
 }
 
-function fitView(view = viewModes[0]) {
+function fitView(view = ISO_VIEW) {
   if (!runtime?.scene || !runtime?.camera) return;
   resizeRuntime();
   const bounds = buildAdaptiveContentBoundingBoxTHREE(runtime.scene, {
@@ -967,10 +960,6 @@ function fitView(view = viewModes[0]) {
   runtime.controls?.update?.();
 }
 
-function cycleViewMode() {
-  viewModeIndex = (viewModeIndex + 1) % viewModes.length;
-  fitView(viewModes[viewModeIndex]);
-}
 
 function resizeRuntime() {
   runtime?.resize?.(Math.max(1, els.canvasWrap.clientWidth), Math.max(1, els.canvasWrap.clientHeight));

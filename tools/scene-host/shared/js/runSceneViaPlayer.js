@@ -2,6 +2,7 @@ import { buildEditorScenePayload } from "./buildEditorRuntimeConfig.js";
 import {
   isScenePreviewMessageEvent,
   postScenePreviewMessage,
+  resolveScenePreviewPeerOrigin,
   SCENE_PREVIEW_CHANNEL
 } from "./scenePreviewProtocol.js";
 import {
@@ -27,6 +28,8 @@ export function createRunScenePreviewController(host) {
   let readyListener = null;
   let hotReloadTimer = null;
   let pushGeneration = 0;
+  let previewOrigin = null;
+  let previewUrlKey = null;
 
   function cleanupReadyListener() {
     if (readyListener) {
@@ -58,21 +61,25 @@ export function createRunScenePreviewController(host) {
    * @param {object} payload
    * @param {{ label?: string, bindSceneEvents?: boolean }} [options]
    */
-  function sendLoadMessage(payload, options = {}) {
+  function sendLoadMessage(payload, targetOrigin, options = {}) {
     if (!previewWindow || previewWindow.closed) {
       return false;
     }
     const label =
       String(options.label || payload?.label || payload?.name || "").trim() || "编辑器预览";
-    return postScenePreviewMessage(previewWindow, {
-      action: "load",
-      payload,
-      bindSceneEvents: options.bindSceneEvents ?? resolveBindFlag(payload),
-      label
-    });
+    return postScenePreviewMessage(
+      previewWindow,
+      {
+        action: "load",
+        payload,
+        bindSceneEvents: options.bindSceneEvents ?? resolveBindFlag(payload),
+        label
+      },
+      targetOrigin
+    );
   }
 
-  function waitForPreviewReady(win) {
+  function waitForPreviewReady(win, expectedOrigin) {
     cleanupReadyListener();
     return new Promise((resolve, reject) => {
       const timer = window.setTimeout(() => {
@@ -81,7 +88,7 @@ export function createRunScenePreviewController(host) {
       }, READY_TIMEOUT_MS);
 
       readyListener = (event) => {
-        if (!isScenePreviewMessageEvent(event)) {
+        if (!isScenePreviewMessageEvent(event) || event.origin !== expectedOrigin) {
           return;
         }
         if (event.source !== win) {
@@ -102,6 +109,8 @@ export function createRunScenePreviewController(host) {
     const { silent = false } = options;
     if (!previewWindow || previewWindow.closed) {
       previewWindow = null;
+      previewOrigin = null;
+      previewUrlKey = null;
       return false;
     }
     const gen = ++pushGeneration;
@@ -117,7 +126,13 @@ export function createRunScenePreviewController(host) {
     if (gen !== pushGeneration) {
       return false;
     }
-    const ok = sendLoadMessage(payload, options);
+    if (!previewOrigin) {
+      if (!silent) {
+        host.showMessage?.("播放器预览地址不在允许通信的来源白名单中。", "error");
+      }
+      return false;
+    }
+    const ok = sendLoadMessage(payload, previewOrigin, options);
     if (ok && !silent) {
       host.showMessage?.("已推送到播放器预览。", "success");
     }
@@ -130,6 +145,8 @@ export function createRunScenePreviewController(host) {
     }
     if (!previewWindow || previewWindow.closed) {
       previewWindow = null;
+      previewOrigin = null;
+      previewUrlKey = null;
       return;
     }
     window.clearTimeout(hotReloadTimer);
@@ -154,32 +171,42 @@ export function createRunScenePreviewController(host) {
 
     const playerUrl = resolvePlayerUrl();
     const url = new URL(playerUrl, window.location.href);
+    const playerOrigin = resolveScenePreviewPeerOrigin(url.href);
+    const openerOrigin = resolveScenePreviewPeerOrigin(window.location.origin);
+    if (!playerOrigin || !openerOrigin) {
+      host.showMessage?.("编辑器或播放器地址不在允许通信的来源白名单中。", "error");
+      return false;
+    }
     url.searchParams.set("editorPreview", "1");
+    url.searchParams.set("openerOrigin", openerOrigin);
 
-    const reuse =
-      previewWindow &&
-      !previewWindow.closed &&
-      previewWindow.location.href.startsWith(new URL(url.origin + url.pathname, url.href).href.split("?")[0]);
+    const nextPreviewUrlKey = `${url.origin}${url.pathname}`;
+    const reuse = previewWindow && !previewWindow.closed && previewUrlKey === nextPreviewUrlKey;
 
     if (!reuse) {
       previewWindow = window.open(url.href, PREVIEW_WINDOW_NAME);
+      previewOrigin = playerOrigin;
+      previewUrlKey = nextPreviewUrlKey;
     } else {
       previewWindow.focus?.();
+      previewOrigin = playerOrigin;
     }
 
     if (!previewWindow) {
+      previewOrigin = null;
+      previewUrlKey = null;
       host.showMessage?.("无法打开播放器窗口（可能被浏览器拦截弹窗）。", "warning");
       return false;
     }
 
     try {
-      await waitForPreviewReady(previewWindow);
+      await waitForPreviewReady(previewWindow, playerOrigin);
     } catch (error) {
       host.showMessage?.(String(error.message || error), "warning");
       return false;
     }
 
-    const ok = sendLoadMessage(payload, {
+    const ok = sendLoadMessage(payload, playerOrigin, {
       label: payload?.label || payload?.name || "编辑器预览"
     });
     if (ok) {
@@ -193,6 +220,8 @@ export function createRunScenePreviewController(host) {
     window.clearTimeout(hotReloadTimer);
     hotReloadTimer = null;
     previewWindow = null;
+    previewOrigin = null;
+    previewUrlKey = null;
   }
 
   return {

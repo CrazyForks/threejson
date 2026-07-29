@@ -1,0 +1,44 @@
+{
+  "name": "@threejson/player-kit",
+  "version": "0.1.0-alpha.1",
+  "description": "Embeddable ThreeJSON scene player runtime: mount to a canvas, load/dispose scenes, transport (play/pause), highlight, editor-preview protocol, playlist IndexedDB storage. No full app shell (top bar, playlist list UI, settings modal) — that stays in tools/scene-host/player and the future apps/scene-player.",
+  "author": "nnrj <tianhehechu2017@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nnrj/threejson.git",
+    "directory": "packages/player-kit"
+  },
+  "homepage": "https://github.com/nnrj/threejson#readme",
+  "bugs": {
+    "url": "https://github.com/nnrj/threejson/issues"
+  },
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json",
+    "./js/*.js": "./js/*.js"
+  },
+  "files": [
+    "js",
+    "LICENSE",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "threejson": "^0.1.0-alpha.8",
+    "@threejson/host-kit": "^0.1.0-alpha.1",
+    "three": ">=0.179.0"
+  },
+  "devDependencies": {
+    "threejson": "file:../..",
+    "@threejson/host-kit": "file:../host-kit",
+    "three": "^0.184.0"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "keywords": [
+    "threejson",
+    "scene-player",
+    "three.js"
+  ],
+  "license": "MIT"
+}

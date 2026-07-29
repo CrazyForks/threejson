@@ -1,4 +1,9 @@
 import { sceneHostAssetUrl } from "../../shared/js/sceneHostPaths.js";
+import {
+  isScenePreviewMessageEvent,
+  postScenePreviewMessage,
+  resolveScenePreviewPeerOrigin
+} from "../../shared/js/scenePreviewProtocol.js";
 import { showToast } from "./threeBoxUiFeedback.js";
 import { t } from "../../shared/i18n/index.js";
 import { enqueueThreeBoxSceneLoad } from "./threeBoxSceneLoadQueue.js";
@@ -9,27 +14,6 @@ import {
 import { syncThreeBoxPreviewAuxiliaryLights } from "./threeBoxPreviewLights.js";
 
 const EDITOR_OPEN_SCENE_BRIDGE_PREFIX = "threejson.editor.openScene.";
-const SCENE_PREVIEW_CHANNEL = "threejson:scene-preview";
-const SCENE_PREVIEW_VERSION = 1;
-
-function isScenePreviewMessageEvent(event) {
-  if (!event || typeof event.data !== "object" || event.data === null) {
-    return false;
-  }
-  if (event.origin && event.origin !== window.location.origin) {
-    return false;
-  }
-  const data = event.data;
-  return data.channel === SCENE_PREVIEW_CHANNEL && data.version === SCENE_PREVIEW_VERSION;
-}
-
-function postScenePreviewMessage(target, message) {
-  if (!target || target.closed) {
-    return false;
-  }
-  target.postMessage({ channel: SCENE_PREVIEW_CHANNEL, version: SCENE_PREVIEW_VERSION, ...message }, window.location.origin);
-  return true;
-}
 
 function downloadBlob(blob, fileName) {
   const url = URL.createObjectURL(blob);
@@ -403,19 +387,37 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
     if (!sceneJson) {
       return;
     }
-    const win = window.open("../player/index.html?editorPreview=1", "_blank");
+    const playerUrl = new URL("../player/index.html", window.location.href);
+    const playerOrigin = resolveScenePreviewPeerOrigin(playerUrl.href);
+    const openerOrigin = resolveScenePreviewPeerOrigin(window.location.origin);
+    if (!playerOrigin || !openerOrigin) {
+      showToast(
+        t("threebox.sceneCard.openInPlayerFailed", "在播放器内打开失败：{error}", {
+          error: "播放器或 ThreeBox 地址不在允许通信的来源白名单中。"
+        }),
+        "error"
+      );
+      return;
+    }
+    playerUrl.searchParams.set("editorPreview", "1");
+    playerUrl.searchParams.set("openerOrigin", openerOrigin);
+    const win = window.open(playerUrl.href, "_blank");
     if (!win) {
       showToast(t("threebox.sceneCard.popupBlocked", "无法打开新窗口，请检查浏览器弹窗拦截设置。"), "warning");
       return;
     }
     let sent = false;
     const onMessage = (event) => {
-      if (!isScenePreviewMessageEvent(event) || event.source !== win) {
+      if (!isScenePreviewMessageEvent(event) || event.origin !== playerOrigin || event.source !== win) {
         return;
       }
       if (event.data?.action === "ready" && !sent) {
         sent = true;
-        postScenePreviewMessage(win, { action: "load", payload: sceneJson, label: currentLabel, bindSceneEvents: false });
+        postScenePreviewMessage(
+          win,
+          { action: "load", payload: sceneJson, label: currentLabel, bindSceneEvents: false },
+          playerOrigin
+        );
       }
       if (event.data?.action === "loaded") {
         window.removeEventListener("message", onMessage);

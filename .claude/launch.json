@@ -4,14 +4,67 @@
     {
       "name": "static-root",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8532"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8532"
+      ],
       "port": 8532
     },
     {
       "name": "threebox-cloud-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "servertmp/threebox-cloud"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "servertmp/threebox-cloud"
+      ],
       "port": 5175
+    },
+    {
+      "name": "scene-player-app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "apps/scene-player"
+      ],
+      "port": 5180
+    },
+    {
+      "name": "scene-shower-app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "apps/scene-shower"
+      ],
+      "port": 5181
+    },
+    {
+      "name": "threebox-app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "apps/threebox"
+      ],
+      "port": 5182
+    },
+    {
+      "name": "scene-editor-app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "apps/scene-editor"
+      ],
+      "port": 5183
     }
   ]
 }

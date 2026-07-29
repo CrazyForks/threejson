@@ -1,6 +1,6 @@
 {
   "name": "threejson",
-  "version": "0.1.0-alpha.8",
+  "version": "0.1.0-alpha.9",
   "description": "JSON-driven Three.js scene runtime: declarative 3D scenes, builders, and handlers.",
   "author": "nnrj <tianhehechu2017@gmail.com>",
   "repository": {
@@ -12,6 +12,10 @@
     "url": "https://github.com/nnrj/threejson/issues"
   },
   "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "exports": {
     ".": "./builtins/full.js",
     "./core": "./core/index.js",
@@ -22,6 +26,7 @@
     "./patch": "./core/handler/jsonPatchDescriptor.js",
     "./patch-core": "./core/handler/jsonPatchApplyCore.js",
     "./runtime-mutation": "./core/runtime/objectMutation/index.js",
+    "./edit": "./core/edit.js",
     "./package.json": "./package.json"
   },
   "files": [

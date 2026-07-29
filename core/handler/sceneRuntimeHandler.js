@@ -11,6 +11,7 @@ import {
 	disposeThreeJsonSceneBackdrop,
 	sceneConfigNeedsAsyncBackdrop
 } from './sceneBackdropResolver.js';
+import { attachRuntimeContext, detachRuntimeContext, isRuntimeContext } from '../runtime/runtimeContext.js';
 
 /**
  * One-shot scene runtime assembly: Scene, Camera, WebGLRenderer, OrbitControls, lights, and render loop.
@@ -172,7 +173,9 @@ function buildRenderLoopConfig(config = {}){
  * @param {(now:number)=>void} [options.beforeFrame]
  * @param {(now:number)=>void} [options.beforeRender]
  * @param {(now:number)=>void} [options.afterRender]
- * @returns {{ scene: THREE.Scene, camera: THREE.Camera, renderer: THREE.WebGLRenderer, controls, renderLoop, setComposer: Function, start: Function, stop: Function, resize: Function, dispose: Function }}
+ * @param {import('../runtime/runtimeContext.js').RuntimeContext} [options.runtimeContext] Optional caller-owned per-scene runtime state.
+ * @param {boolean} [options.disposeRuntimeContext=false] Dispose the supplied runtime context with this runtime.
+ * @returns {{ scene: THREE.Scene, camera: THREE.Camera, renderer: THREE.WebGLRenderer, controls, renderLoop, runtimeContext: object|null, setComposer: Function, start: Function, stop: Function, resize: Function, invalidate: Function, renderOnce: Function, dispose: Function }}
  */
 function createSceneRuntime(options = {}){
 	const canvas = options.canvas;
@@ -183,6 +186,10 @@ function createSceneRuntime(options = {}){
 	const camera = createCamera(config.camera, width, height);
 	const renderer = createRenderer(canvas, config.renderer, width, height);
 	const controls = createControls(camera, canvas, config.controls, scene);
+	const runtimeContext = isRuntimeContext(options.runtimeContext) ? options.runtimeContext : null;
+	if(runtimeContext){
+		attachRuntimeContext(scene, runtimeContext);
+	}
 	if (config.camera && typeof config.camera === 'object') {
 		applyCameraOrientation(camera, config.camera);
 	}
@@ -203,6 +210,12 @@ function createSceneRuntime(options = {}){
 		renderLoop.stop();
 		controls?.dispose?.();
 		renderer.dispose();
+		if(runtimeContext){
+			detachRuntimeContext(scene);
+			if(options.disposeRuntimeContext === true){
+				runtimeContext.dispose();
+			}
+		}
 	};
 
 	return {
@@ -211,10 +224,13 @@ function createSceneRuntime(options = {}){
 		renderer,
 		controls,
 		renderLoop,
+		runtimeContext,
 		setComposer: composer => renderLoop.setComposer(composer),
 		start: () => renderLoop.start(),
 		stop: () => renderLoop.stop(),
 		resize: size => renderLoop.resize(size),
+		invalidate: () => renderLoop.invalidate(),
+		renderOnce: now => renderLoop.renderOnce(now),
 		dispose: () => {
 			disposeThreeJsonSceneBackdrop(scene);
 			innerDispose();

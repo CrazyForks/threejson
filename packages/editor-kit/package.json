@@ -1,0 +1,51 @@
+{
+  "name": "@threejson/editor-kit",
+  "version": "0.1.0-alpha.1",
+  "description": "Framework-agnostic, no-shell logic for building ThreeJSON scene editors: the editor command layer (registry + command specs), the AI scene-update flow (command/JSON round-trips), and the domain-edit session (drill-in, child-transform baselines, undo). No DOM, no UI framework — scene tree / property panels / sidebars stay in the app.",
+  "author": "nnrj <tianhehechu2017@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nnrj/threejson.git",
+    "directory": "packages/editor-kit"
+  },
+  "homepage": "https://github.com/nnrj/threejson#readme",
+  "bugs": {
+    "url": "https://github.com/nnrj/threejson/issues"
+  },
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json",
+    "./command": "./lib/command/index.js",
+    "./command/specs": "./lib/command/specs.js",
+    "./command/types": "./lib/command/types.js",
+    "./ai": "./lib/ai/index.js",
+    "./ai/runEditorAiUpdate": "./lib/ai/runEditorAiUpdate.js",
+    "./ai/commandPrompt": "./lib/ai/commandPrompt.js",
+    "./ai/sceneSpatialContext": "./lib/ai/sceneSpatialContext.js",
+    "./ai/wrapCoreCommandsForEditor": "./lib/ai/wrapCoreCommandsForEditor.js",
+    "./domainEditSession": "./lib/domainEditSession.js",
+    "./lib/*.js": "./lib/*.js"
+  },
+  "files": [
+    "lib",
+    "LICENSE",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "threejson": "^0.1.0-alpha.8",
+    "three": ">=0.179.0"
+  },
+  "devDependencies": {
+    "threejson": "file:../..",
+    "three": "^0.184.0"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "keywords": [
+    "threejson",
+    "scene-editor",
+    "three.js"
+  ],
+  "license": "MIT"
+}

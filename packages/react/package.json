@@ -1,0 +1,51 @@
+{
+  "name": "@threejson/react",
+  "version": "0.1.0-alpha.1",
+  "description": "Thin React bindings over ThreeJSON's framework-agnostic host/player kits: <SceneViewport />, useScenePlayer(), useHostI18n(), usePlayerSettings(). No business shell — app UI stays in the app.",
+  "author": "nnrj <tianhehechu2017@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nnrj/threejson.git",
+    "directory": "packages/react"
+  },
+  "homepage": "https://github.com/nnrj/threejson#readme",
+  "bugs": {
+    "url": "https://github.com/nnrj/threejson/issues"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json",
+    "./src/*.js": "./src/*.js"
+  },
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "@threejson/host-kit": "^0.1.0-alpha.1",
+    "@threejson/player-kit": "^0.1.0-alpha.1",
+    "react": ">=18",
+    "three": ">=0.179.0",
+    "threejson": "^0.1.0-alpha.8"
+  },
+  "devDependencies": {
+    "@threejson/host-kit": "file:../host-kit",
+    "@threejson/player-kit": "file:../player-kit",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.184.0",
+    "threejson": "file:../.."
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "keywords": [
+    "threejson",
+    "react",
+    "three.js",
+    "scene-viewport"
+  ],
+  "license": "MIT"
+}

@@ -1,0 +1,75 @@
+/*
+ * App-specific additions on top of the verbatim threebox.css.
+ *
+ * Each generated scene renders in its own live canvas inside its chat card (SceneCard.jsx / the
+ * `sceneCard*` classes are all in threebox.css), exactly like the original — there is no shared
+ * viewport. What remains here is only the handful of controls the original does not have: the
+ * adjust/generate mode toggle above the composer, and error-message colouring.
+ */
+
+/* ── Adjust / generate mode toggle (this app supports adjust turns) ───────────── */
+.composerModeRow {
+  display: flex;
+  gap: 14px;
+  padding: 4px 6px 8px;
+  font-size: 12px;
+}
+.composerModeOpt {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-muted, #9aa0a6);
+  cursor: pointer;
+}
+.composerModeOpt.active {
+  color: var(--text, #e6e6e6);
+}
+.composerModeOpt input {
+  margin: 0;
+  accent-color: var(--accent, #3b82f6);
+}
+
+/* ── Error message text ──────────────────────────────────────────────────────── */
+.chatMessageText.chatMessageError {
+  color: #f87171;
+}
+
+/* ── Project group items (this app renders projects as collapsible groups) ────── */
+.projectItemTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 6px;
+  color: var(--text, #e6e6e6);
+}
+.projectItemTitle:hover {
+  background: var(--hover, rgba(255, 255, 255, 0.06));
+}
+.projectItemCount {
+  margin-left: auto;
+  font-size: 11px;
+  opacity: 0.6;
+}
+.historyItemPin {
+  flex: none;
+  font-size: 10px;
+  margin-right: 2px;
+}
+
+/* ── Built-in provider consent notice (not in the original threebox.css) ──────── */
+.providerBuiltinConsentNotice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  color: var(--muted, #9aa0a6);
+  background: var(--panel2, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+}

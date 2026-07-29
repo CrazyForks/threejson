@@ -1,0 +1,16 @@
+# Source/development files are not part of this app's deployed static artifact.
+.git/
+.github/
+node_modules/
+.wrangler/
+src/
+.dev.vars
+.env
+.env.*
+*.local
+*.test.json
+*.log
+coverage/
+README.md
+package-lock.json
+*.tsbuildinfo

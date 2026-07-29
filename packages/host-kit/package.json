@@ -1,0 +1,55 @@
+{
+  "name": "@threejson/host-kit",
+  "version": "0.1.0-alpha.1",
+  "description": "Framework-agnostic scene-host runtime shared by ThreeJSON's editor/player/shower/threebox apps: settings schemas/stores, AI turn orchestration, scene file IO, i18n, and viewport helpers. No React or other UI framework dependency.",
+  "author": "nnrj <tianhehechu2017@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nnrj/threejson.git",
+    "directory": "packages/host-kit"
+  },
+  "homepage": "https://github.com/nnrj/threejson#readme",
+  "bugs": {
+    "url": "https://github.com/nnrj/threejson/issues"
+  },
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json",
+    "./js/*.js": "./js/*.js",
+    "./js/platform/*.js": "./js/platform/*.js",
+    "./css/*.css": "./css/*.css",
+    "./i18n/index.js": "./i18n/index.js",
+    "./i18n/*.js": "./i18n/*.js",
+    "./i18n/locales/*.json": "./i18n/locales/*.json"
+  },
+  "files": [
+    "js",
+    "i18n",
+    "css",
+    "LICENSE",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "threejson": "^0.1.0-alpha.8",
+    "three": ">=0.179.0",
+    "three-viewport-gizmo": ">=2.0.0"
+  },
+  "devDependencies": {
+    "threejson": "file:../..",
+    "three": "^0.184.0"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "keywords": [
+    "threejson",
+    "scene-host",
+    "three.js"
+  ],
+  "license": "MIT",
+  "peerDependenciesMeta": {
+    "three-viewport-gizmo": {
+      "optional": true
+    }
+  }
+}

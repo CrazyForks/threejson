@@ -18,7 +18,7 @@
  * version, so a bump to one without the other fails the test suite instead of silently going stale
  * (as happened once already — 1.0.0 was pinned here well after 1.1.2 had shipped).
  */
-export const ASSETS_PACKAGE_VERSION = "1.1.2";
+export const ASSETS_PACKAGE_VERSION = "1.1.3";
 
 export const DEFAULT_CDN_ASSETS_BASE =
   `https://cdn.jsdelivr.net/npm/@threejson/assets@${ASSETS_PACKAGE_VERSION}`;

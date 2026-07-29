@@ -1,0 +1,107 @@
+:root {
+  --bg: #0f1216; --chrome: #171c23; --panel: #141920; --line: #29323d;
+  --text: #e6ebf2; --muted: #8b98a8; --accent: #4a9eff; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; width: 100%; height: 100%; overflow: hidden;
+  background: var(--bg); color: var(--text);
+  font: 13px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+
+.app { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+.body { display: grid; grid-template-columns: 260px 1fr 340px; min-height: 0; }
+
+.bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  background: var(--chrome); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.brand { font-weight: 700; }
+.spacer { flex: 1; }
+
+.panel { background: var(--panel); overflow-y: auto; min-width: 0; }
+.panel.left { border-right: 1px solid var(--line); }
+.panel.right { border-left: 1px solid var(--line); display: grid;
+  grid-template-rows: auto 1fr auto; overflow: hidden; }
+.panelTitle { padding: 9px 12px; font-weight: 600; border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; background: var(--panel); }
+
+.viewportWrap { position: relative; min-width: 0; background: #0a0d11; }
+
+.node { display: block; width: 100%; text-align: left; background: none; border: 0;
+  color: var(--text); padding: 5px 12px; cursor: pointer; font: inherit;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.node:hover { background: #202833; }
+.node.active { background: #22304a; color: #cfe4ff; }
+.node .type { color: var(--muted); font-size: 11px; margin-left: 6px; }
+
+.console { overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 6px;
+  font: 11.5px/1.5 "Cascadia Code", Consolas, monospace; }
+.line { white-space: pre-wrap; word-break: break-all; }
+.line.in { color: #cfe4ff; }
+.line.out { color: #9fd4a3; }
+.line.err { color: #ff9b91; }
+
+.consoleBar { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--line);
+  background: var(--chrome); }
+.consoleBar input { flex: 1; background: #0e1319; color: var(--text);
+  border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px;
+  font: 12px/1.4 "Cascadia Code", Consolas, monospace; outline: none; }
+.consoleBar input:focus { border-color: var(--accent); }
+
+button, select { background: #232b35; color: var(--text); border: 1px solid var(--line);
+  border-radius: 6px; padding: 5px 10px; cursor: pointer; font: inherit; }
+button:hover:not(:disabled), select:hover { border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #08121f; font-weight: 600; }
+
+.mask { position: absolute; inset: 0; display: grid; place-content: center; padding: 24px;
+  text-align: center; background: rgba(10,13,17,.85); color: var(--muted); }
+.muted { color: var(--muted); }
+.hint { padding: 8px 12px; color: var(--muted); font-size: 11.5px; }
+
+/* ── Property inspector ─────────────────────────────────────────────────────── */
+.inspector { padding: 8px; display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
+.propRow { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.propLabel { color: var(--muted); flex: none; min-width: 58px; }
+.propValue { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.propValue.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; }
+.propGroup { display: flex; flex-direction: column; gap: 4px; }
+.propAxes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.propField { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.propAxis { color: var(--muted); flex: none; }
+.propField input[type="number"] {
+  width: 100%; min-width: 0; background: #0e1319; color: inherit;
+  border: 1px solid var(--line); border-radius: 4px; padding: 3px 4px; font: inherit;
+}
+.propField input[type="color"] { background: none; border: 1px solid var(--line); border-radius: 4px; }
+.hint.err { color: #f87171; }
+.propUnset { color: var(--muted); font-size: 10px; }
+
+/* ── Transform gizmo mode toggle ────────────────────────────────────────────── */
+.gizmoModes { display: inline-flex; gap: 2px; }
+.gizmoModes button { border-radius: 0; }
+.gizmoModes button:first-child { border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
+.gizmoModes button:last-child { border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
+.gizmoModes button.active { background: var(--accent, #3b82f6); color: #fff; }
+
+/* ── Material panel ─────────────────────────────────────────────────────────── */
+.propField.propCheck { justify-content: flex-start; gap: 6px; }
+.propField.propWide { flex-direction: column; align-items: stretch; gap: 3px; }
+.propField.propWide input[type="text"] {
+  width: 100%; min-width: 0; background: #0e1319; color: inherit;
+  border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px; font: inherit; font-size: 11px;
+}
+.propGroup .propAxes input[type="number"] {
+  width: 100%; min-width: 0; background: #0e1319; color: inherit;
+  border: 1px solid var(--line); border-radius: 4px; padding: 3px 4px; font: inherit;
+}
+
+/* ── Session recovery banner ────────────────────────────────────────────────── */
+.recoveryBanner {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; font-size: 12px;
+  background: color-mix(in srgb, var(--accent, #3b82f6) 22%, transparent);
+  border-bottom: 1px solid var(--line);
+}
+.recoveryBanner button { font-size: 11px; padding: 3px 9px; }
+.recoveryBanner .recoveryClose { padding: 0 8px; font-size: 15px; line-height: 1; }
+
+/* Active-state for toolbar toggle buttons (Gizmo). */
+.bar button.active { background: var(--accent, #3b82f6); color: #fff; }

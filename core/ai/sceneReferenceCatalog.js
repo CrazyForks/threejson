@@ -18,13 +18,18 @@
  * not an error — since this is a best-effort enhancement, not a required capability.
  */
 import { convertFriendlyJsonToStandardJson } from "../util/util.js";
+import { DEFAULT_CDN_ASSETS_BASE } from "../util/assetsBase.js";
 
 const MANIFEST_RELATIVE_PATH = "assets/json/demo-show/manifest.json";
 const DOC_LOCALE_DIR = { "zh-CN": "docs/zh", "en-US": "docs/en" };
 const PUBLIC_REFERENCE_LINKS = {
   docsIndex: "https://threejson.org/",
   githubExamples: "https://github.com/nnrj/threejson/tree/master/assets/json",
-  assetsCdnBase: "https://cdn.jsdelivr.net/npm/@threejson/assets@latest/assets/"
+  // Derived from assetsBase.js's single pinned version rather than a local literal: an unpinned
+  // `@latest` risks the silent-staleness/breakage class of bug that pin exists to prevent, and the
+  // published @threejson/assets package exposes the assets/ folder's *contents* at its root — so
+  // there is no "assets/" path segment (callers strip it, see buildReferenceBlocks below).
+  assetsCdnBase: `${DEFAULT_CDN_ASSETS_BASE}/`
 };
 
 /** Curated intent-signal id (see sceneCapability.js's INTENT_SIGNALS) -> demo-show manifest

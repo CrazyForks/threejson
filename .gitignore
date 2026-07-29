@@ -15,10 +15,14 @@ sync.ffs_db
 .cursor/
 .claude/
 servertmp/
+.wrangler/
+.dev.vars
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
+# Claude/Cursor 本地启动配置
+.claude/launch.json
 
 # ==========================================
 # Local dependencies and package-manager caches
@@ -39,6 +43,7 @@ out/
 target/
 .cache/
 .vite/
+*.tsbuildinfo
 tools/scene-host/desktop/.pack/
 tools/scene-host/desktop/dist/
 tools/scene-host/desktop/dist-build/
@@ -93,3 +98,7 @@ setting.json
 # ==========================================
 tmp/
 temp/
+# ==========================================
+# Local AI provider test credentials (dev-only, never commit)
+# ==========================================
+apps/*/settings.test.json

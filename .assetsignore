@@ -5,10 +5,17 @@
 # Dependencies
 node_modules
 **/node_modules/**
+servertmp/
+apps/
+packages/
+tests/
+**/dist/
 
 # IDE
 .idea
 .vscode
+.claude/
+.agents/
 
 # OS files
 .DS_Store
@@ -18,6 +25,19 @@ Thumbs.db
 .wrangler
 .wrangler/**
 
+# Local credentials and development-only state
+.dev.vars
+.env
+.env.*
+*.local
+*.test.json
+tmp/
+temp/
+
 # Logs
 *.log
 package-lock.json
+
+# Internal planning and local research material. Public docs/en and docs/zh remain deployable
+# because the runtime AI reference catalog fetches them.
+docs/dev/

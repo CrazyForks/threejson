@@ -1,0 +1,11 @@
+{
+  "//": "Dev-only AI provider credentials for local verification. Copy to settings.test.json (which is gitignored) and fill apiKey. NEVER commit a real key.",
+  "//provider": "deepseek | chatgpt | custom  — determines the proxy target and default model",
+  "//apiKey": "REQUIRED. Your provider API key (use a throwaway/test key).",
+  "//model": "Optional. Blank uses the provider default (deepseek -> deepseek-chat).",
+  "//baseUrl": "Optional. Only for provider=custom or a self-hosted OpenAI-compatible endpoint root.",
+  "provider": "deepseek",
+  "apiKey": "",
+  "model": "",
+  "baseUrl": ""
+}

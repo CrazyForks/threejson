@@ -74,6 +74,32 @@ function renderFrame(renderer, scene, camera, composer, config){
 	renderer.render(scene, camera);
 }
 
+function resolveRequestFrame(requestFrame){
+	if(typeof requestFrame === 'function'){
+		return requestFrame;
+	}
+	if(typeof globalThis.requestAnimationFrame === 'function'){
+		return globalThis.requestAnimationFrame.bind(globalThis);
+	}
+	return callback => globalThis.setTimeout(() => callback(Date.now()), 16);
+}
+
+function resolveCancelFrame(cancelFrame){
+	if(typeof cancelFrame === 'function'){
+		return cancelFrame;
+	}
+	if(typeof globalThis.cancelAnimationFrame === 'function'){
+		return globalThis.cancelAnimationFrame.bind(globalThis);
+	}
+	return handle => globalThis.clearTimeout(handle);
+}
+
+function resolveScheduleMode(config){
+	return getConfigValue(config, 'scheduleMode', 'continuous') === 'demand'
+		? 'demand'
+		: 'continuous';
+}
+
 /**
  * Create a start/stop render loop controller.
  * @param {object} [options]
@@ -82,20 +108,25 @@ function renderFrame(renderer, scene, camera, composer, config){
  * @param {THREE.WebGLRenderer} options.renderer
  * @param {*} [options.controls] May include optional `update()`
  * @param {*} [options.composer] EffectComposer, etc.
- * @param {object} [options.config] fps, lowFps, autoResize, firstAutoResize, ratioRate, updateAnimations, renderMode
+ * @param {object} [options.config] fps, lowFps, autoResize, firstAutoResize, ratioRate, updateAnimations, renderMode, scheduleMode (`continuous` default or opt-in `demand`)
  * @param {(now:number)=>void} [options.beforeFrame]
  * @param {(now:number)=>void} [options.beforeRender]
  * @param {(now:number)=>void} [options.afterRender]
- * @returns {{ start: Function, stop: Function, resize: Function, setComposer: Function, isRunning: Function, getAnimationFrameId: Function }}
+ * @param {(callback:(now:number)=>void)=>unknown} [options.requestFrame] Test/host scheduler override
+ * @param {(handle:unknown)=>void} [options.cancelFrame] Test/host scheduler override
+ * @returns {{ start: Function, stop: Function, resize: Function, setComposer: Function, invalidate: Function, renderOnce: Function, isRunning: Function, getAnimationFrameId: Function }}
  */
 function createRenderLoop(options = {}){
 	const { scene, camera, renderer, controls, composer, config = {}, beforeFrame, beforeRender, afterRender } = options;
+	const requestFrame = resolveRequestFrame(options.requestFrame);
+	const cancelFrame = resolveCancelFrame(options.cancelFrame);
 	let activeComposer = composer;
 	let animationFrameId = null;
 	let running = false;
 	let lastRenderTime = 0;
 	let lastControlsStepTime = null;
 	let fpsInterval = 1000 / (getConfigValue(config, 'fps', DEFAULT_FPS) || DEFAULT_FPS);
+	let controlsChangeListener = null;
 
 	function shouldRender(now){
 		if(!getConfigValue(config, 'lowFps', false)){
@@ -124,11 +155,10 @@ function createRenderLoop(options = {}){
 		config.firstAutoResize = false;
 	}
 
-	function step(now){
+	function renderOnce(now = (typeof performance !== 'undefined' ? performance.now() : Date.now())){
 		if(!running){
-			return;
+			return false;
 		}
-		animationFrameId = requestAnimationFrame(step);
 		beforeFrame?.(now);
 		if(scene && getConfigValue(config, 'updateAnimations', true)){
 			const animOpts = {};
@@ -157,12 +187,32 @@ function createRenderLoop(options = {}){
 			syncViewModelsToCamera(scene, camera);
 		}
 		if(!shouldRender(now)){
-			return;
+			return false;
 		}
 		beforeRender?.(now);
 		renderFrame(renderer, scene, camera, activeComposer, config);
 		autoResize();
 		afterRender?.(now);
+		return true;
+	}
+
+	function scheduleNextFrame(){
+		if(!running || animationFrameId !== null){
+			return false;
+		}
+		animationFrameId = requestFrame(step);
+		return true;
+	}
+
+	function step(now){
+		animationFrameId = null;
+		if(!running){
+			return;
+		}
+		if(resolveScheduleMode(config) === 'continuous'){
+			scheduleNextFrame();
+		}
+		renderOnce(now);
 	}
 
 	function resize(size = {}){
@@ -188,10 +238,39 @@ function createRenderLoop(options = {}){
 			camera.aspect = width / height;
 			camera.updateProjectionMatrix();
 		}
+		invalidate();
 	}
 
 	function setComposer(nextComposer){
 		activeComposer = nextComposer;
+		invalidate();
+	}
+
+	function invalidate(){
+		if(!running){
+			return false;
+		}
+		if(resolveScheduleMode(config) === 'continuous'){
+			return false;
+		}
+		return scheduleNextFrame();
+	}
+
+	function bindDemandControls(){
+		if(resolveScheduleMode(config) !== 'demand' || !controls || typeof controls.addEventListener !== 'function' || controlsChangeListener){
+			return;
+		}
+		controlsChangeListener = () => invalidate();
+		controls.addEventListener('change', controlsChangeListener);
+	}
+
+	function unbindDemandControls(){
+		if(!controlsChangeListener || !controls || typeof controls.removeEventListener !== 'function'){
+			controlsChangeListener = null;
+			return;
+		}
+		controls.removeEventListener('change', controlsChangeListener);
+		controlsChangeListener = null;
 	}
 
 	function start(){
@@ -199,14 +278,16 @@ function createRenderLoop(options = {}){
 			return;
 		}
 		running = true;
-		lastRenderTime = performance.now();
-		animationFrameId = requestAnimationFrame(step);
+		lastRenderTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+		bindDemandControls();
+		scheduleNextFrame();
 	}
 
 	function stop(){
 		running = false;
-		if(animationFrameId){
-			cancelAnimationFrame(animationFrameId);
+		unbindDemandControls();
+		if(animationFrameId !== null){
+			cancelFrame(animationFrameId);
 			animationFrameId = null;
 		}
 	}
@@ -216,6 +297,8 @@ function createRenderLoop(options = {}){
 		stop,
 		resize,
 		setComposer,
+		invalidate,
+		renderOnce,
 		isRunning: () => running,
 		getAnimationFrameId: () => animationFrameId
 	};

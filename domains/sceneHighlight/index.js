@@ -10,6 +10,15 @@ import {
   normalizeHighlightChannel
 } from "./channels.js";
 
+export {
+  createSceneHighlightPassJson,
+  expandPassListEntry,
+  HIGHLIGHT_CHANNEL_STYLES,
+  normalizeHighlightChannel,
+  HIGHLIGHT_ALARM_RED,
+  HIGHLIGHT_LOCATE_AMBER
+} from "./channels.js";
+
 registerPassListEntryExpander(expandPassListEntry);
 
 /**

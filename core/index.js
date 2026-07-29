@@ -116,6 +116,10 @@ export * from "./handler/holeSceneOps.js";
 export * from "./handler/objectDescriptorAttach.js";
 export * from "./handler/sceneDescriptorBinding.js";
 export * from "./handler/objectRegistry.js";
+export * from "./runtime/runtimeContext.js";
+export * from "./runtime/runtimeEntityRegistry.js";
+export * from "./runtime/frameCommitScheduler.js";
+export * from "./runtime/dynamicGeometryBatch.js";
 export * from "./handler/bucketIndex.js";
 export * from "./handler/inferSystemBucketTags.js";
 export {
@@ -326,6 +330,7 @@ export {
   ASSETS_BASE_MODE_BASE_FIRST,
   ASSETS_PACKAGE_VERSION
 } from "./util/assetsBase.js";
+export * from "./theme/runtimeVisualDefaults.js";
 export { registerCoreParticleMechanism } from "./builder/particle/registerCoreParticle.js";
 
 import "./builder/shader/registerCoreShader.js";

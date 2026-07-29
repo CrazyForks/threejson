@@ -31,7 +31,13 @@ import { THREE_JSON_AGENT_CAPABILITY_INDEX } from "./sceneCapabilityIndex.js";
 // failed classification to a brand-new scene.
 const DEFAULT_CLASSIFY_MAX_TOKENS = 800;
 const DEFAULT_SUMMARIZE_MAX_TOKENS = 400;
-const DEFAULT_TITLE_MAX_TOKENS = 60;
+// The title output itself is tiny (SCENE_TITLE_MAX_LENGTH caps it at 80 chars), but reasoning
+// providers spend their token budget on hidden reasoning *before* emitting any content — 60 was so
+// small that the whole budget went to reasoning and `content` came back empty, silently yielding no
+// title. Match the summarize budget (which reliably produces output on the same providers); a
+// mid-length reasoning pass fits, while non-reasoning models are unaffected since max_tokens is a
+// cap, not a target, and the sanitizer still trims the result to SCENE_TITLE_MAX_LENGTH.
+const DEFAULT_TITLE_MAX_TOKENS = 400;
 const SCENE_TITLE_MAX_LENGTH = 80;
 const MAX_ESTIMATED_SCENE_SEGMENTS = 16;
 /** Characters unsafe in a file/folder name across common filesystems — a generated title is used

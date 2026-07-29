@@ -1,7 +1,8 @@
 import {
   isEditorPreviewUrl,
   isScenePreviewMessageEvent,
-  postScenePreviewMessage
+  postScenePreviewMessage,
+  resolveScenePreviewOpenerOrigin
 } from "../../shared/js/scenePreviewProtocol.js";
 import { t } from "../../shared/i18n/index.js";
 
@@ -23,6 +24,7 @@ export function createPlayerEditorPreviewBridge(options) {
   } = options;
 
   const active = isEditorPreviewUrl();
+  const openerOrigin = active ? resolveScenePreviewOpenerOrigin() : null;
   let installed = false;
   let loadingGeneration = 0;
 
@@ -30,18 +32,28 @@ export function createPlayerEditorPreviewBridge(options) {
     if (!window.opener || window.opener.closed) {
       return;
     }
-    postScenePreviewMessage(window.opener, { action: "ready" });
+    if (!openerOrigin) {
+      return;
+    }
+    postScenePreviewMessage(window.opener, { action: "ready" }, openerOrigin);
   }
 
   function notifyEditorLoaded(ok, errorMessage = "") {
     if (!window.opener || window.opener.closed) {
       return;
     }
-    postScenePreviewMessage(window.opener, {
-      action: "loaded",
-      ok: Boolean(ok),
-      error: errorMessage || undefined
-    });
+    if (!openerOrigin) {
+      return;
+    }
+    postScenePreviewMessage(
+      window.opener,
+      {
+        action: "loaded",
+        ok: Boolean(ok),
+        error: errorMessage || undefined
+      },
+      openerOrigin
+    );
   }
 
   async function handleLoadMessage(data) {
@@ -84,7 +96,7 @@ export function createPlayerEditorPreviewBridge(options) {
     }
     installed = true;
     window.addEventListener("message", (event) => {
-      if (!isScenePreviewMessageEvent(event)) {
+      if (!isScenePreviewMessageEvent(event) || event.origin !== openerOrigin) {
         return;
       }
       if (window.opener && event.source !== window.opener) {
@@ -97,7 +109,7 @@ export function createPlayerEditorPreviewBridge(options) {
   }
 
   function bootstrap() {
-    if (!active) {
+    if (!active || !openerOrigin) {
       return false;
     }
     installMessageListener();

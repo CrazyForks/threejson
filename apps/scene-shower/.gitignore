@@ -1,0 +1,26 @@
+# Dependencies and generated assets
+node_modules/
+dist/
+.vite/
+.wrangler/
+*.tsbuildinfo
+
+# Local credentials and deployment state
+.dev.vars
+.env
+.env.*
+!.env.example
+*.local
+settings.test.json
+*.test.json
+
+# Diagnostics and machine-specific files
+coverage/
+*.log
+sync.ffs_db
+sync.ffs_db.*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

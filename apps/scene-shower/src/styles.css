@@ -1,0 +1,59 @@
+:root {
+  --bg: #11151b;
+  --chrome: #1b2129;
+  --panel: #161b22;
+  --line: #2b3440;
+  --text: #e6ebf2;
+  --muted: #8b98a8;
+  --accent: #4a9eff;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; width: 100%; height: 100%; overflow: hidden;
+  background: var(--bg); color: var(--text);
+  font: 13px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+
+.app { display: grid; grid-template-columns: 240px 1fr 380px; height: 100%; }
+
+.catalog { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; }
+.catalogTitle { padding: 10px 12px; font-weight: 600; border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; background: var(--panel); }
+.section { padding: 8px 0 4px; }
+.sectionTitle { padding: 4px 12px; color: var(--muted); font-size: 11px;
+  text-transform: uppercase; letter-spacing: .04em; }
+.item { display: block; width: 100%; text-align: left; background: none; border: 0;
+  color: var(--text); padding: 6px 12px; cursor: pointer; font: inherit; }
+.item:hover { background: #202833; }
+.item.active { background: #22304a; color: #cfe4ff; }
+.itemDesc { color: var(--muted); font-size: 11px; }
+
+.center { display: grid; grid-template-rows: auto 1fr; min-width: 0; }
+.viewportWrap { position: relative; min-height: 0; background: #0c0f14; }
+
+.editorPane { display: grid; grid-template-rows: auto 1fr auto;
+  border-left: 1px solid var(--line); background: var(--panel); min-width: 0; }
+.editor { width: 100%; height: 100%; resize: none; border: 0; outline: none;
+  background: #0e1319; color: #d7dae0; padding: 10px;
+  font: 12px/1.55 "Cascadia Code", Consolas, monospace; }
+
+.bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  background: var(--chrome); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.editorPane .bar:last-child { border-bottom: 0; border-top: 1px solid var(--line); }
+.spacer { flex: 1; }
+
+button, select { background: #232b35; color: var(--text); border: 1px solid var(--line);
+  border-radius: 6px; padding: 5px 10px; cursor: pointer; font: inherit; }
+button:hover:not(:disabled), select:hover { border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #08121f; font-weight: 600; }
+label.check { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); cursor: pointer; }
+
+.mask { position: absolute; inset: 0; display: grid; place-content: center; gap: 10px;
+  justify-items: center; text-align: center; padding: 24px;
+  background: rgba(12,15,20,.82); color: var(--muted); }
+
+.toast { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex;
+  align-items: center; gap: 10px; border-radius: 8px; padding: 8px 12px; color: #fff; }
+.toast.error { background: rgba(180,35,24,.92); }
+.toast.info { background: rgba(30,90,160,.92); }
+.toast button { background: rgba(0,0,0,.25); border-color: rgba(255,255,255,.35); }
