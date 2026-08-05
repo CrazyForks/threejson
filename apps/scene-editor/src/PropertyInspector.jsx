@@ -5,11 +5,12 @@
  * registry the console uses. That is the whole point: the inspector adds no private mutation path,
  * so an edit made here and the identical command typed into the console are indistinguishable.
  *
- * Undo: core mutations apply to the live scene without writing back to the source payload, so each
- * edit brackets the patch — `beginHistoryStep()` snapshots the document before, and
- * `commitRuntimeToDocument()` folds the result back after. Without the commit the document never
- * changes, and redo has no "after" state to restore. Undo reloads the whole scene rather than
- * inverting one property: coarser than the original editor's per-property history, but honest.
+ * Undo: each edit reads the object's descriptor before and after the command, and — if it
+ * changed — pushes a per-object `objectSnapshot` history entry (useEditorHistory.js). Undo/redo
+ * re-applies just that one object's before/after state via `object.patch`, not a whole-scene
+ * reload, matching the original editor's per-property history. `commitRuntimeToDocument()` still
+ * runs after every edit to keep the exported/autosaved document in sync — undo/redo no longer
+ * depends on it for correctness, but export and session recovery do.
  *
  * Kept as app code rather than pushed into @threejson/react-ui: only this app needs it so far, and
  * the extraction rule for these packages is "a second consumer actually exists", not "it looks
@@ -226,24 +227,39 @@ export function PropertyInspector({ editor, selection, revision, onChanged }) {
     void refresh();
   }, [refresh]);
 
-  // Both edit paths share one history bracket: snapshot the document, run the command, and only on
-  // success fold the result back in. `op` is object.patch for transforms and material.patch for
-  // material fields — material.patch exists precisely so a material edit does not have to hand-build
-  // a `{ material: { … } }` object.patch partial and risk clobbering sibling fields.
+  // Both edit paths (object.patch for transforms, material.patch for material fields — the latter
+  // exists precisely so a material edit does not have to hand-build a `{ material: { … } }`
+  // object.patch partial and risk clobbering sibling fields) share one history bracket: read the
+  // object's full descriptor before and after the command, and if it actually changed, push a
+  // per-object undo entry (useEditorHistory.js) carrying just that before/after pair — not a
+  // whole-document snapshot, so undo/redo only touches this one object.
   const runEdit = useCallback(
     async (op, args) => {
       if (!selection) {
         return;
       }
       setBusy(true);
-      editor.beginHistoryStep();
+      const beforeResult = await runCommandObject("object.get", { id: selection }, { quiet: true });
+      const before = beforeResult?.data?.value ?? null;
       const result = await runCommandObject(op, { id: selection, ...args });
-      setBusy(false);
       if (result?.ok === false) {
+        setBusy(false);
         setError(result?.error || "Edit failed.");
         return;
       }
+      const afterResult = await runCommandObject("object.get", { id: selection }, { quiet: true });
+      const after = afterResult?.data?.value ?? null;
+      if (before && after) {
+        editor.pushHistoryEntry({
+          kind: "objectSnapshot",
+          threeJsonId: selection,
+          before,
+          after,
+          label: op
+        });
+      }
       await editor.commitRuntimeToDocument();
+      setBusy(false);
       setError(null);
       await refresh();
       onChanged?.();
@@ -267,17 +283,34 @@ export function PropertyInspector({ editor, selection, revision, onChanged }) {
   );
 
   if (!selection) {
-    return <div className="hint">Select an object to inspect its properties.</div>;
+    return (
+      <div className="panelCard sceneTreePropCard">
+        <div className="panelTitle">属性</div>
+        <p className="sceneManageHint">Select an object to inspect its properties.</p>
+      </div>
+    );
   }
   if (error && !descriptor) {
-    return <div className="hint err">{error}</div>;
+    return (
+      <div className="panelCard sceneTreePropCard">
+        <div className="panelTitle">属性</div>
+        <p className="hint err">{error}</p>
+      </div>
+    );
   }
   if (!descriptor) {
-    return <div className="hint">Reading…</div>;
+    return (
+      <div className="panelCard sceneTreePropCard">
+        <div className="panelTitle">属性</div>
+        <p className="sceneManageHint">Reading…</p>
+      </div>
+    );
   }
 
   return (
-    <div className="inspector">
+    <div className="panelCard sceneTreePropCard">
+      <div className="panelTitle">属性</div>
+      <div className="inspector sceneTreePropGrid">
       <div className="propRow">
         <span className="propLabel">Name</span>
         <span className="propValue" title={descriptor.name || ""}>
@@ -338,6 +371,7 @@ export function PropertyInspector({ editor, selection, revision, onChanged }) {
       ) : null}
 
       {error ? <div className="hint err">{error}</div> : null}
+      </div>
     </div>
   );
 }

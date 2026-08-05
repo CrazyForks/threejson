@@ -1,0 +1,116 @@
+/* scene-host editor: enable left/right docks (phase 2b+). */
+
+#rootContainer.sceneHostMvpNoDocks #leftFlyoutHost,
+#rootContainer.sceneHostMvpNoDocks #rightFlyoutHost {
+  display: none !important;
+}
+
+.eventEditorScript {
+  width: 100%;
+  min-height: 10rem;
+  margin-top: 0.35rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.eventEditorModeBadge {
+  justify-self: start;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.eventEditorParseStatus {
+  min-height: 1.2em;
+  font-size: 12px;
+  margin: 0.35rem 0;
+}
+
+.eventEditorParseStatus[data-kind="error"] {
+  color: #e45757;
+}
+
+.eventEditorParseStatus[data-kind="ok"] {
+  color: #3a9d5d;
+}
+
+.eventEditorActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.eventEditorLibList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 16rem;
+  overflow: auto;
+}
+
+.eventEditorLibPickBtn {
+  text-align: left;
+}
+
+.eventEditorLibDialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+#viewportGizmoOverlayRoot {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+
+/* In 3D mode the canvas intentionally runs behind the floating editor chrome. Keep the gizmo in
+   the visible canvas corner instead of underneath the pinned top/right bars. Code and All modes
+   already size/position canvasWrap around their visible viewport, so they need no extra offset. */
+#rootContainer:not(.codeEditMode) #viewportGizmoOverlayRoot {
+  top: var(--dockInsetTop, 0px);
+}
+
+#rootContainer:not(.codeEditMode).rightDockPinned #viewportGizmoOverlayRoot,
+#rootContainer:not(.codeEditMode).rightDockPeek #viewportGizmoOverlayRoot {
+  right: var(--rightDockWidth, 238px);
+}
+
+/* The wrapper spans the viewport and never blocks canvas clicks; only the widget is interactive. */
+#viewportGizmoOverlay {
+  pointer-events: auto;
+}
+
+.bottomBarSpacer {
+  flex: 1 1 auto;
+}
+
+.bottomBarToggles {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bottomBarToggleBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: #9a9a9a;
+  cursor: pointer;
+}
+
+.bottomBarToggleBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e4e4e4;
+}
+
+.bottomBarToggleBtn[aria-pressed="true"] {
+  color: #6db8ff;
+}
+

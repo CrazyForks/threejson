@@ -36,18 +36,103 @@ the same path.
 
 ## Scope — read this before comparing to tools/scene-host/editor
 
-"Step one" scope: load a scene, browse its addressable objects, select, and drive the editor through
-the command layer. The original editor is ~16,000 lines across `editor/js` panels, and that UI is
-app-local — only the command / AI / domain-edit-session logic was extracted into editor-kit. Not
-reimplemented here:
+A phased faithful recreation of `tools/scene-host/editor` (~16,000 lines / 58 modules) is in
+progress — see the plan for the full 9-phase breakdown. Status per phase:
 
-- Texture upload/sampling controls, other viewport overlays
-- AI sidebars (generate / adjust panels), CodeMirror JSON editing
-- Recent scenes, presets, asset library, `.tjz`/GLB export
+- **Phase 1 (done): shell, dock chrome, CSS fidelity.** `editor-base.css` +
+  `builtin-provider-privacy.css` + `host-overrides.css` are ported verbatim from
+  `tools/scene-host/shared/css` and `tools/scene-host/editor/css` (see `src/*.css`, imported in
+  `main.jsx`). The dock/tab structure (`src/dock/*`) is a faithful port of `_shell-body.html`: a
+  real top menubar (文件/编辑/查看/运行/设置/帮助), a left dock with 组件/资源/AI生成/AI调整 tabs, a
+  right dock with 对象/场景/事件 tabs, pin/peek/auto-hide behavior on all four chrome regions
+  (persisted to `localStorage` under `threejson.editor.viewChrome`), and the bottom status bar.
+  Only 组件 (empty state text) and 对象 (real tree + inspector) have content; 资源/AI生成/AI调整/
+  场景/事件 are placeholder stubs naming the phase that fills them in — that's phases 3–9, not a gap
+  in this phase's own scope.
+- **Phase 2 (done): viewport, feedback, and interaction primitives.** Grid/axes helpers
+  (`src/lib/useEditorGridHelper.js`, ported from `editorGridHelper.js`) wired to the bottom-bar
+  toggle buttons, both on by default; per-scene camera-view preservation across reloads
+  (`src/lib/useViewPreserve.js`, ported from `editorViewPreserve.js`) so undo/redo no longer
+  jump-cuts the camera; a toast system (`src/lib/useUiFeedback.js`, ported from `uiFeedback.js`)
+  driving the `#messageBox` DOM node directly, same as the original; a generic yes/no confirm
+  modal (`src/dock/ConfirmModal.jsx`, ported from `editorConfirmModal.js`) wired into the session-
+  recovery "Load sample scene" discard action; and Ctrl/Cmd+Z / +Y keyboard shortcuts for undo/
+  redo (`src/lib/useEditorKeyboardShortcuts.js`, ported from `editorKeyboardShortcuts.js` — Alt+F5
+  and Ctrl+S are not bound yet since their target features, cross-app run and save, don't exist
+  until phases 5–6).
 
-Present (each has its own section below): a scene-tree hierarchy (`@threejson/react-ui`'s
-`SceneTreePanel`), a property inspector with a material panel (`src/PropertyInspector.jsx`), a
-TransformControls gizmo, a viewport navigation gizmo, and IndexedDB session recovery.
+  **Rescoped out of this phase, documented rather than force-fit:** the scene-tree right-click
+  context menu (`sceneTreeContextMenu.js`) needs either a context-menu prop on `@threejson/react-
+  ui`'s shared `SceneTreePanel` or a DOM-matching workaround, plus export handlers that don't exist
+  until phase 5 — cleaner to build once phase 5's export plumbing exists than to ship a half-wired
+  menu now. `editorCameraViewSnapshot.js` (the *other*, distinct camera-view feature — a transient
+  pose-preserver across Code/All/3D mode switches) has no consumer until phase 8 adds those modes.
+- **Phase 3 (done): settings modal.** `src/SettingsModal.jsx` (ported from `settingsModal.js`) is a
+  generic schema-driven form over all 11 sections of host-kit's already-packaged
+  `editorSettingsSchema.js`/`editorSettingsStore.js` — general, layout, session, sceneJson,
+  editing, domainEdit, render, interaction, io, capture, ai — reachable from 设置 → 编辑器设置….
+  `src/lib/useEditorSettings.js` is the thin `useSyncExternalStore` binding (same pattern as
+  `apps/threebox`'s settings store), persisting to `sceneEditor_settings_v1` in localStorage. The
+  phase-2 hooks now read their real settings values instead of hardcoded fallbacks: the toast
+  duration (`useUiFeedback.js`) and the grid/axes helpers' initial on/off state
+  (`useEditorGridHelper.js`) both seed from the store. The "设置 → 清除缓存…" menu item is real too
+  (clears the dock pin/peek localStorage state added in phase 1). The **ai** section's provider-
+  list editing (add/delete provider cards, built-in-provider quota card) is not built — no consumer
+  until phase 7 adds the AI panels; its plain behavior fields (agent depth, streaming, etc.) render
+  through the generic field loop like every other section.
+- **Phase 4 (done): undo/redo as a per-operation inverse stack.** `src/lib/useEditorHistory.js`
+  (ported from `editorHistory.js`'s past/future array design) replaces the whole-document snapshot
+  stack described above. Two of the original's five entry kinds are wired this phase — both have
+  real producers today: `objectSnapshot` (the original's `objectObjJsonSnapshot` — full descriptor
+  before/after for one object, pushed by every property- and material-panel edit in
+  `PropertyInspector.jsx`) and `transform` (the original's `objectDelta`/transform — before/after
+  position/rotation/scale, pushed by the transform gizmo in `App.jsx`). Undo/redo re-applies just
+  the one named object via `object.patch`, not a scene reload — verified live: editing
+  `port-dispatch-center`'s position, undoing, and redoing round-trips correctly through the console
+  log (`撤销: object.patch (port-dispatch-center)` / `重做: …`) without touching any other object.
+  `objectAdd`/`objectRemove` (no producer — object creation/deletion isn't built until phases 5/9)
+  and `sceneSnapshot` (the original's whole-document fallback, used for its "Reset to bootstrap"
+  feature and precise-inversion-failure fallback — neither exists yet) are documented gaps, not
+  silent ones. A full scene load (open/import/restore) now resets history outright rather than
+  pushing an entry, matching the original's behavior for an ordinary scene open.
+- **Phase 5 (partial): import/export.** Done and verified live: ThreeJSON import/export (file
+  picker + download), native Three.js JSON export (`src/lib/editorNativeJsonExport.js`, ported from
+  `editorNativeJsonExport.js` — verified against both a real download and its own oversized-payload
+  guard rail correctly refusing a >300M-char scene), `.tjz` archive import/export
+  (`src/lib/editorTjzExport.js` + `threejson/edit`'s `parseTjzArchiveForScene` — `packTjzArchive`/
+  `parseTjzArchiveForScene`/`isTjzLike`/`inspectTjzArchiveEntry` needed a new `core/index.js`
+  re-export line since they were previously reachable only via a deep-relative import, forbidden
+  for apps/\*), and mesh export (GLB/GLTF/OBJ/STL/PLY/USDZ) via already-packaged `meshExport.js` +
+  `@threejson/react-ui`'s `MeshExportDialog`, plus quick GLB actions for the whole scene and the
+  selected object (`src/lib/editorMeshExport.js`). All reachable from 文件 → 导入/导出 in the top
+  menu, structured as real nested flyouts (`SubMenu` in `src/dock/TopBar.jsx`), not disabled stubs.
+
+  **Carried forward within phase 5, not yet built:** recent-scenes list (`recentScenes.js`), scene
+  presets panel UI (`presetScenePanel.js` — its store is already packaged as
+  `scenePresetsStore.js`), asset-library panel (`assetLibraryPanel.js`), scene-management panel
+  (`sceneManagePanel.js` — the 场景 tab's `sceneConfig` editor, still a stub from phase 1), template
+  project export (`editorTemplateExportModal.js`, using packaged `templateExportBuilders.js`), and
+  the rename-before-download prompt (`exportFilenameModal`, gated by `io.promptExportFilename` —
+  exports currently always use an auto-generated filename).
+- **Phases 6–9 (not started):** the original's localStorage cross-app bridge, AI panels (including
+  the settings section's provider-list UI), CodeMirror code view, and domain-specific editing
+  (including the deferred scene-tree context menu, and the `objectAdd`/`objectRemove`/
+  `sceneSnapshot` history entry kinds once their producers exist). See the plan file for detail.
+
+What's functionally present today (each has its own section below): a scene-tree hierarchy
+(`@threejson/react-ui`'s `SceneTreePanel`), a property inspector with a material panel
+(`src/PropertyInspector.jsx`), a TransformControls gizmo, a viewport navigation gizmo, and
+IndexedDB session recovery. The dev-only command console and the URL-based scene loader (top bar
+"打开" / 文件→打开) are additive affordances this app has that the original chrome does not — kept
+because there's no file-picker-backed open/save yet (that's phase 5).
+
+### Cross-app handoff: two mechanisms, only one is the port target
+
+`src/sceneTransferProtocol.js` implements a `postMessage`-based handoff (own origin allowlist,
+`SCENE_TRANSFER_CHANNEL`) — a deliberate, already-built, tested alternative to the original's
+`threejson.editor.openScene.<sceneKey>` localStorage bridge. Per the maintainer's decision, phase 6
+replaces it with the original's exact bridge for baseline parity; this postMessage mechanism is
+kept only as a documented candidate to reconsider **after** that parity is reached, not before.
 
 ### How editing and history actually work
 

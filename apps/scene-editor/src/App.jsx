@@ -9,9 +9,9 @@
  *   @threejson/host-kit   → scene URL resolution, scene-tree model, live-object lookup
  *   threejson             → command registry/executor, engine
  *
- * Scope: load a scene, browse its object hierarchy, select via tree/inspector/gizmo, and drive the
- * editor through editor-kit's command layer. Not reimplemented from the original ~16,000-line editor:
- * material/texture panels, three-view, AI sidebars, CodeMirror, session recovery — see README.
+ * Shell/chrome (App shell, dock/tab structure, CSS) is a faithful port of
+ * tools/scene-host/editor/_shell-body.html — see src/dock/*. Feature panels are ported
+ * incrementally by phase; see README.md's Scope section for current status per phase.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useScenePlayer } from "@threejson/react";
@@ -28,8 +28,29 @@ import {
   createSceneEditorTransferReceiver,
   hasSceneTransferRequest
 } from "./sceneTransferProtocol.js";
+import { useDockChrome } from "./dock/useDockChrome.js";
+import { TopBar } from "./dock/TopBar.jsx";
+import { LeftDock } from "./dock/LeftDock.jsx";
+import { RightDock } from "./dock/RightDock.jsx";
+import { BottomBar } from "./dock/BottomBar.jsx";
+import { ConfirmModal } from "./dock/ConfirmModal.jsx";
+import { SettingsModal } from "./SettingsModal.jsx";
+import { useEditorGridHelper } from "./lib/useEditorGridHelper.js";
+import { useViewPreserve } from "./lib/useViewPreserve.js";
+import { useUiFeedback } from "./lib/useUiFeedback.js";
+import { useEditorKeyboardShortcuts } from "./lib/useEditorKeyboardShortcuts.js";
+import { MeshExportDialog } from "@threejson/react-ui";
+import { downloadBlob } from "@threejson/host-kit/js/meshExport.js";
+import { exportSceneAsGlb, exportSelectedObjectAsGlb } from "./lib/editorMeshExport.js";
+import { exportNativeSceneJson } from "./lib/editorNativeJsonExport.js";
+import { exportSceneAsTjz } from "./lib/editorTjzExport.js";
+import { parseTjzArchiveForScene } from "threejson";
 
 const DEFAULT_SCENE = "json/portShow.json";
+
+function cloneJson(value) {
+  return value == null ? value : JSON.parse(JSON.stringify(value));
+}
 
 export function App() {
   const player = useScenePlayer();
@@ -47,6 +68,8 @@ export function App() {
   const [sceneUrl, setSceneUrl] = useState(DEFAULT_SCENE);
   const [restoredBanner, setRestoredBanner] = useState(false);
   const [transferMessage, setTransferMessage] = useState("");
+  const [confirmState, setConfirmState] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const consoleEndRef = useRef(null);
   const autoLoadedRef = useRef(false);
   const transferReceiverRef = useRef(null);
@@ -130,15 +153,31 @@ export function App() {
     recovery.save({ payload: editor.payload, selection: editor.selection, label: sceneUrl });
   }, [editor.sceneVersion, editor.selection, editor.payload, sceneUrl, recovery]);
 
-  // Rebuild the tree whenever a scene finishes loading. editor.sceneVersion (not editor.payload) is
-  // the correct trigger — see useEditorApi.
+  // Rebuild the tree whenever a scene finishes loading (editor.sceneVersion — not editor.payload,
+  // see useEditorApi) or any command runs (editor.log.length): undo/redo and typed console commands
+  // mutate the live graph without a scene reload, so the sceneVersion-only trigger alone would miss
+  // them.
   useEffect(() => {
     setTreeRevision((n) => n + 1);
-  }, [editor.sceneVersion]);
+  }, [editor.sceneVersion, editor.log.length]);
 
   useEffect(() => {
     consoleEndRef.current?.scrollIntoView({ block: "end" });
   }, [editor.log]);
+
+  // Generic yes/no confirm, replacing native window.confirm() — see dock/ConfirmModal.jsx.
+  const confirmYesNo = useCallback((message, options = {}) => {
+    return new Promise((resolve) => {
+      setConfirmState({
+        message,
+        ...options,
+        resolve: (value) => {
+          setConfirmState(null);
+          resolve(value);
+        }
+      });
+    });
+  }, []);
 
   const loadUrl = useCallback(async () => {
     const url = sceneUrl.trim();
@@ -196,16 +235,37 @@ export function App() {
     });
   }, []);
 
+  // Captures the object's transform just before a drag starts, so onCommit can pair it with the
+  // post-drag transform into a single "transform" history entry (useEditorHistory.js) — a per-
+  // object undo, not a whole-document snapshot.
+  const transformBeforeRef = useRef(null);
   const { helper: gizmoHelper } = useTransformGizmo({
     player,
     object: selectedObject,
     mode: gizmoMode,
     enabled: Boolean(selectedObject),
-    onDragStart: () => editor.beginHistoryStep(),
+    onDragStart: () => {
+      const d = selectedObject?.userData?.objJson;
+      transformBeforeRef.current = d
+        ? { position: cloneJson(d.position), rotation: cloneJson(d.rotation), scale: cloneJson(d.scale) }
+        : null;
+    },
     onCommit: async () => {
       // syncBoxModelTransformFromObject3D already folded the live transform into the descriptor;
       // commit re-serialises so it survives a reload, then refresh the panels.
       await editor.commitRuntimeToDocument();
+      const before = transformBeforeRef.current;
+      const d = selectedObject?.userData?.objJson;
+      if (before && d && editor.selection) {
+        editor.pushHistoryEntry({
+          kind: "transform",
+          threeJsonId: editor.selection,
+          before,
+          after: { position: cloneJson(d.position), rotation: cloneJson(d.rotation), scale: cloneJson(d.scale) },
+          label: "变换物体"
+        });
+      }
+      transformBeforeRef.current = null;
       setTreeRevision((n) => n + 1);
     }
   });
@@ -215,117 +275,274 @@ export function App() {
     []
   );
 
+  const dockChrome = useDockChrome();
+  const { pinned, peek, setDockPeek } = dockChrome;
+
+  const { gridVisible, axesVisible, toggleGrid, toggleAxes } = useEditorGridHelper(
+    () => player.getSnapshot()?.scene || null,
+    editor.sceneVersion
+  );
+  useViewPreserve(player, editor, sceneUrl);
+  const { showMessage } = useUiFeedback();
+  useEditorKeyboardShortcuts({
+    onUndo: () => void editor.runCommand("editor.history.undo"),
+    onRedo: () => void editor.runCommand("editor.history.redo")
+  });
+
+  // Import/export (phase 5) — file pickers driven by hidden <input type="file"> elements, matching
+  // the original's #topBarOpenFileInput/#tjzArchiveFileInput pattern.
+  const jsonFileInputRef = useRef(null);
+  const tjzFileInputRef = useRef(null);
+  const [meshExportOpen, setMeshExportOpen] = useState(false);
+
+  const handleImportJsonFile = useCallback(
+    async (file) => {
+      if (!file) {
+        return;
+      }
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        await editor.loadPayload(data, { label: file.name });
+        setSceneUrl(file.name);
+        setRestoredBanner(false);
+        showMessage(`已导入 ${file.name}。`, "success");
+      } catch (error) {
+        showMessage(`导入失败：${error?.message || error}`, "error");
+      }
+    },
+    [editor, showMessage]
+  );
+
+  const handleImportTjzFile = useCallback(
+    async (file) => {
+      if (!file) {
+        return;
+      }
+      try {
+        const { payload, dispose } = await parseTjzArchiveForScene(file);
+        await editor.loadPayload(payload, { label: file.name });
+        setSceneUrl(file.name);
+        setRestoredBanner(false);
+        showMessage(`已导入 ${file.name}。`, "success");
+        // The rewritten blob: URLs are consumed by the deploy pipeline as soon as loadPayload
+        // resolves; dispose() only revokes them, so this is safe to call right after awaiting it.
+        dispose?.();
+      } catch (error) {
+        showMessage(`导入失败：${error?.message || error}`, "error");
+      }
+    },
+    [editor, showMessage]
+  );
+
+  const handleExportThreeJson = useCallback(() => {
+    if (!editor.payload) {
+      return;
+    }
+    downloadBlob(
+      new Blob([JSON.stringify(editor.payload, null, 2)], { type: "application/json" }),
+      `scene-${Date.now()}.json`
+    );
+    showMessage("ThreeJSON 已导出。", "success");
+  }, [editor.payload, showMessage]);
+
+  const handleExportNativeJson = useCallback(async () => {
+    const scene = player.getSnapshot()?.scene;
+    try {
+      const result = await exportNativeSceneJson(scene);
+      showMessage(
+        result.omittedCount > 0
+          ? `Three.js 原生 JSON 已导出。已跳过 ${result.omittedCount} 个过重的三方模型（${result.omittedSummary}）；完整场景请用 ThreeJSON 导出。`
+          : "Three.js 原生 JSON 已导出。",
+        result.omittedCount > 0 ? "warning" : "success"
+      );
+    } catch (error) {
+      showMessage(`导出原生 JSON 失败：${error?.message || error}`, "error");
+    }
+  }, [player, showMessage]);
+
+  const handleExportTjz = useCallback(async () => {
+    if (!editor.payload) {
+      return;
+    }
+    try {
+      await exportSceneAsTjz(editor.payload);
+      showMessage(".tjz 包已导出。", "success");
+    } catch (error) {
+      showMessage(`导出 .tjz 失败：${error?.message || error}`, "error");
+    }
+  }, [editor.payload, showMessage]);
+
+  const handleExportGlbScene = useCallback(async () => {
+    const snap = player.getSnapshot();
+    if (!snap?.scene) {
+      return;
+    }
+    try {
+      const result = await exportSceneAsGlb(snap.scene, { renderer: snap.renderer, fileNameStem: "scene" });
+      showMessage(
+        result.warnings.length ? `已导出（含 ${result.warnings.length} 项警告）：${result.fileName}` : "GLB 已导出。",
+        result.warnings.length ? "warning" : "success"
+      );
+    } catch (error) {
+      showMessage(`导出 GLB 失败：${error?.message || error}`, "error");
+    }
+  }, [player, showMessage]);
+
+  const handleExportGlbSelection = useCallback(async () => {
+    const snap = player.getSnapshot();
+    if (!snap?.scene || !editor.selection) {
+      return;
+    }
+    try {
+      const result = await exportSelectedObjectAsGlb(snap.scene, editor.selection, { renderer: snap.renderer });
+      showMessage(
+        result.warnings.length ? `已导出（含 ${result.warnings.length} 项警告）：${result.fileName}` : "GLB 已导出。",
+        result.warnings.length ? "warning" : "success"
+      );
+    } catch (error) {
+      showMessage(`导出选中对象失败：${error?.message || error}`, "error");
+    }
+  }, [player, editor.selection, showMessage]);
+
   return (
-    <div className="app">
-      <div className="bar">
-        <span className="brand">ThreeJSON Editor</span>
+    <div id="rootContainer" className={dockChrome.rootClassName}>
+      <div id="stageShell">
+        <TopBar
+          sceneTitle={sceneUrl}
+          sceneUrl={sceneUrl}
+          onSceneUrlChange={setSceneUrl}
+          onLoadUrl={(url) => {
+            setSceneUrl(url);
+            void loadUrl();
+          }}
+          editor={editor}
+          player={player}
+          gizmoMode={gizmoMode}
+          onGizmoModeChange={setGizmoMode}
+          selectedObject={selectedObject}
+          dockChrome={dockChrome}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onImportJson={() => jsonFileInputRef.current?.click()}
+          onImportTjz={() => tjzFileInputRef.current?.click()}
+          onExportThreeJson={handleExportThreeJson}
+          onExportNativeJson={() => void handleExportNativeJson()}
+          onExportTjz={() => void handleExportTjz()}
+          onExportGlbScene={() => void handleExportGlbScene()}
+          onExportGlbSelection={() => void handleExportGlbSelection()}
+          onOpenMeshExportDialog={() => setMeshExportOpen(true)}
+        />
         <input
-          value={sceneUrl}
-          onChange={(e) => setSceneUrl(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && void loadUrl()}
-          style={{
-            background: "#0e1319",
-            color: "inherit",
-            border: "1px solid var(--line)",
-            borderRadius: 6,
-            padding: "5px 8px",
-            minWidth: 260,
-            font: "inherit"
+          ref={jsonFileInputRef}
+          type="file"
+          accept=".json,.threejson,application/json"
+          hidden
+          onChange={(e) => {
+            void handleImportJsonFile(e.target.files?.[0]);
+            e.target.value = "";
           }}
         />
-        <button onClick={() => void loadUrl()}>Load</button>
-        <span className="spacer" />
-        <div className="gizmoModes" role="group" aria-label="Transform mode">
-          {["translate", "rotate", "scale"].map((m) => (
-            <button
-              key={m}
-              className={gizmoMode === m ? "active" : ""}
-              disabled={!selectedObject}
-              title={selectedObject ? `${m[0].toUpperCase()}${m.slice(1)} the selected object` : "Select an object first"}
-              onClick={() => setGizmoMode(m)}
-            >
-              {m === "translate" ? "Move" : m === "rotate" ? "Rotate" : "Scale"}
-            </button>
-          ))}
-        </div>
-        <button onClick={() => void editor.runCommand("editor.view.fit")} disabled={!player.hasScene}>
-          Fit view
-        </button>
-        <button
-          className={gizmoVisible ? "active" : ""}
-          title="Show/hide the navigation gizmo"
-          aria-pressed={gizmoVisible}
-          onClick={toggleGizmo}
-        >
-          Gizmo
-        </button>
-        <button onClick={() => void editor.runCommand("editor.history.undo")}>Undo</button>
-        <button onClick={() => void editor.runCommand("editor.history.redo")}>Redo</button>
-      </div>
+        <input
+          ref={tjzFileInputRef}
+          type="file"
+          accept=".tjz,.zip,application/zip"
+          hidden
+          onChange={(e) => {
+            void handleImportTjzFile(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
 
-      {restoredBanner && (
-        <div className="recoveryBanner">
-          <span>Restored your previous session. Edits keep autosaving.</span>
-          <span className="spacer" />
-          <button
-            onClick={() => {
-              // Load the sample directly rather than via loadUrl(): loadUrl closes over the current
-              // sceneUrl, and setSceneUrl won't have applied yet in this same tick.
-              void (async () => {
-                setSceneUrl(DEFAULT_SCENE);
-                const response = await fetch(resolveSceneHostUrl(DEFAULT_SCENE));
-                await editor.loadPayload(await response.json(), { label: DEFAULT_SCENE });
-                await recovery.clear();
-                setRestoredBanner(false);
-              })();
-            }}
-          >
-            Load sample scene
-          </button>
-          <span className="spacer" />
-          <button className="recoveryClose" aria-label="Dismiss" onClick={() => setRestoredBanner(false)}>
-            ×
-          </button>
-        </div>
-      )}
-
-      {transferMessage && (
-        <div className="recoveryBanner" role="status">
-          <span>{transferMessage}</span>
-          <span className="spacer" />
-          <button className="recoveryClose" aria-label="Dismiss transfer status" onClick={() => setTransferMessage("")}>
-            ×
-          </button>
-        </div>
-      )}
-
-      <div className="body">
-        <aside className="panel left">
-          <div className="panelTitle">Scene tree</div>
-          {/* During a reload the runtime has no scene yet, and the panel's empty state ("no objects
-              in this scene") would read as data loss rather than as work in progress. */}
-          {player.loading ? (
-            <div className="hint">{player.loadingMessage || "Loading…"}</div>
-          ) : (
-          <SceneTreePanel
-            scene={player.getSnapshot()?.scene || null}
-            revision={treeRevision}
-            selectedKey={editor.selection}
-            onSelect={selectNode}
-            // The gizmo helper is a live child of the scene; keep it out of the outliner.
-            extraRuntimeObjects={gizmoHelper ? [gizmoHelper] : undefined}
+        <main id="canvasWrap" ref={player.canvasWrapRef}>
+          <canvas
+            id="canvasContainer"
+            ref={player.canvasRef}
+            style={{ display: "block", width: "100%", height: "100%" }}
           />
+          {player.loading && (
+            <div id="loadingMask">
+              <span className="loadingMaskInner">{player.loadingMessage || "3D 场景加载中..."}</span>
+            </div>
           )}
-        </aside>
+          {!player.loading && !player.hasScene && (
+            <div id="loadingMask">
+              <span className="loadingMaskInner">No scene loaded.</span>
+            </div>
+          )}
+          {restoredBanner && (
+            <div className="restoredBannerNotice" style={{ display: "block" }}>
+              Restored your previous session.{" "}
+              <button
+                className="miniBtn"
+                onClick={() => {
+                  void (async () => {
+                    const ok = await confirmYesNo(
+                      "这会丢弃恢复的会话，改为载入示例场景。是否继续？",
+                      { title: "载入示例场景", confirmLabel: "载入示例", cancelLabel: "取消" }
+                    );
+                    if (!ok) {
+                      return;
+                    }
+                    // Load the sample directly rather than via loadUrl(): loadUrl closes over the
+                    // current sceneUrl, and setSceneUrl won't have applied yet in this same tick.
+                    setSceneUrl(DEFAULT_SCENE);
+                    const response = await fetch(resolveSceneHostUrl(DEFAULT_SCENE));
+                    await editor.loadPayload(await response.json(), { label: DEFAULT_SCENE });
+                    await recovery.clear();
+                    setRestoredBanner(false);
+                    showMessage("已载入示例场景。", "success");
+                  })();
+                }}
+              >
+                Load sample scene
+              </button>{" "}
+              <button className="miniBtn" onClick={() => setRestoredBanner(false)}>
+                ×
+              </button>
+            </div>
+          )}
+          {transferMessage && (
+            <div className="restoredBannerNotice" style={{ display: "block", top: "calc(46px + var(--dockInsetTop, 0px))" }} role="status">
+              {transferMessage}{" "}
+              <button className="miniBtn" onClick={() => setTransferMessage("")}>
+                ×
+              </button>
+            </div>
+          )}
+          <div id="messageBox" />
+        </main>
 
-        <div className="viewportWrap" ref={player.canvasWrapRef}>
-          <canvas ref={player.canvasRef} style={{ display: "block", width: "100%", height: "100%" }} />
-          {player.loading && <div className="mask">{player.loadingMessage || "Loading…"}</div>}
-          {!player.loading && !player.hasScene && <div className="mask">No scene loaded.</div>}
-        </div>
+        <LeftDock
+          pinned={pinned.leftDock}
+          onTogglePin={() => dockChrome.togglePinned("leftDock")}
+          onMouseEnter={() => setDockPeek("leftDock", true)}
+          onMouseLeave={() => setDockPeek("leftDock", false)}
+        />
 
-        <aside className="panel right">
-          <div className="panelTitle">Properties</div>
+        <RightDock
+          pinned={pinned.rightDock}
+          onTogglePin={() => dockChrome.togglePinned("rightDock")}
+          onMouseEnter={() => setDockPeek("rightDock", true)}
+          onMouseLeave={() => setDockPeek("rightDock", false)}
+        >
+          <div className="panelCard sceneTreeCard">
+            <div className="panelTitle">场景树</div>
+            {/* During a reload the runtime has no scene yet, and the panel's empty state ("no
+                objects in this scene") would read as data loss rather than as work in progress. */}
+            {player.loading ? (
+              <div className="hint">{player.loadingMessage || "Loading…"}</div>
+            ) : (
+              <SceneTreePanel
+                scene={player.getSnapshot()?.scene || null}
+                revision={treeRevision}
+                selectedKey={editor.selection}
+                onSelect={selectNode}
+                // The gizmo helper is a live child of the scene; keep it out of the outliner.
+                extraRuntimeObjects={gizmoHelper ? [gizmoHelper] : undefined}
+              />
+            )}
+          </div>
+
           <PropertyInspector
             editor={editor}
             selection={editor.selection}
@@ -336,50 +553,87 @@ export function App() {
             onChanged={() => setTreeRevision((n) => n + 1)}
           />
 
-          <div className="panelTitle">
-            Command console
-            <div className="muted" style={{ fontWeight: 400, fontSize: 11, marginTop: 2 }}>
-              selection: {editor.selection || "—"}
-            </div>
-          </div>
-
-          <div className="console">
-            <div className="line muted">Available: {commandHelp}</div>
-            {editor.log.map((entry, i) => (
-              <div key={i} className={`line ${entry.kind}`}>
-                {entry.kind === "in" ? "› " : ""}
-                {entry.text}
+          {/* Command console: a dev affordance this app adds beyond the original chrome, so every
+              editor.* command is reachable without a UI for it yet. Not part of _shell-body.html. */}
+          <div className="panelCard">
+            <div className="panelTitle">
+              Command console
+              <div className="muted" style={{ fontWeight: 400, fontSize: 11, marginTop: 2 }}>
+                selection: {editor.selection || "—"}
               </div>
-            ))}
-            <div ref={consoleEndRef} />
-          </div>
-
-          <div className="consoleBar">
-            <input
-              value={commandLine}
-              placeholder="editor.view.fit"
-              onChange={(e) => setCommandLine(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
+            </div>
+            <div className="console">
+              <div className="line muted">Available: {commandHelp}</div>
+              {editor.log.map((entry, i) => (
+                <div key={i} className={`line ${entry.kind}`}>
+                  {entry.kind === "in" ? "› " : ""}
+                  {entry.text}
+                </div>
+              ))}
+              <div ref={consoleEndRef} />
+            </div>
+            <div className="consoleBar">
+              <input
+                className="editorThemedField"
+                value={commandLine}
+                placeholder="editor.view.fit"
+                onChange={(e) => setCommandLine(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    void editor.runCommand(commandLine);
+                    setCommandLine("");
+                  }
+                }}
+              />
+              <button
+                className="toolBtn"
+                onClick={() => {
                   void editor.runCommand(commandLine);
                   setCommandLine("");
-                }
-              }}
-            />
-            <button
-              className="primary"
-              onClick={() => {
-                void editor.runCommand(commandLine);
-                setCommandLine("");
-              }}
-              disabled={!commandLine.trim()}
-            >
-              Run
-            </button>
-            <button onClick={editor.clearLog}>Clear</button>
+                }}
+                disabled={!commandLine.trim()}
+              >
+                Run
+              </button>
+              <button className="toolBtn secondary" onClick={editor.clearLog}>
+                Clear
+              </button>
+            </div>
           </div>
-        </aside>
+        </RightDock>
       </div>
+
+      <BottomBar
+        gizmoVisible={gizmoVisible}
+        onToggleGizmo={toggleGizmo}
+        gridVisible={gridVisible}
+        onToggleGrid={toggleGrid}
+        axesVisible={axesVisible}
+        onToggleAxes={toggleAxes}
+      />
+      <ConfirmModal
+        state={confirmState}
+        onCancel={() => confirmState?.resolve(false)}
+        onConfirm={() => confirmState?.resolve(true)}
+      />
+      {settingsOpen && (
+        <SettingsModal onClose={() => setSettingsOpen(false)} showToast={showMessage} />
+      )}
+      {meshExportOpen && (
+        <MeshExportDialog
+          getSceneSnapshot={() => {
+            const snap = player.getSnapshot();
+            return snap?.scene ? { scene: snap.scene, renderer: snap.renderer, currentLabel: "scene" } : null;
+          }}
+          onClose={() => setMeshExportOpen(false)}
+          onExported={(detail) => {
+            showMessage(
+              detail.warnings?.length ? `已导出（含 ${detail.warnings.length} 项警告）：${detail.fileName}` : "已导出。",
+              detail.warnings?.length ? "warning" : "success"
+            );
+          }}
+        />
+      )}
     </div>
   );
 }

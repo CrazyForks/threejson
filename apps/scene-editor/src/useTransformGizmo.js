@@ -5,15 +5,17 @@
  * object's own position/rotation/scale), so the job here is to fold that raw mutation back into the
  * command/history pipeline rather than let it bypass it:
  *
- *  - on drag start: disable orbit controls (so a drag doesn't also spin the camera) and
- *    `beginHistoryStep()` — snapshot the document so the whole drag is one undo;
+ *  - on drag start: disable orbit controls (so a drag doesn't also spin the camera); the caller's
+ *    onDragStart records the object's pre-drag position/rotation/scale so the whole drag becomes
+ *    one undo entry, not one per intermediate frame;
  *  - on drag end: `syncBoxModelTransformFromObject3D` writes the live transform back into the
  *    object's descriptor (the scene exporter reads the descriptor, not the live matrix — without
- *    this the drag would vanish on the next reload), then `commitRuntimeToDocument()` makes it
- *    authoritative, and `onCommit` refreshes the tree + inspector.
+ *    this the drag would vanish on the next reload), then the caller's onCommit pairs the recorded
+ *    before with the post-drag transform into one per-object "transform" history entry
+ *    (useEditorHistory.js), calls `commitRuntimeToDocument()`, and refreshes the tree + inspector.
  *
- * That mirrors the inspector's beginHistoryStep → mutate → commit bracket, so a gizmo drag and a
- * typed `object.patch` produce the same document and the same undo entry.
+ * That mirrors the inspector's read-before → mutate → read-after → push-entry bracket, so a gizmo
+ * drag and a typed `object.patch` end up in the same kind of undo entry (scoped to one object).
  *
  * Kept as app code: TransformControls is inherently DOM/canvas-bound and this is the only app with a
  * viewport it can attach to, so there is no second consumer to extract for.
@@ -29,7 +31,7 @@ import { syncBoxModelTransformFromObject3D } from "threejson";
  * @param {any} params.object the live Object3D to manipulate, or null to detach.
  * @param {"translate"|"rotate"|"scale"} params.mode
  * @param {boolean} params.enabled
- * @param {() => void} params.onDragStart snapshot hook (beginHistoryStep).
+ * @param {() => void} params.onDragStart pre-drag capture hook (records position/rotation/scale).
  * @param {() => void | Promise<void>} params.onCommit fold-back hook (sync + commit + refresh).
  * @returns {{ helper: any | null }} the gizmo helper Object3D, so the caller can hide it from the
  *   scene tree via SceneTreePanel's extraRuntimeObjects.

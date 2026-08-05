@@ -49,6 +49,7 @@ tools/scene-host/desktop/dist/
 tools/scene-host/desktop/dist-build/
 tools/scene-host/desktop/dist-installer/
 /tests/fixtures/ai-test/out/
+BAD_TEMP/
 
 # ==========================================
 # Logs and runtime diagnostics

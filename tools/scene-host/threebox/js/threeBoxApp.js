@@ -245,8 +245,22 @@ async function main() {
     shouldUsePreviewAuxiliaryLights: () =>
       settingsModal.getSettings()?.general?.previewAuxiliaryLights !== false,
     assetGateway: () => {
-      const baseUrl = settingsModal.getSettings()?.general?.assetGatewayUrl?.trim();
-      return baseUrl ? { baseUrl } : null;
+      const settings = settingsModal.getSettings();
+      const baseUrl = settings?.general?.assetGatewayUrl?.trim();
+      if (!baseUrl) {
+        return null;
+      }
+      // The gateway may be configured to require an API key (see threebox-server's asset-gateway
+      // admin setting); proxied URLs are loaded as plain <img>/texture `src` GETs with no
+      // Authorization header, so the key has to travel as a query param instead (see
+      // core/util/assetGateway.js). Only attach it when the gateway is the same built-in backend
+      // the key was issued for — never send our trial key to an arbitrary self-hosted gateway URL.
+      const builtinBackendUrl = String(settings?.ai?.builtinBackendUrl || "").replace(/\/$/, "");
+      const isBuiltinGateway = builtinBackendUrl && baseUrl.replace(/\/$/, "") === builtinBackendUrl;
+      const apiKey = isBuiltinGateway
+        ? settings?.ai?.providers?.find((provider) => provider.provider === "threebox-builtin")?.apiKey
+        : "";
+      return apiKey ? { baseUrl, apiKey } : { baseUrl };
     }
   });
 

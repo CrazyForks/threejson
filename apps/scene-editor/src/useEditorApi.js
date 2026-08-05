@@ -8,13 +8,17 @@
  * dispatch them, but nothing about how this particular app stores selection or renders a scene.
  * The app supplies that here, and gets the whole command surface for free.
  *
- * Scope note: `undo`/`redo` are wired to a simple payload-snapshot stack rather than the original
- * editor's `editorHistory` (677 lines of per-object inverse operations, which is app-local and not
- * part of any package). It is honest history for whole-scene ingests, not per-property undo.
+ * Undo/redo is a per-operation inverse stack (useEditorHistory.js, ported from the original
+ * editor's editorHistory.js), not a whole-document snapshot: each object edit records that one
+ * object's before/after state, and undo/redo re-applies just that object via `object.patch`. A
+ * full scene load (open/import/restore) resets the stack outright rather than pushing an entry —
+ * see applyPayload — matching the original's behavior for an ordinary scene open.
  */
 import { useCallback, useMemo, useRef, useState } from "react";
 import { createCommandContext, createCommandRegistry, executeCommand } from "threejson/core";
 import { registerEditorCommands } from "@threejson/editor-kit/command";
+import { useEditorHistory } from "./lib/useEditorHistory.js";
+import { getEditorSettings } from "./lib/useEditorSettings.js";
 
 export function useEditorApi(player) {
   const [selection, setSelectionState] = useState(null);
@@ -29,8 +33,9 @@ export function useEditorApi(player) {
   const playerRef = useRef(player);
   playerRef.current = player;
   const payloadRef = useRef(null);
-  const undoStack = useRef([]);
-  const redoStack = useRef([]);
+  const history = useEditorHistory({
+    maxDepth: Math.min(500, Math.max(1, Math.round(Number(getEditorSettings().editing.historyMaxDepth) || 50)))
+  });
   const selectionRef = useRef(null);
   selectionRef.current = selection;
 
@@ -48,6 +53,13 @@ export function useEditorApi(player) {
     []
   );
 
+  // applyHistoryEntry needs `registry`/`commitRuntimeToDocument`, both defined after `editorApi` —
+  // and `editorApi.undo`/`redo` (part of the EditorApi contract editor-kit's command layer calls)
+  // are fixed once at editorApi's creation. The ref indirection lets `editorApi.undo/redo` always
+  // reach the *current* applyHistoryEntry closure without editorApi itself needing to be recreated
+  // every render (which would also recreate `registry`, tearing down registered commands).
+  const applyHistoryEntryRef = useRef(null);
+
   const editorApi = useMemo(() => {
     const api = {
       getCommandContext() {
@@ -63,11 +75,10 @@ export function useEditorApi(player) {
 
       async ingest(nextPayload, options = {}) {
         try {
-          if (!options.historyReplay && payloadRef.current) {
-            undoStack.current.push(payloadRef.current);
-            redoStack.current.length = 0;
-          }
           await applyPayload(nextPayload, { label: options.label });
+          // A full load opens a (possibly different) scene — matches the original editor's
+          // resetForFullSceneLoad: history is per-scene, not carried across an open/import/restore.
+          history.clear();
           return { ok: true };
         } catch (error) {
           return { ok: false, error: String(error?.message || error) };
@@ -84,27 +95,11 @@ export function useEditorApi(player) {
       },
 
       async undo() {
-        const prev = undoStack.current.pop();
-        if (!prev) {
-          return { ok: false };
-        }
-        if (payloadRef.current) {
-          redoStack.current.push(payloadRef.current);
-        }
-        await applyPayload(prev, { label: "undo" });
-        return { ok: true };
+        return history.undo((entry, direction) => applyHistoryEntryRef.current?.(entry, direction));
       },
 
       async redo() {
-        const next = redoStack.current.pop();
-        if (!next) {
-          return { ok: false };
-        }
-        if (payloadRef.current) {
-          undoStack.current.push(payloadRef.current);
-        }
-        await applyPayload(next, { label: "redo" });
-        return { ok: true };
+        return history.redo((entry, direction) => applyHistoryEntryRef.current?.(entry, direction));
       },
 
       fitView() {
@@ -119,6 +114,7 @@ export function useEditorApi(player) {
       }
     };
     return api;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applyPayload]);
 
   // One registry per app instance, seeded with the core commands and then extended with
@@ -134,13 +130,10 @@ export function useEditorApi(player) {
    *
    * Core mutations (`object.patch`, `material.patch`) apply to the live scene and do **not** write
    * through to the payload the scene was loaded from. Left alone that has two consequences: the
-   * edits vanish on any reload, and history is a lie — an "undo" that re-ingests the untouched
-   * document appears to work only because it throws the runtime edits away, while redo has nothing
-   * to reapply. Re-serialising the scene after each edit makes the document authoritative again, so
-   * both directions of history operate on real before/after states.
-   *
-   * Cost is a full scene serialisation per edit. Acceptable for an editor; the alternative is
-   * per-property inverse operations (the original editor's editorHistory).
+   * edits vanish on any reload, and export/session-recovery would see stale data. Re-serialising
+   * the scene after each edit makes the document authoritative again. Undo/redo no longer depends
+   * on this for its own correctness (each history entry carries its own before/after state), but
+   * export, autosave, and the "committed document" concept it backs still do.
    */
   const commitRuntimeToDocument = useCallback(async () => {
     const ctx = editorApi.getCommandContext();
@@ -156,27 +149,45 @@ export function useEditorApi(player) {
   }, [editorApi, registry]);
 
   /**
-   * Records the current document so the next mutation can be undone.
-   *
-   * Core mutations (`object.patch`, `material.patch`, …) edit `ctx.document` — which *is*
-   * payloadRef.current — in place, and they do not go through `ingest`, so nothing would otherwise
-   * reach the undo stack. Callers about to mutate should snapshot first. The clone is essential:
-   * keeping the same reference would push an object that the patch then edits underneath us,
-   * making undo a no-op.
-   *
-   * This is whole-document undo, not the original editor's per-property inverse operations, so an
-   * undo reloads the scene. Correct, and coarser than the original.
+   * Applies one history entry's before/after state to its target object via `object.patch`,
+   * mirroring the original editor's applyTransformEntry/applyObjJsonSnapshotEntry: only the one
+   * object named by the entry is touched, not the whole document. `object.patch`'s
+   * `options.autoRedeploy` (on by default) handles the original's manual needsRedeploy/
+   * redeployObject step.
    */
-  const beginHistoryStep = useCallback(() => {
-    const current = payloadRef.current;
-    if (!current) {
-      return;
+  applyHistoryEntryRef.current = async (entry, direction) => {
+    if (entry?.kind !== "objectSnapshot" && entry?.kind !== "transform") {
+      return false;
     }
-    const copy =
-      typeof structuredClone === "function" ? structuredClone(current) : JSON.parse(JSON.stringify(current));
-    undoStack.current.push(copy);
-    redoStack.current.length = 0;
-  }, []);
+    const target = direction === "undo" ? entry.before : entry.after;
+    if (!target) {
+      return false;
+    }
+    const label = direction === "undo" ? "撤销" : "重做";
+    appendLog({ kind: "in", text: `${label}: ${entry.label || entry.kind} (${entry.threeJsonId})` });
+    const ctx = editorApi.getCommandContext();
+    const result = await executeCommand(
+      ctx,
+      { op: "object.patch", args: { id: entry.threeJsonId, partial: target } },
+      { registry }
+    );
+    if (result?.ok === false) {
+      appendLog({ kind: "err", text: `${label} failed: ${result?.error || "object.patch failed"}` });
+      return false;
+    }
+    await commitRuntimeToDocument();
+    setSelectionState(entry.threeJsonId);
+    appendLog({ kind: "out", text: JSON.stringify(result) });
+    return true;
+  };
+
+  /** Records one object's before/after descriptor (or transform) onto the undo stack. */
+  const pushHistoryEntry = useCallback(
+    (entry) => {
+      history.push(entry);
+    },
+    [history]
+  );
 
   /**
    * Runs a structured command ({ op, args }) through the registry.
@@ -236,8 +247,8 @@ export function useEditorApi(player) {
     registry,
     runCommand,
     runCommandObject,
-    beginHistoryStep,
     commitRuntimeToDocument,
+    pushHistoryEntry,
     log,
     clearLog: () => setLog([]),
     selection,
@@ -245,8 +256,8 @@ export function useEditorApi(player) {
     payload,
     sceneVersion,
     loadPayload: (next, opts) => editorApi.ingest(next, opts),
-    canUndo: undoStack.current.length > 0,
-    canRedo: redoStack.current.length > 0,
+    canUndo: history.canUndo,
+    canRedo: history.canRedo,
     undo: () => editorApi.undo(),
     redo: () => editorApi.redo()
   };

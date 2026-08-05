@@ -38,6 +38,12 @@ function buildProxyUrl(url, config, context) {
   const target = new URL(endpoint, baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`);
   target.searchParams.set("url", url);
   target.searchParams.set("kind", context.kind);
+  // Proxied asset URLs are embedded directly as <img>/texture/media `src` values — the browser
+  // fetches them as plain GETs with no way to attach an `Authorization` header. If the gateway
+  // requires an API key, it must therefore travel as a query param instead of a header, or every
+  // deployment with "require API key" turned on would silently 401 on every texture/media load.
+  const apiKey = String(config.apiKey || "").trim();
+  if (apiKey) target.searchParams.set("key", apiKey);
   return target.href;
 }
 
