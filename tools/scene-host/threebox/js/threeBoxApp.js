@@ -533,6 +533,15 @@ async function main() {
           } else if (phase?.phase === "processing") {
             streaming.processing();
             await waitForStatusPaint();
+          } else if (phase?.phase === "capability-review") {
+            // Fires after the draft (onSceneDraft below) is already on the canvas — a second,
+            // un-streamed round trip that can take as long as the original generation. Without
+            // this the composer just sits on a stale "正在生成…" with no visible activity; see
+            // core/ai/sceneAiService.js's maybeApplyCapabilityReview.
+            if (typeof streaming.processing === "function") {
+              streaming.processing(t("threebox.app.capabilityReview", "正在校验场景是否充分使用相关能力…"));
+            }
+            await waitForStatusPaint();
           }
         },
         onSceneDraft: !agentOptions.enabled

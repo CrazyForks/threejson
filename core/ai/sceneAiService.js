@@ -806,11 +806,28 @@ async function maybeApplyCapabilityReview(prompt, sceneJsonString, options = {})
     if (fit.ok) {
       break;
     }
+    // This is a second, un-streamed LLM round trip after the draft already shown via
+    // `onSceneDraft` above — it can take as long as (or longer than) the original generation, so
+    // hosts need a phase event here or the UI just sits on a stale "generating…" status with no
+    // visible activity for minutes (see the `capability-review` phase handling in host apps).
+    await emitSceneGenerationPhase(options, { phase: "capability-review", attempt, gaps: fit.gaps });
     const fixPrompt = buildCapabilityFixPrompt(prompt, fit);
-    current = await requestUpdatedSceneJsonString(fixPrompt, current, {
-      ...stripChatTransportOptions(options),
-      maxTokens: options.capabilityReviewMaxTokens || options.maxTokens || DEFAULT_GENERATE_MAX_TOKENS
-    });
+    try {
+      current = await requestUpdatedSceneJsonString(fixPrompt, current, {
+        ...stripChatTransportOptions(options),
+        maxTokens: options.capabilityReviewMaxTokens || options.maxTokens || DEFAULT_GENERATE_MAX_TOKENS
+      });
+    } catch (error) {
+      // This review pass only ever *improves* capability usage on top of an already-valid,
+      // already-rendered draft — it must never be able to turn a good draft into a reported
+      // generation failure. Respect an explicit user-initiated stop; swallow anything else
+      // (timeout, transient network/provider error, malformed fix response) and keep the last
+      // known-good scene instead of discarding it.
+      if (options.signal?.aborted) {
+        throw error;
+      }
+      break;
+    }
   }
   return current;
 }

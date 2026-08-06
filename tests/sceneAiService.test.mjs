@@ -819,6 +819,76 @@ test("a compact full-regeneration cutoff fails after two requests instead of bli
   assert.equal(requestCount, 2);
 });
 
+test("a failed capability-review pass keeps the already-drafted scene instead of failing the whole turn", async () => {
+  // The prompt asks for a visible text label; the drafted scene only carries it as metadata
+  // (no objType:"text" item), so evaluateCapabilityFit reports a gap and generateSceneJsonString
+  // attempts one capability-review round trip to fix it.
+  const draftScene = JSON.stringify({
+    threeJsonId: "cabin-scene",
+    objectList: [{ threeJsonId: "cabin", objType: "box", label: "森林之家" }]
+  });
+  const prompt = "在小木屋门口添加文字'森林之家'";
+  const phases = [];
+  let requestCount = 0;
+  globalThis.fetch = async () => {
+    requestCount += 1;
+    if (requestCount === 1) {
+      return {
+        ok: true,
+        async json() {
+          return { choices: [{ message: { content: `${draftScene}\n<<<THREEJSON_COMPLETE>>>` } }] };
+        }
+      };
+    }
+    // The capability-review round trip fails (network error, provider timeout, etc.) — this must
+    // never discard the perfectly valid draft that was already shown to the user.
+    throw new Error("network down");
+  };
+
+  const output = await generateSceneJsonString(prompt, {
+    provider: "chatgpt",
+    apiKey: "test-key",
+    onGenerationPhase: (detail) => phases.push(detail.phase)
+  });
+
+  assert.equal(requestCount, 2);
+  assert.ok(phases.includes("capability-review"));
+  assert.equal(JSON.parse(output).threeJsonId, "cabin-scene");
+});
+
+test("an explicitly aborted capability-review pass still propagates the abort", async () => {
+  const draftScene = JSON.stringify({
+    threeJsonId: "cabin-scene",
+    objectList: [{ threeJsonId: "cabin", objType: "box", label: "森林之家" }]
+  });
+  const prompt = "在小木屋门口添加文字'森林之家'";
+  const controller = new AbortController();
+  let requestCount = 0;
+  globalThis.fetch = async () => {
+    requestCount += 1;
+    if (requestCount === 1) {
+      return {
+        ok: true,
+        async json() {
+          return { choices: [{ message: { content: `${draftScene}\n<<<THREEJSON_COMPLETE>>>` } }] };
+        }
+      };
+    }
+    controller.abort();
+    const error = new Error("aborted");
+    error.name = "AbortError";
+    throw error;
+  };
+
+  await assert.rejects(
+    generateSceneJsonString(prompt, {
+      provider: "chatgpt",
+      apiKey: "test-key",
+      signal: controller.signal
+    })
+  );
+});
+
 test("generateSceneJsonString streams an ordinary scene directly without marker buffering", async () => {
   const scene = '{"threeJsonId":"streamed-segment","sceneConfig":{"scene":{"background":"#111111"}}}';
   const streamedPieces = [scene.slice(0, 30), scene.slice(30)];
