@@ -1110,6 +1110,47 @@ async function updateSceneJsonString(prompt, currentSceneJsonString, options = {
 }
 
 /**
+ * Best-effort: interpret `rawContent` as an RFC 6902 JSON Patch against `currentSceneJsonString`
+ * and apply it locally (no extra LLM round trip). Returns `null` (not a throw) whenever the
+ * content isn't a patch or doesn't apply cleanly, so callers can fall through to their next
+ * fallback (e.g. a full-JSON regeneration call) without special-casing "not a patch" as an error.
+ * This is the second-cheapest output the commands-preferring update pipeline accepts — after
+ * commands, before a full scene JSON rewrite — see requestUpdatedSceneEditCommands's call sites.
+ * @param {string} rawContent
+ * @param {string} currentSceneJsonString
+ * @param {object} options
+ * @returns {{outputMode:"patch", patch: object[], sceneJsonString: string, rawContent: string}|null}
+ */
+function tryApplyContentAsPatch(rawContent, currentSceneJsonString, options) {
+  if (!currentSceneJsonString) {
+    return null;
+  }
+  let patch;
+  try {
+    patch = extractPatchOperations(rawContent);
+  } catch (_error) {
+    return null;
+  }
+  if (!isRfc6902PatchList(patch)) {
+    return null;
+  }
+  let currentSceneObj;
+  try {
+    currentSceneObj = parseSceneJsonString(currentSceneJsonString);
+  } catch (_error) {
+    return null;
+  }
+  const applied = applySceneJsonPatch(currentSceneObj, patch);
+  if (!applied.ok) {
+    return null;
+  }
+  const sceneJsonString = prettyJson(
+    projectSceneOutputObject(applied.scene, options?.outputFormat, options)
+  );
+  return { outputMode: "patch", patch, sceneJsonString, rawContent: String(rawContent || "") };
+}
+
+/**
  * Request scene edit commands from LLM (core scene.* / object.* only).
  * @param {string} prompt Modification request
  * @param {object} [context={}] objectList, selectionId, selectionDescriptor, fullSceneJson, currentSceneJsonString
@@ -1199,6 +1240,16 @@ async function requestUpdatedSceneEditCommands(prompt, context = {}, options = {
 
   const fallbackToJson = options.fallbackToJson !== false;
   const tryJsonFallback = async (reason) => {
+    // Before paying for an entirely fresh full-JSON regeneration call, check whether the model's
+    // existing response is actually a small RFC 6902 JSON Patch against the current scene — a
+    // second, cheaper-than-full-JSON incremental output the model is allowed to use (see
+    // buildSceneCommandAutoUpdateSystemPrompt's "auto" prompt). Applying it locally (no extra LLM
+    // round trip) keeps the whole point of the commands-first pipeline intact: never ask the model
+    // to re-emit the entire scene when a small patch would do.
+    const patchAttempt = tryApplyContentAsPatch(content, currentSceneJsonString, options);
+    if (patchAttempt) {
+      return patchAttempt;
+    }
     if (!fallbackToJson || !currentSceneJsonString) {
       throw new Error(reason);
     }

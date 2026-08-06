@@ -467,22 +467,19 @@ async function main() {
     streaming.processing(t("threebox.chat.generating", "正在生成…"));
     let streamBuffer = "";
     const agentOptions = resolveThreeBoxAgentOptions(settings);
-    const progressiveSceneCard = agentOptions.enabled ? createConfiguredSceneCard() : null;
-    const sceneCard = progressiveSceneCard || createConfiguredSceneCard();
+    // Generation is always draft-then-incrementally-refine now (see core/ai/sceneAgent.js's module
+    // docblock) — there is no more "agent enabled" branch, so this is the only scene card and it
+    // always renders progressively: the draft first (onSceneDraft below), then every subsequent
+    // refine/review round's stage_preview/scene_ready progress event (queueScenePreview below).
+    const sceneCard = createConfiguredSceneCard();
     let draftPreviewStarted = false;
     let draftPreviewPromise = null;
     let previewRenderQueue = Promise.resolve();
     let previewQueueOpen = true;
     let lastQueuedPreviewJson = "";
-    if (progressiveSceneCard) {
-      api.appendToBody(textEl, progressiveSceneCard.el);
-    } else {
-      // Mount the card before the final AI post-processing finishes. A validated draft can begin
-      // deploying while capability review / final projection continues in the background.
-      api.appendToBody(textEl, sceneCard.el);
-    }
+    api.appendToBody(textEl, sceneCard.el);
     const queueScenePreview = (sceneJsonString) => {
-      if (!progressiveSceneCard || !sceneJsonString || sceneJsonString === lastQueuedPreviewJson) {
+      if (!sceneJsonString || sceneJsonString === lastQueuedPreviewJson) {
         return;
       }
       lastQueuedPreviewJson = sceneJsonString;
@@ -494,7 +491,7 @@ async function main() {
           if (!previewQueueOpen) {
             return null;
           }
-          return progressiveSceneCard.render(JSON.parse(sceneJsonString), { label: text });
+          return sceneCard.render(JSON.parse(sceneJsonString), { label: text, draft: true });
         });
     };
     const updateAgentProgress = createAgentProgressUpdater(streaming, queueScenePreview);
@@ -544,20 +541,18 @@ async function main() {
             await waitForStatusPaint();
           }
         },
-        onSceneDraft: !agentOptions.enabled
-          ? (draftJsonString) => {
-              if (draftPreviewStarted || !draftJsonString) {
-                return;
-              }
-              draftPreviewStarted = true;
-              draftPreviewPromise = Promise.resolve()
-                .then(() => sceneCard.render(JSON.parse(draftJsonString), { label: text }))
-                .catch((error) => {
-                  console.warn("[threebox] draft preview render failed:", error);
-                  return null;
-                });
-            }
-          : undefined,
+        onSceneDraft: (draftJsonString) => {
+          if (draftPreviewStarted || !draftJsonString) {
+            return;
+          }
+          draftPreviewStarted = true;
+          draftPreviewPromise = Promise.resolve()
+            .then(() => sceneCard.render(JSON.parse(draftJsonString), { label: text, draft: true }))
+            .catch((error) => {
+              console.warn("[threebox] draft preview render failed:", error);
+              return null;
+            });
+        },
         agentOptions,
         onAgentProgress: updateAgentProgress,
         includeReferenceLinks: settings.ai?.attachReferenceLinks !== false,
@@ -617,18 +612,15 @@ async function main() {
         sceneCard.setLabel(title || text);
         return title;
       });
-      if (progressiveSceneCard) {
-        // A finished JSON result must not sit behind obsolete draft renders. Closing the queue
-        // prevents previews that have not started yet from touching the card; render()'s sequence
-        // guard supersedes the one preview that may already be in flight.
-        previewQueueOpen = false;
-        void previewRenderQueue.catch((error) => {
-          console.warn("[threebox] superseded agent preview render failed:", error);
-        });
-        await sceneCard.render(outputSceneJson, { label: text });
-      } else {
-        await sceneCard.render(outputSceneJson, { label: text });
-      }
+      // A finished result must not sit behind obsolete draft renders. Closing the queue prevents
+      // previews that have not started yet from touching the card; render()'s sequence guard
+      // supersedes the one preview that may already be in flight. `draft` unset (not true) clears
+      // the "still refining" badge — the turn is genuinely done now.
+      previewQueueOpen = false;
+      void previewRenderQueue.catch((error) => {
+        console.warn("[threebox] superseded agent preview render failed:", error);
+      });
+      await sceneCard.render(outputSceneJson, { label: text });
       sceneCardsByTurnId.set(turnId, sceneCard);
 
       const sceneTitle = await resolvedTitlePromise;

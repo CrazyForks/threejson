@@ -55,14 +55,14 @@ export function isProviderVisionCapable(provider) {
   return isProviderVisionCapableShared(provider);
 }
 
+/**
+ * There is no more "enable multi-turn agent" toggle — draft-then-incremental-refine is the only
+ * generation/adjustment behavior now (see core/ai/sceneAgent.js's module docblock). The only
+ * thing left to resolve from settings is how many automatic refine rounds are allowed before the
+ * round budget kicks in (the model can always finish earlier via `# done`).
+ */
 export function resolveThreeBoxAgentOptions(settings = {}) {
-  const agent = settings?.agent || {};
-  return {
-    enabled: agent.enabled === true,
-    depth: agent.depth || settings?.ai?.agentDepth || "medium",
-    iterativeApply: agent.iterativeAdjust !== false,
-    progressiveGenerate: agent.progressiveGenerate !== false
-  };
+  return { maxRefineRounds: settings?.ai?.maxAutoRefineRounds };
 }
 
 export function buildResultDigest(sceneJson) {

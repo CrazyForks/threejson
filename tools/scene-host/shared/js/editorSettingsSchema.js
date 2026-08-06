@@ -146,9 +146,13 @@ export const EDITOR_SETTINGS_DEFAULTS = {
       providers: [],
       defaultProviderId: "",
       builtinBackendUrl: DEFAULT_BUILTIN_BACKEND_URL,
-      agentEnabled: false,
-      agentDepth: "medium",
-      agentIterativeApply: false,
+      // Generation/adjustment is always draft-then-incrementally-refine now — there is no more
+      // on/off "Agent" toggle or depth preset (see core/ai/sceneAgent.js's module docblock). This
+      // is the one knob left: how many automatic refine rounds the model gets before the round
+      // budget stops it (it can always finish earlier by saying it's done). Default matches
+      // core/ai/sceneAgent.js's DEFAULT_MAX_REFINE_ROUNDS; the hard ceiling (60) is enforced there
+      // regardless of what's configured here.
+      maxAutoRefineRounds: 20,
       agentFitViewEachRound: false,
       incrementalUpdate: false,
       updateOutputMode: "auto",
@@ -814,20 +818,14 @@ export const EDITOR_SETTINGS_FIELDS = [
       placeholder: "https://api.threebox.org",
       testEndpoint: "builtinBackend"
     },
-    { section: "ai", path: "ai.agentEnabled", type: "checkbox", label: "启用 Agent" },
-    { section: "ai", path: "ai.agentIterativeApply", type: "checkbox", label: "迭代应用到画布" },
     { section: "ai", path: "ai.agentFitViewEachRound", type: "checkbox", label: "每轮变更后自适应取景" },
     {
       section: "ai",
-      path: "ai.agentDepth",
-      type: "select",
-      label: "Agent 深度",
-      options: [
-        { value: "simple", label: "simple" },
-        { value: "medium", label: "medium" },
-        { value: "deep", label: "deep" },
-        { value: "auto", label: "auto" }
-      ]
+      path: "ai.maxAutoRefineRounds",
+      type: "number",
+      label: "自动细化最大轮数",
+      min: 1,
+      max: 60
     },
     {
       section: "ai",

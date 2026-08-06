@@ -15,8 +15,6 @@
  * the result in here.
  */
 import {
-  generateSceneJsonString,
-  generateSceneJsonFromImage,
   parseSceneJsonString,
   runSceneAgent,
   classifyTurnIntent,
@@ -99,14 +97,17 @@ export function buildResultDigest(sceneJson) {
 }
 
 /**
- * First-turn (no prior context) generation: builds the structured JSON envelope and calls
- * core/ai's generateSceneJsonString with streaming enabled.
- * @param {{ userPrompt: string, providerOptions: object, onDelta?: (delta:string)=>void, onGenerationPhase?: (phase:object)=>void|Promise<void>, onSceneDraft?: (sceneJsonString:string)=>void|Promise<void>, signal?: AbortSignal, globalPromptPrefix?: string, agentOptions?: object, onAgentProgress?: (p: object)=>void, includeReferenceLinks?: boolean, locale?: string, onlineTextureHints?: boolean, generationStrategy?: "single"|"segmented"|"compact", estimatedSegments?: number, maxSceneSegments?: number }} input
+ * First-turn (no prior context) generation: builds the structured JSON envelope and always runs
+ * it through core/ai's runSceneAgent — draft first (small, structurally can't truncate), then
+ * automatic incremental refine rounds until the model says `# done` or the round budget runs out
+ * (see core/ai/sceneAgent.js's module docblock). There is no more "single-turn" bypass: a one-shot
+ * full-scene-JSON generation is exactly the pattern that made complex scenes truncate/fail, so
+ * it's no longer a mode a caller can opt back into here.
+ * @param {{ userPrompt: string, providerOptions: object, onDelta?: (delta:string)=>void, onGenerationPhase?: (phase:object)=>void|Promise<void>, onSceneDraft?: (sceneJsonString:string)=>void|Promise<void>, signal?: AbortSignal, globalPromptPrefix?: string, agentOptions?: {maxRefineRounds?: number}, onAgentProgress?: (p: object)=>void, includeReferenceLinks?: boolean, locale?: string, onlineTextureHints?: boolean, generationStrategy?: "single"|"segmented"|"compact", estimatedSegments?: number, maxSceneSegments?: number }} input
  */
 export async function runAiGenerateTurn({
   userPrompt,
   providerOptions,
-  onDelta,
   onGenerationPhase,
   onSceneDraft,
   signal,
@@ -132,53 +133,33 @@ export async function runAiGenerateTurn({
     selectedCapabilityIds,
     requiresAnimation
   });
-  if (agentOptions?.enabled) {
-    const result = await runSceneAgent(
-      { mode: "generate", prompt: envelope },
-      {
-        ...providerOptions,
-        signal,
-        agent: {
-          enabled: true,
-          depth: agentOptions.depth || "medium",
-          progressiveRefinement: agentOptions.progressiveGenerate !== false
-        },
-        resolveReferenceUrl: resolveSceneAiReferenceUrl,
-        capabilityLookup,
-        onlineTextureHints,
-        estimatedSegments,
-        segmentedOutput: generationStrategy === "segmented",
-        maxSceneSegments,
-        selectedCapabilityIds,
-        animationCapabilities: requiresAnimation === true,
-        onGenerationPhase,
-        applyDraftCommands: applyAiDraftCommands,
-        locale,
-        onProgress: onAgentProgress
-      }
-    );
-    const sceneJson = parseSceneJsonString(result.sceneJsonString);
-    return { sceneJson, sceneJsonString: result.sceneJsonString, agentResult: result };
-  }
-  const sceneJsonString = await generateSceneJsonString(envelope, {
-    ...providerOptions,
-    stream: true,
-    onDelta,
-    onGenerationPhase,
-    onSceneDraft,
-    signal,
-    resolveReferenceUrl: resolveSceneAiReferenceUrl,
-    capabilityLookup,
-    onlineTextureHints,
-    estimatedSegments,
-    segmentedOutput: generationStrategy === "segmented",
-    maxSceneSegments,
-    selectedCapabilityIds,
-    animationCapabilities: requiresAnimation === true,
-    locale
-  });
-  const sceneJson = parseSceneJsonString(sceneJsonString);
-  return { sceneJson, sceneJsonString };
+  const result = await runSceneAgent(
+    { mode: "generate", prompt: envelope },
+    {
+      ...providerOptions,
+      signal,
+      // Not `stream`/`onDelta`: this turn is now many small LLM calls (outline, draft, N refine
+      // rounds, reviews), not one big one — a single concatenated character stream across all of
+      // them would read as garbled nonsense. The draft (onSceneDraft below) plus onGenerationPhase/
+      // onProgress status text are the UI feedback now instead of raw streamed JSON text.
+      agent: { maxRefineRounds: agentOptions?.maxRefineRounds },
+      resolveReferenceUrl: resolveSceneAiReferenceUrl,
+      capabilityLookup,
+      onlineTextureHints,
+      estimatedSegments,
+      segmentedOutput: generationStrategy === "segmented",
+      maxSceneSegments,
+      selectedCapabilityIds,
+      animationCapabilities: requiresAnimation === true,
+      onGenerationPhase,
+      onSceneDraft,
+      applyDraftCommands: applyAiDraftCommands,
+      locale,
+      onProgress: onAgentProgress
+    }
+  );
+  const sceneJson = parseSceneJsonString(result.sceneJsonString);
+  return { sceneJson, sceneJsonString: result.sceneJsonString, agentResult: result };
 }
 
 /**
@@ -205,45 +186,24 @@ export async function runAiImageGenerateTurn({
   if (!image) {
     throw new Error("runAiImageGenerateTurn: image is required.");
   }
-  if (agentOptions?.enabled) {
-    const result = await runSceneAgent(
-      { mode: "fromImage", prompt, image },
-      {
-        ...providerOptions,
-        signal,
-        imageDetail,
-        maxTokens,
-        agent: {
-          enabled: true,
-          depth: agentOptions.depth || "medium",
-          progressiveRefinement: agentOptions.progressiveGenerate !== false
-        },
-        resolveReferenceUrl: resolveSceneAiReferenceUrl,
-        capabilityLookup,
-        onlineTextureHints,
-        onGenerationPhase,
-        locale,
-        onProgress: onAgentProgress
-      }
-    );
-    const sceneJson = parseSceneJsonString(result.sceneJsonString);
-    return { sceneJson, sceneJsonString: result.sceneJsonString, agentResult: result };
-  }
-  const sceneJsonString = await generateSceneJsonFromImage(
-    { prompt, image },
+  const result = await runSceneAgent(
+    { mode: "fromImage", prompt, image },
     {
       ...providerOptions,
+      signal,
       imageDetail,
       maxTokens,
-      signal,
+      agent: { maxRefineRounds: agentOptions?.maxRefineRounds },
       resolveReferenceUrl: resolveSceneAiReferenceUrl,
       capabilityLookup,
       onlineTextureHints,
-      locale
+      onGenerationPhase,
+      locale,
+      onProgress: onAgentProgress
     }
   );
-  const sceneJson = parseSceneJsonString(sceneJsonString);
-  return { sceneJson, sceneJsonString };
+  const sceneJson = parseSceneJsonString(result.sceneJsonString);
+  return { sceneJson, sceneJsonString: result.sceneJsonString, agentResult: result };
 }
 
 /**
@@ -383,7 +343,7 @@ async function runAiAgentAdjustTurn({
       {
         ...providerOptions,
         updateMode: mode.updateMode,
-        agent: { enabled: true, depth: agentOptions.depth || "medium" },
+        agent: { maxRefineRounds: agentOptions?.maxRefineRounds },
         resolveReferenceUrl: resolveSceneAiReferenceUrl,
         capabilityLookup,
         onlineTextureHints,
@@ -434,11 +394,10 @@ async function runAiAgentAdjustTurn({
       },
       {
         ...providerOptions,
-        agent: {
-          enabled: true,
-          depth: agentOptions.depth || "medium",
-          iterativeApply: agentOptions.iterativeApply !== false
-        },
+        // applyCommands/refreshContext being supplied here is what makes runSceneAgent's
+        // update-mode commands path always iterative now (see its canIterate check) — there is no
+        // more separate "iterativeApply" toggle to gate that on.
+        agent: { maxRefineRounds: agentOptions?.maxRefineRounds },
         resolveReferenceUrl: resolveSceneAiReferenceUrl,
         capabilityLookup,
         onlineTextureHints,
@@ -525,29 +484,11 @@ export async function runAiAdjustTurn({
   animationCapabilities,
   signal
 }) {
-  if (agentOptions?.enabled) {
-    return runAiAgentAdjustTurn({
-      userPrompt,
-      envelope,
-      targetSceneJsonString,
-      providerOptions,
-      agentOptions,
-      updateOutputMode,
-      resolveContextPayload,
-      onAgentProgress,
-      locale,
-      capabilityLookup,
-      onlineTextureHints,
-      selectedCapabilityIds,
-      animationCapabilities,
-      signal
-    });
-  }
-
-  // strictOutputMode forces exactly the requested single stage with no cascade — opt-in and
-  // default-off so existing callers (ThreeBox never passes it) keep the always-cascade behavior
-  // below unchanged. Used by Editor's AI-edit quick controls: "auto" (strictOutputMode left off)
-  // means "let the cascade decide"; picking a specific mode forces it.
+  // strictOutputMode forces exactly the requested single stage with no cascade and no round
+  // budget — a deliberate one-shot escape hatch, unrelated to the always-iterative behavior
+  // below. Used by Editor's AI-edit quick controls: "auto" (strictOutputMode left off) means "let
+  // the iterative loop decide"; picking a specific mode forces it. Checked first, ahead of the
+  // always-iterative default, so it stays a true escape hatch regardless of round-budget settings.
   if (strictOutputMode && updateOutputMode !== "auto") {
     if (updateOutputMode === "json-full") {
       const fullJsonString = await requestUpdatedSceneJsonString(userPrompt, targetSceneJsonString, {
@@ -639,90 +580,26 @@ export async function runAiAdjustTurn({
     }
   }
 
-  try {
-    const cmdResult = await requestUpdatedSceneEditCommands(
-      userPrompt,
-      { userMessage: envelope, currentSceneJsonString: targetSceneJsonString, fullSceneJson: targetSceneJsonString },
-      {
-        ...providerOptions,
-        outputMode: "commands",
-        fallbackToJson: false,
-        stream: true,
-        onDelta,
-        signal,
-        resolveReferenceUrl: resolveSceneAiReferenceUrl,
-        capabilityLookup,
-        onlineTextureHints,
-        selectedCapabilityIds,
-        animationCapabilities,
-        locale
-      }
-    );
-    if (cmdResult.outputMode === "commands" && cmdResult.commands?.length) {
-      const offscreenRuntime = await createOffscreenRuntimeFromSceneJsonString(targetSceneJsonString);
-      try {
-        const ctx = createCommandContext({
-          scene: offscreenRuntime.scene,
-          camera: offscreenRuntime.camera,
-          renderer: offscreenRuntime.renderer,
-          controls: offscreenRuntime.controls
-        });
-        const execResult = await executeCommands(ctx, cmdResult.commands);
-        if (execResult.results.some((r) => r.ok)) {
-          const sceneJsonString = exportRuntimeSceneJsonString(offscreenRuntime);
-          return {
-            stage: "commands",
-            commands: cmdResult.commands,
-            execResult,
-            sceneJson: parseSceneJsonString(sceneJsonString),
-            sceneJsonString
-          };
-        }
-      } finally {
-        offscreenRuntime.dispose?.();
-      }
-    }
-  } catch (_error) {
-    /* fall through to json-incremental */
-  }
-
-  try {
-    const { sceneJsonString: patchedJsonString, patch } = await requestUpdatedSceneJsonString(userPrompt, targetSceneJsonString, {
-      ...providerOptions,
-      updateMode: "incremental",
-      includePatch: true,
-      stream: true,
-      onDelta,
-      signal,
-      resolveReferenceUrl: resolveSceneAiReferenceUrl,
-      capabilityLookup,
-      onlineTextureHints,
-      selectedCapabilityIds,
-      animationCapabilities,
-      locale
-    });
-    return {
-      stage: "json-incremental",
-      patch,
-      sceneJson: parseSceneJsonString(patchedJsonString),
-      sceneJsonString: patchedJsonString
-    };
-  } catch (_error) {
-    /* fall through to json-full */
-  }
-
-  const fullJsonString = await requestUpdatedSceneJsonString(userPrompt, targetSceneJsonString, {
-    ...providerOptions,
-    updateMode: "full",
-    stream: true,
-    onDelta,
-    signal,
-    resolveReferenceUrl: resolveSceneAiReferenceUrl,
+  // Everything else always goes through the iterative agent loop now — commands preferred, JSON
+  // Patch next, a full-scene-JSON rewrite as the last resort within a round (see
+  // core/ai/sceneAgent.js's module docblock) — rather than the old "try commands once, catch and
+  // fall to incremental JSON once, catch and fall to full JSON" cascade. Whether this adjust turn
+  // was triggered automatically right after a generate turn's draft or by a typed follow-up
+  // message, it is the exact same call.
+  return runAiAgentAdjustTurn({
+    userPrompt,
+    envelope,
+    targetSceneJsonString,
+    providerOptions,
+    agentOptions,
+    updateOutputMode,
+    resolveContextPayload,
+    onAgentProgress,
+    locale,
     capabilityLookup,
     onlineTextureHints,
     selectedCapabilityIds,
     animationCapabilities,
-    locale
+    signal
   });
-  return { stage: "json-full", sceneJson: parseSceneJsonString(fullJsonString), sceneJsonString: fullJsonString };
 }

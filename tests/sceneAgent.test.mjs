@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { test, mock } from "node:test";
-import { resolveAgentDepth } from "../core/ai/agentDepth.js";
 import { validateSceneJson, listTexturePointersSummary } from "../core/ai/agentTools.js";
 import { runSceneAgent } from "../core/ai/sceneAgent.js";
 
@@ -19,12 +18,6 @@ const MINIMAL_SCENE = {
   }
 };
 
-test("resolveAgentDepth returns presets", () => {
-  assert.equal(resolveAgentDepth("medium").runOutline, true);
-  assert.equal(resolveAgentDepth("simple").maxSteps, 2);
-  assert.equal(resolveAgentDepth("unknown").maxSteps, 2);
-});
-
 test("validateSceneJson accepts minimal scene", () => {
   const r = validateSceneJson(JSON.stringify(MINIMAL_SCENE));
   assert.equal(r.ok, true);
@@ -36,19 +29,20 @@ test("listTexturePointersSummary on scene with material", () => {
   assert.equal(r.count, 1);
 });
 
-test("resolveAgentDepth auto allows multiple repair attempts", () => {
-  assert.equal(resolveAgentDepth("auto").maxRepairAttempts, 3);
-  assert.equal(resolveAgentDepth("deep").runLayoutReview, true);
-});
+// Every runSceneAgent call below now always runs the full pipeline (outline -> small draft ->
+// repair-if-invalid -> incremental refine-to-done -> capability review -> layout review) — there
+// is no more "agent disabled" bypass. "# done" replies keep the refine/review rounds from looping
+// needlessly in these tests; a fetchMock's fallback branch (anything not explicitly matched)
+// returns "# done" so any extra round a test doesn't care to assert on still terminates cleanly.
 
-test("runSceneAgent medium agent repairs invalid JSON once", async () => {
+test("runSceneAgent repairs an invalid draft once, then completes via done/reviews", async () => {
   const validScene = JSON.stringify(MINIMAL_SCENE);
   const invalidScene = JSON.stringify({ threeJsonId: "invalid", objectList: [] });
   let call = 0;
   const fetchMock = mock.fn(async () => {
     call += 1;
-    const content =
-      call === 1 ? "- floor\n- walls" : call === 2 ? invalidScene : validScene;
+    // 1: outline, 2: draft (invalid), 3: repair fix (valid), 4+: refine/review rounds all "# done"
+    const content = call === 1 ? "- floor\n- walls" : call === 2 ? invalidScene : call === 3 ? validScene : "# done";
     return {
       ok: true,
       async text() {
@@ -65,21 +59,20 @@ test("runSceneAgent medium agent repairs invalid JSON once", async () => {
     const result = await runSceneAgent(
       { mode: "generate", prompt: "floor" },
       {
-        agent: { enabled: true, depth: "medium" },
         apiKey: "test-key",
         provider: "deepseek"
       }
     );
     assert.equal(result.agentUsed, true);
     assert.ok(result.sceneJsonString.includes("objectList"));
-    assert.ok(result.steps.some((s) => s.kind === "repair"));
-    assert.ok(fetchMock.mock.calls.length >= 2);
+    assert.ok(result.steps.some((s) => s.kind === "repair" && s.ok === true));
+    assert.ok(fetchMock.mock.calls.length >= 3);
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test("runSceneAgent with agent disabled uses single-shot and agentUsed false", async () => {
+test("runSceneAgent generate always runs the agent pipeline — agentUsed is always true", async () => {
   const scenePayload = JSON.stringify(MINIMAL_SCENE);
   const fetchMock = mock.fn(async () => ({
     ok: true,
@@ -98,15 +91,54 @@ test("runSceneAgent with agent disabled uses single-shot and agentUsed false", a
     const result = await runSceneAgent(
       { mode: "generate", prompt: "a small floor" },
       {
-        agent: { enabled: false },
-        capabilityReview: false,
         apiKey: "test-key",
         provider: "deepseek"
       }
     );
-    assert.equal(result.agentUsed, false);
+    // Every call in this mock returns the same already-valid scene, so the outline is free-text,
+    // the draft is immediately valid, the draft-refinement loop sees "json" output matching the
+    // unchanged scene every round, and only stops once maxRefineRounds is exhausted — this test
+    // only cares that the pipeline always runs and eventually returns a usable scene.
+    assert.equal(result.agentUsed, true);
     assert.ok(result.sceneJsonString.includes("objectList"));
-    assert.equal(fetchMock.mock.calls.length, 1);
+    assert.ok(fetchMock.mock.calls.length >= 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("runSceneAgent respects a caller-configured maxRefineRounds cap", async () => {
+  const scenePayload = JSON.stringify(MINIMAL_SCENE);
+  let call = 0;
+  const fetchMock = mock.fn(async () => {
+    call += 1;
+    // Never says "# done" — the loop must still terminate at the configured round cap rather
+    // than spinning forever.
+    return {
+      ok: true,
+      async text() {
+        return "";
+      },
+      async json() {
+        return { choices: [{ message: { content: scenePayload } }] };
+      }
+    };
+  });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = fetchMock;
+  try {
+    const result = await runSceneAgent(
+      { mode: "generate", prompt: "a small floor" },
+      {
+        agent: { maxRefineRounds: 2 },
+        apiKey: "test-key",
+        provider: "deepseek"
+      }
+    );
+    assert.equal(result.agentUsed, true);
+    assert.ok(result.sceneJsonString.includes("objectList"));
+    // outline(1) + draft(1) + at most 2 refine rounds + capability review(<=1) + layout review(1).
+    assert.ok(fetchMock.mock.calls.length <= 6, `expected <= 6 calls, got ${fetchMock.mock.calls.length}`);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -121,19 +153,35 @@ test("runSceneAgent texture fill soft-fails and keeps scene JSON", async () => {
     },
     async json() {
       return {
-        choices: [{ message: { content: scenePayload } }]
+        choices: [{ message: { content: "# done" } }]
       };
     }
   }));
   const originalFetch = globalThis.fetch;
   globalThis.fetch = fetchMock;
   try {
+    // First real content call must produce the valid scene; every subsequent round says "# done"
+    // so refinement/review stop immediately. Swap in a one-off responder for call 2 (the draft).
+    let call = 0;
+    globalThis.fetch = mock.fn(async () => {
+      call += 1;
+      const content = call === 2 ? scenePayload : "# done";
+      return {
+        ok: true,
+        async text() {
+          return "";
+        },
+        async json() {
+          return { choices: [{ message: { content } }] };
+        }
+      };
+    });
     const result = await runSceneAgent(
       { mode: "generate", prompt: "a small floor" },
       {
-        agent: { enabled: false },
         apiKey: "test-key",
         provider: "deepseek",
+        agent: { maxRefineRounds: 1 },
         texture: {
           enabled: true,
           imageProvider: {
@@ -162,12 +210,15 @@ test("runSceneAgent update commands agent repairs invalid script", async () => {
   let call = 0;
   const fetchMock = mock.fn(async () => {
     call += 1;
+    // 1: outline (free text), 2: bad round-1 reply, 3: still-bad round-2 reply, 4: valid commands
     const content =
       call === 1
-        ? "- patch floor color"
+        ? "- outline text"
         : call === 2
-          ? "not a command script"
-          : validCommands;
+          ? "- patch floor color"
+          : call === 3
+            ? "not a command script"
+            : validCommands;
     return {
       ok: true,
       async text() {
@@ -190,7 +241,6 @@ test("runSceneAgent update commands agent repairs invalid script", async () => {
         updateContext: { objectList: [{ threeJsonId: "floor", objType: "box" }] }
       },
       {
-        agent: { enabled: true, depth: "medium" },
         apiKey: "test-key",
         provider: "deepseek"
       }
@@ -198,11 +248,9 @@ test("runSceneAgent update commands agent repairs invalid script", async () => {
     assert.equal(result.agentUsed, true);
     assert.equal(result.outputMode, "commands");
     assert.ok(Array.isArray(result.commands));
-    assert.ok(
-      result.steps.some((s) => s.ok === false) || fetchMock.mock.calls.length >= 2
-    );
+    assert.ok(result.steps.some((s) => s.ok === false));
     assert.ok(result.steps.some((s) => s.kind === "commands" && s.ok === true));
-    assert.ok(fetchMock.mock.calls.length >= 2);
+    assert.ok(fetchMock.mock.calls.length >= 3);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -262,7 +310,6 @@ test("runSceneAgent attaches local reference material to an agent commands round
         updateContext: { objectList: [{ threeJsonId: "floor", objType: "box" }] }
       },
       {
-        agent: { enabled: true, depth: "medium" },
         apiKey: "test-key",
         provider: "deepseek",
         resolveReferenceUrl: (path) => `https://ref.test/${path}`,
@@ -316,7 +363,6 @@ test("runSceneAgent update auto accepts JSON output in agent session", async () 
         outputMode: "auto"
       },
       {
-        agent: { enabled: true, depth: "simple" },
         apiKey: "test-key",
         provider: "deepseek"
       }
@@ -333,26 +379,31 @@ test("runSceneAgent update auto accepts JSON output in agent session", async () 
 test("runSceneAgent emits scene_ready before texture fill", async () => {
   const scenePayload = JSON.stringify(MINIMAL_SCENE);
   const progress = [];
-  const fetchMock = mock.fn(async () => ({
-    ok: true,
-    async text() {
-      return "";
-    },
-    async json() {
-      return {
-        choices: [{ message: { content: scenePayload } }]
-      };
-    }
-  }));
+  let call = 0;
+  const fetchMock = mock.fn(async () => {
+    call += 1;
+    const content = call === 2 ? scenePayload : "# done";
+    return {
+      ok: true,
+      async text() {
+        return "";
+      },
+      async json() {
+        return {
+          choices: [{ message: { content } }]
+        };
+      }
+    };
+  });
   const originalFetch = globalThis.fetch;
   globalThis.fetch = fetchMock;
   try {
     await runSceneAgent(
       { mode: "generate", prompt: "a small floor" },
       {
-        agent: { enabled: false },
         apiKey: "test-key",
         provider: "deepseek",
+        agent: { maxRefineRounds: 1 },
         onProgress: (p) => progress.push(p.kind),
         texture: { enabled: false }
       }
@@ -363,15 +414,14 @@ test("runSceneAgent emits scene_ready before texture fill", async () => {
   }
 });
 
-test("runSceneAgent medium agent emits stage_preview after repair", async () => {
+test("runSceneAgent emits stage_preview after repair", async () => {
   const validScene = JSON.stringify(MINIMAL_SCENE);
   const invalidScene = JSON.stringify({ threeJsonId: "invalid", objectList: [] });
   const progress = [];
   let call = 0;
   const fetchMock = mock.fn(async () => {
     call += 1;
-    const content =
-      call === 1 ? "- floor\n- walls" : call === 2 ? invalidScene : validScene;
+    const content = call === 1 ? "- floor\n- walls" : call === 2 ? invalidScene : call === 3 ? validScene : "# done";
     return {
       ok: true,
       async text() {
@@ -388,9 +438,9 @@ test("runSceneAgent medium agent emits stage_preview after repair", async () => 
     await runSceneAgent(
       { mode: "generate", prompt: "floor" },
       {
-        agent: { enabled: true, depth: "medium" },
         apiKey: "test-key",
         provider: "deepseek",
+        agent: { maxRefineRounds: 1 },
         onProgress: (p) => progress.push(p.kind)
       }
     );
@@ -401,12 +451,14 @@ test("runSceneAgent medium agent emits stage_preview after repair", async () => 
   }
 });
 
-test("runSceneAgent optionally refines a valid draft with mixed-output protocol", async () => {
+test("runSceneAgent refines a valid draft with mixed-output protocol until done", async () => {
   const initialScene = JSON.stringify(MINIMAL_SCENE);
   const replies = [
+    "- outline text",
     initialScene,
     '[{"op":"replace","path":"/objectList/0/material/color","value":"#224466"}]',
-    "# done"
+    "# done",
+    "# done" // layout review round
   ];
   const progress = [];
   const fetchMock = mock.fn(async () => ({
@@ -415,7 +467,7 @@ test("runSceneAgent optionally refines a valid draft with mixed-output protocol"
       return "";
     },
     async json() {
-      return { choices: [{ message: { content: replies.shift() } }] };
+      return { choices: [{ message: { content: replies.shift() || "# done" } }] };
     }
   }));
   const originalFetch = globalThis.fetch;
@@ -424,12 +476,7 @@ test("runSceneAgent optionally refines a valid draft with mixed-output protocol"
     const result = await runSceneAgent(
       { mode: "generate", prompt: "make a simple blockout box" },
       {
-        agent: {
-          enabled: true,
-          depth: "simple",
-          progressiveRefinement: true,
-          maxDraftRefinementRounds: 2
-        },
+        agent: { maxRefineRounds: 5 },
         apiKey: "test-key",
         provider: "deepseek",
         onProgress: (event) => progress.push(event)
@@ -439,7 +486,7 @@ test("runSceneAgent optionally refines a valid draft with mixed-output protocol"
     assert.equal(JSON.parse(result.sceneJsonString).objectList[0].material.color, "#224466");
     assert.ok(result.steps.some((step) => step.kind === "draft_refinement" && step.outputMode === "patch"));
     assert.ok(result.steps.some((step) => step.kind === "draft_refinement_done"));
-    assert.ok(progress.filter((event) => event.kind === "stage_preview").length >= 2);
+    assert.ok(progress.filter((event) => event.kind === "stage_preview").length >= 1);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -453,10 +500,13 @@ test("runSceneAgent iterative apply execs commands and skips final exec batch", 
   const progress = [];
   const fetchMock = mock.fn(async () => {
     fetchCall += 1;
+    // 1: outline, 2: round-1 commands, 3+: done
     const content =
       fetchCall === 1
-        ? 'object.patch id=floor partial={"material":{"color":"#112233"}}'
-        : "# done";
+        ? "- outline text"
+        : fetchCall === 2
+          ? 'object.patch id=floor partial={"material":{"color":"#112233"}}'
+          : "# done";
     return {
       ok: true,
       async text() {
@@ -479,7 +529,6 @@ test("runSceneAgent iterative apply execs commands and skips final exec batch", 
         updateContext: { objectList: [{ threeJsonId: "floor", objType: "box" }] }
       },
       {
-        agent: { enabled: true, depth: "simple", iterativeApply: true },
         apiKey: "test-key",
         provider: "deepseek",
         applyCommands: async (commands, meta) => {
@@ -504,6 +553,49 @@ test("runSceneAgent iterative apply execs commands and skips final exec batch", 
     assert.equal(refreshCount, 1);
     assert.ok(progress.includes("commands_applied"));
     assert.ok(progress.includes("refine"));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("runSceneAgent update commands falls back to the non-iterative runner without applyCommands/refreshContext", async () => {
+  // canIterate requires BOTH applyCommands and refreshContext — omitting them (as a bare core/ai
+  // caller with no live/offscreen runtime would) must not throw; it should use the
+  // collect-one-batch-and-return runner instead.
+  const currentScene = JSON.stringify(MINIMAL_SCENE);
+  const validCommands = 'object.patch id=floor partial={"material":{"color":"#336699"}}';
+  let call = 0;
+  const fetchMock = mock.fn(async () => {
+    call += 1;
+    const content = call === 1 ? "- outline text" : validCommands;
+    return {
+      ok: true,
+      async text() {
+        return "";
+      },
+      async json() {
+        return { choices: [{ message: { content } }] };
+      }
+    };
+  });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = fetchMock;
+  try {
+    const result = await runSceneAgent(
+      {
+        mode: "update",
+        prompt: "change floor color",
+        currentSceneJsonString: currentScene,
+        outputMode: "commands"
+      },
+      {
+        apiKey: "test-key",
+        provider: "deepseek"
+      }
+    );
+    assert.equal(result.outputMode, "commands");
+    assert.equal(result.iterativeApplied, undefined);
+    assert.ok(Array.isArray(result.commands) && result.commands.length > 0);
   } finally {
     globalThis.fetch = originalFetch;
   }

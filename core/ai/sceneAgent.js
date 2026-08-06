@@ -1,5 +1,23 @@
 /**
- * Optional multi-step scene agent. Disabled unless agent.enabled === true.
+ * Scene agent: always draft-then-incrementally-refine. There is no more "single-turn vs
+ * multi-turn agent" distinction — a one-shot full-JSON generation is exactly the pattern that
+ * made large/complex scenes truncate or fail, so it is no longer a mode you can opt into or out
+ * of here. What used to be depth-gated ("simple"/"medium"/"deep"/"auto" — see the now-removed
+ * agentDepth.js) is now a single user-configurable round budget (see normalizeAgentOptions
+ * below): the model can always finish early via `# done`, the cap only guards against a runaway
+ * loop.
+ *
+ * Two distinct round loops remain (deliberately not merged into one implementation): `generate`
+ * mode's post-draft elaboration goes through runOptionalDraftRefinement (full-scene-context,
+ * commands/patch/full-JSON/done cascade, works with or without a live runtime); `update`/adjust
+ * mode's editing loop goes through runSceneAgentCommandsUpdateIterative (cheap spatial-summary
+ * context, richer exploration/validation hooks tailored to editing an existing live scene). They
+ * share the same round-budget setting and the same patch handling (commandsFromPatchResult).
+ *
+ * Repair/capability-review/layout-review still exist (real domain knowledge lives in
+ * evaluateSceneCapabilityFit/buildLayoutReviewPrompt); capability/layout fixes now go through
+ * runTargetedFixRound, which prefers a small commands/JSON-Patch fix and only falls back to a
+ * full-scene-JSON rewrite when that isn't available or doesn't work out.
  */
 import {
   generateSceneJsonString,
@@ -17,9 +35,7 @@ import {
   commandListIsEmptyOrCommentsOnly,
   commandScriptIndicatesDone
 } from "./sceneCommandSkill.js";
-import { resolveAgentDepth } from "./agentDepth.js";
 import {
-  validateSceneJson,
   validateSceneJsonWithNormalizer,
   listTexturePointersSummary,
   requestSceneOutline,
@@ -40,14 +56,40 @@ import { fetchReferenceMaterial } from "./sceneReferenceCatalog.js";
  * @property {object} [usageEstimate]
  */
 
+/** Cheap, text-only planning call before any scene JSON is authored. */
+const OUTLINE_MAX_TOKENS = 1200;
+/** First-pass scene: deliberately small so it is structurally unable to hit an output-length
+ * truncation — a rough, correctly-structured blockout, not the finished scene. Detail is added
+ * afterward by the incremental refine loop, a small step at a time. */
+const DRAFT_MAX_TOKENS = 2200;
+/** Per-round budget for the incremental refine loop (commands / JSON Patch / a bounded full-JSON
+ * rewrite for one round when neither of those is available) — generous headroom for a single
+ * small step, still far below a whole-scene rewrite budget. */
+const REFINE_ROUND_MAX_TOKENS = 3000;
+/** Only reached when a round has no incremental-apply mechanism available at all (bare `core/ai`
+ * callers with no live/offscreen runtime) — the lowest-priority fallback, not the common path. */
+const FULL_REWRITE_MAX_TOKENS = 6000;
+/** Generous default so a complex scene has real room to converge — the model can always finish
+ * earlier via `# done`; this only guards against never finishing. User-configurable per host
+ * settings (e.g. ThreeBox's `ai.maxAutoRefineRounds`), clamped to HARD_MAX_REFINE_ROUNDS. */
+const DEFAULT_MAX_REFINE_ROUNDS = 20;
+/** Hard ceiling enforced regardless of what a caller/user configures — a stuck loop (model never
+ * emits `# done`) must still terminate. */
+const HARD_MAX_REFINE_ROUNDS = 60;
+const MAX_CAPABILITY_REVIEW_ATTEMPTS = 1;
+const MAX_REPAIR_ATTEMPTS = 2;
+
 /**
  * @param {object} agentOptions
- * @returns {{ enabled: boolean, depth: string }}
+ * @returns {{ maxRefineRounds: number }}
  */
 function normalizeAgentOptions(agentOptions = {}) {
-  const enabled = agentOptions.enabled === true;
-  const depth = agentOptions.depth || "simple";
-  return { enabled, depth };
+  const raw = Number(agentOptions?.maxRefineRounds);
+  const maxRefineRounds =
+    Number.isFinite(raw) && raw > 0
+      ? Math.max(1, Math.min(HARD_MAX_REFINE_ROUNDS, Math.round(raw)))
+      : DEFAULT_MAX_REFINE_ROUNDS;
+  return { maxRefineRounds };
 }
 
 /**
@@ -104,6 +146,20 @@ async function resolveAgentReferenceMaterial(userPrompt, chatOptions) {
   } catch (_err) {
     return "";
   }
+}
+
+/**
+ * A `requestUpdatedSceneEditCommands` result with `outputMode:"patch"` has already had its RFC
+ * 6902 patch applied locally (see sceneAiService.js's tryApplyContentAsPatch) — it just needs to
+ * reach the runtime. Wrapping the already-patched JSON in a single `scene.load` command lets it
+ * flow through the exact same dry-run/apply/undo machinery as ordinary commands, with no special
+ * casing needed anywhere else (the executor and every applyCommands closure already support
+ * `scene.load`'s `args.json`).
+ * @param {{outputMode:"patch", sceneJsonString: string}} patchResult
+ * @returns {{op:"scene.load", args:{json: object}}[]}
+ */
+function commandsFromPatchResult(patchResult) {
+  return [{ op: "scene.load", args: { json: parseSceneJsonString(patchResult.sceneJsonString) } }];
 }
 
 /**
@@ -237,6 +293,10 @@ async function runSceneAgentCommandsUpdate(params) {
       }
       lastError = validation.error || "Scene JSON validation failed.";
       continue;
+    }
+
+    if (commandResult.outputMode === "patch") {
+      commandResult = { ...commandResult, commands: commandsFromPatchResult(commandResult) };
     }
 
     const dryRun = await dryRunUpdateCommands(commandResult.commands, baseContext.currentSceneJsonString);
@@ -447,6 +507,10 @@ async function runSceneAgentCommandsUpdateIterative(params) {
       }
       lastError = validation.error || "Scene JSON validation failed.";
       continue;
+    }
+
+    if (commandResult.outputMode === "patch") {
+      commandResult = { ...commandResult, commands: commandsFromPatchResult(commandResult) };
     }
 
     const commands = commandResult.commands;
@@ -668,6 +732,53 @@ async function runOptionalDraftRefinement(params) {
 }
 
 /**
+ * Repair/capability-review/layout-review all need to turn "here's what's wrong" into "here's a
+ * fixed scene" — previously always via a full-scene-JSON rewrite (updateSceneJsonString). This
+ * tries the same commands/JSON-Patch-preferring single round `requestSceneRefinementStep` uses
+ * for draft refinement first (same LLM call count as before, just a cheaper/more targeted output
+ * format when the model can manage it), and only falls back to the full-JSON rewrite — kept
+ * available, just now the last resort — when that attempt throws or produces something invalid.
+ * @param {string} fixPrompt describes the specific problem to fix
+ * @param {string} sceneJsonString current (valid) scene JSON to fix
+ * @param {{chatOptions: object, chatOptionsFullUpdate: object, applyDraftCommands?: Function, refineMaxTokens: number, fullRewriteMaxTokens: number}} config
+ * @returns {Promise<string>}
+ */
+async function runTargetedFixRound(fixPrompt, sceneJsonString, config) {
+  const { chatOptions, chatOptionsFullUpdate, applyDraftCommands, refineMaxTokens, fullRewriteMaxTokens } = config;
+  try {
+    const refinement = await requestSceneRefinementStep(fixPrompt, sceneJsonString, {
+      ...chatOptions,
+      allowCommands: typeof applyDraftCommands === "function",
+      maxTokens: refineMaxTokens
+    });
+    if (refinement.outputMode === "done") {
+      return sceneJsonString;
+    }
+    let candidate = refinement.sceneJsonString || "";
+    if (refinement.outputMode === "commands") {
+      const applied = await applyDraftCommands(refinement.commands, {
+        sceneJsonString,
+        commandScript: refinement.commandScript
+      });
+      candidate = typeof applied === "string" ? applied : String(applied?.sceneJsonString || "");
+      if (applied && typeof applied === "object" && applied.ok === false) {
+        throw new Error(applied.error || "Targeted fix commands failed.");
+      }
+    }
+    const validation = await validateSceneJsonWithNormalizer(candidate);
+    if (!validation.ok) {
+      throw new Error(validation.error || "Targeted fix produced invalid scene JSON.");
+    }
+    return candidate;
+  } catch (_error) {
+    return updateSceneJsonString(fixPrompt, sceneJsonString, {
+      ...chatOptionsFullUpdate,
+      maxTokens: fullRewriteMaxTokens
+    });
+  }
+}
+
+/**
  * @param {object} input
  * @param {string} input.mode generate | update | fromImage
  * @param {string} [input.prompt]
@@ -681,7 +792,10 @@ async function runOptionalDraftRefinement(params) {
 async function runSceneAgent(input = {}, options = {}) {
   const mode = input.mode || "generate";
   const prompt = String(input.prompt || "").trim();
-  const { enabled, depth } = normalizeAgentOptions(options.agent);
+  const { maxRefineRounds } = normalizeAgentOptions(options.agent);
+  // Fixed metadata label — there is no more "depth" concept to report (see the module docblock);
+  // kept only so tokenHint's shape doesn't change for anything reading it.
+  const depth = "standard";
   const onProgress = options.onProgress;
   const steps = [];
   let stepIndex = 0;
@@ -715,16 +829,19 @@ async function runSceneAgent(input = {}, options = {}) {
   const projectFinalScene = (sceneJsonString) =>
     projectSceneJsonString(sceneJsonString, requestedOutputFormat);
 
-  /** Agent repair/layout steps always use full-scene JSON, not incremental patch. */
-  const chatOptionsFullUpdate = { ...chatOptions, allowInvalidSceneDraft: enabled };
+  /** Lowest-priority fallback for repair/capability/layout fixes — a full-scene-JSON rewrite,
+   * only reached when a targeted commands/patch fix (runTargetedFixRound below) isn't available
+   * or doesn't work out. */
+  const chatOptionsFullUpdate = { ...chatOptions, allowInvalidSceneDraft: true };
   delete chatOptionsFullUpdate.updateMode;
 
-  /** Avoid duplicate capability review inside generate when agent loop handles it. */
+  /** Avoid duplicate capability review inside generate — this module's own capability-review
+   * pass below (preset.runCapabilityReview) is the one that runs. */
   const chatOptionsGenerate = {
     ...chatOptions,
     capabilityReview: false,
     allowInvalidSceneDraft: true,
-    planFirst: chatOptions.planFirst === true && !enabled
+    planFirst: false
   };
 
   const maybeFillTextures = async (sceneJsonString) => {
@@ -816,50 +933,26 @@ async function runSceneAgent(input = {}, options = {}) {
     );
   };
 
-  const runSingleShot = async () => {
-    if (mode === "update") {
-      if (!prompt) {
-        throw new Error("prompt is required for update mode.");
-      }
-      if (!input.currentSceneJsonString?.trim()) {
-        throw new Error("currentSceneJsonString is required for update mode.");
-      }
-      return updateSceneJsonString(prompt, input.currentSceneJsonString, chatOptions);
-    }
-    if (mode === "fromImage") {
-      if (input.image === undefined || input.image === null) {
-        throw new Error("image is required for fromImage mode.");
-      }
-      return generateSceneJsonFromImage(
-        { prompt: prompt || undefined, image: input.image },
-        chatOptions
-      );
-    }
-    if (!prompt) {
-      throw new Error("prompt is required for generate mode.");
-    }
-    return generateSceneJsonString(prompt, chatOptions);
+  // Every LLM round now flows through the pipeline below — there is no more one-shot bypass to
+  // fall back to (see the module docblock). `preset` is a fixed policy object rather than a
+  // depth-derived lookup: the only thing that's actually user-configurable now is the refine
+  // round budget (maxRefineRounds), everything else here is a stable default.
+  const preset = {
+    maxSteps: maxRefineRounds,
+    maxRefineRounds,
+    outlineMaxTokens: OUTLINE_MAX_TOKENS,
+    generateMaxTokens: DRAFT_MAX_TOKENS,
+    repairMaxTokens: REFINE_ROUND_MAX_TOKENS,
+    layoutReviewMaxTokens: REFINE_ROUND_MAX_TOKENS,
+    reviewMaxTokens: 800,
+    runOutline: true,
+    runRepair: true,
+    runCapabilityReview: true,
+    runLayoutReview: true,
+    runTextureReview: false,
+    maxCapabilityReviewAttempts: MAX_CAPABILITY_REVIEW_ATTEMPTS,
+    maxRepairAttempts: MAX_REPAIR_ATTEMPTS
   };
-
-  if (!enabled) {
-    let sceneJsonString = await runSingleShot();
-    steps.push({ kind: "single", ok: true });
-    const singleValidation = await validateSceneJson(sceneJsonString);
-    if (!singleValidation.ok) {
-      throw new Error(singleValidation.error || "Scene JSON validation failed.");
-    }
-    emitSceneReady(sceneJsonString);
-    const fillResult = await maybeFillTextures(sceneJsonString);
-    return {
-      sceneJsonString: projectFinalScene(fillResult.sceneJsonString),
-      textureFillWarning: fillResult.textureFillWarning,
-      steps,
-      agentUsed: false,
-      tokenHint: { rounds: stepIndex || 1, depth: "simple" }
-    };
-  }
-
-  const preset = resolveAgentDepth(depth);
   let outline = "";
   let sceneJsonString = "";
 
@@ -891,8 +984,13 @@ async function runSceneAgent(input = {}, options = {}) {
     }
 
     let commandStepIndex = stepIndex;
-    const iterativeApply = options.agent?.iterativeApply === true;
-    const commandRunner = iterativeApply
+    // Iterative (apply-as-you-go, refresh context, ask again) is always preferred now — it's
+    // strictly better than "collect one command batch and let the caller apply it once" (see the
+    // module docblock). The only reason to fall back to the non-iterative runner is a caller that
+    // hasn't wired up applyCommands/refreshContext at all (e.g. a bare core/ai script) —
+    // runSceneAgentCommandsUpdateIterative itself requires both and throws without them.
+    const canIterate = typeof options.applyCommands === "function" && typeof options.refreshContext === "function";
+    const commandRunner = canIterate
       ? runSceneAgentCommandsUpdateIterative
       : runSceneAgentCommandsUpdate;
     const commandResult = await commandRunner({
@@ -974,8 +1072,17 @@ async function runSceneAgent(input = {}, options = {}) {
   // updateSceneJsonString.
   const referenceMaterial = await resolveAgentReferenceMaterial(prompt, chatOptions);
 
+  // Ask for a rough first pass, not the finished scene — the incremental refine loop right after
+  // this (see the "Always elaborate the ... draft" block below) is what actually fills in detail,
+  // a small step at a time, without ever risking an output-length truncation on a single call.
+  const draftBlockoutHint =
+    mode === "generate"
+      ? "\n\nThis is a first pass, not the finished scene: give a small, structurally correct blockout — the right groups/objects roughly placed with simple geometry — and skip fine detail, secondary objects, and material/texture polish. Those will be added afterward in follow-up refinement rounds."
+      : "";
+
   const generatePrompt =
     (outline && preset.runOutline ? `${prompt}\n\nFollow this outline:\n${outline}` : prompt) +
+    draftBlockoutHint +
     (referenceMaterial ? `\n\n${referenceMaterial}` : "");
 
   if (mode === "update") {
@@ -1022,6 +1129,10 @@ async function runSceneAgent(input = {}, options = {}) {
       },
       onProgress
     );
+    // Repair fixes genuinely invalid/malformed JSON — requestSceneRefinementStep (used by
+    // runTargetedFixRound for capability/layout review below) is documented for refining an
+    // already-*valid* draft and starts by re-parsing the current scene, so it isn't a good fit
+    // here; a full-scene-JSON rewrite stays the direct, single-call repair path.
     const repairPrompt =
       `Fix the scene JSON so it is valid ThreeJSON. Previous error: ${validation.error}. User intent: ${prompt}` +
       (referenceMaterial ? `\n\n${referenceMaterial}` : "");
@@ -1052,17 +1163,12 @@ async function runSceneAgent(input = {}, options = {}) {
     }
   }
 
-  if (
-    validation.ok &&
-    mode === "generate" &&
-    options.agent?.progressiveRefinement === true
-  ) {
-    const maxDraftRefinementRounds = Math.max(
-      1,
-      Math.round(
-        Number(options.agent?.maxDraftRefinementRounds) || preset.maxRefineRounds || 2
-      )
-    );
+  // Always elaborate the (deliberately small — see DRAFT_MAX_TOKENS) draft with incremental
+  // commands/JSON-Patch rounds now — this is the actual fix for "one giant JSON call truncates on
+  // a large scene": no single call after this point ever has to hold the whole finished scene,
+  // detail accumulates one small step at a time (see the module docblock). There is no more
+  // opt-in flag for this; it always runs for generate mode once a valid draft exists.
+  if (validation.ok && mode === "generate") {
     sceneJsonString = await runOptionalDraftRefinement({
       userPrompt: prompt,
       initialSceneJsonString: sceneJsonString,
@@ -1075,7 +1181,7 @@ async function runSceneAgent(input = {}, options = {}) {
         stepIndex = value;
       },
       applyDraftCommands,
-      maxRounds: maxDraftRefinementRounds
+      maxRounds: preset.maxRefineRounds
     });
     validation = await validateSceneJsonWithNormalizer(sceneJsonString);
   }
@@ -1101,9 +1207,12 @@ async function runSceneAgent(input = {}, options = {}) {
         onProgress
       );
       const fixPrompt = buildCapabilityFixPrompt(prompt, fit);
-      sceneJsonString = await updateSceneJsonString(fixPrompt, sceneJsonString, {
-        ...chatOptionsFullUpdate,
-        maxTokens: preset.repairMaxTokens || preset.generateMaxTokens
+      sceneJsonString = await runTargetedFixRound(fixPrompt, sceneJsonString, {
+        chatOptions,
+        chatOptionsFullUpdate,
+        applyDraftCommands,
+        refineMaxTokens: preset.repairMaxTokens || preset.generateMaxTokens,
+        fullRewriteMaxTokens: FULL_REWRITE_MAX_TOKENS
       });
       validation = await validateSceneJsonWithNormalizer(sceneJsonString);
       steps.push({
@@ -1152,9 +1261,12 @@ async function runSceneAgent(input = {}, options = {}) {
       pointerSummary,
       capabilityFit
     );
-    sceneJsonString = await updateSceneJsonString(reviewPrompt, sceneJsonString, {
-      ...chatOptionsFullUpdate,
-      maxTokens: preset.layoutReviewMaxTokens || preset.repairMaxTokens
+    sceneJsonString = await runTargetedFixRound(reviewPrompt, sceneJsonString, {
+      chatOptions,
+      chatOptionsFullUpdate,
+      applyDraftCommands,
+      refineMaxTokens: preset.layoutReviewMaxTokens || preset.repairMaxTokens,
+      fullRewriteMaxTokens: FULL_REWRITE_MAX_TOKENS
     });
     validation = await validateSceneJsonWithNormalizer(sceneJsonString);
     steps.push({ kind: "layout_review", ok: validation.ok, error: validation.error });

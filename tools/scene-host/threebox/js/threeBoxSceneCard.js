@@ -51,6 +51,20 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
   loadingMask.textContent = t("threebox.sceneCard.waitingForDraft", "等待场景草稿…");
   canvasWrap.appendChild(loadingMask);
 
+  // Shown once the draft renders and stays up through every incremental refine round (see
+  // core/ai/sceneAgent.js's module docblock — generation is always draft-then-refine now), cleared
+  // once the turn's final render lands. Distinct from loadingMask: the canvas is already fully
+  // interactive and showing real content while this is up, it's not a "still loading" state.
+  const draftBadge = document.createElement("div");
+  draftBadge.className = "sceneCardDraftBadge";
+  draftBadge.textContent = t("threebox.sceneCard.draftBadge", "草稿 · 自动细化中…");
+  draftBadge.hidden = true;
+  canvasWrap.appendChild(draftBadge);
+
+  function setDraftState(isDraft) {
+    draftBadge.hidden = !isDraft;
+  }
+
   const actionBar = document.createElement("div");
   actionBar.className = "sceneCardActionBar";
   actionBar.innerHTML = [
@@ -179,6 +193,7 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
     runtime?.dispose?.();
     runtime = null;
     currentSceneJson = sceneJsonPayload;
+    setDraftState(options.draft === true);
     setLabel(
       options.label || sceneJsonPayload?.label || sceneJsonPayload?.name || t("threebox.sceneCard.defaultLabel", "ThreeBox 场景")
     );

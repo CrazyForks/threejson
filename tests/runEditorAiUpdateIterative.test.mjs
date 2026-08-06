@@ -24,10 +24,13 @@ test("runEditorAiUpdate iterative agent skips duplicate final exec", async () =>
   let execCount = 0;
   const fetchMock = mock.fn(async () => {
     fetchCall += 1;
+    // 1: outline (always requested now, regardless of depth), 2: round-1 commands, 3+: done.
     const content =
       fetchCall === 1
-        ? 'object.patch id=floor partial={"material":{"color":"#445566"}}'
-        : "# done";
+        ? "- outline text"
+        : fetchCall === 2
+          ? 'object.patch id=floor partial={"material":{"color":"#445566"}}'
+          : "# done";
     return {
       ok: true,
       async text() {

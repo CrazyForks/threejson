@@ -336,6 +336,32 @@ export function createEditorAiGeneratePanel(host) {
     }
   }
 
+  /** Generation is now always draft-then-incrementally-refine (outline -> small draft -> N auto
+   * refine rounds -> capability/layout review — see core/ai/sceneAgent.js's module docblock), so a
+   * single raw-text stream from one LLM call no longer makes sense (there isn't just one call
+   * anymore) — runAiGenerateTurn doesn't offer onDelta for that reason. This renders a short,
+   * readable running log of what stage is in progress instead, the same status-line approach
+   * ThreeBox's chat panel uses (see threeBoxApp.js's createAgentProgressUpdater). Reloading the
+   * live canvas on every intermediate round (the way ThreeBox's disposable scene card does) isn't
+   * viable here — editorApp.js's ingestScenePayload tears down and re-initializes the whole
+   * runtime per call — so the canvas only updates once, with the finished result, same as before;
+   * only the status text updates progressively now. */
+  function createGenerateStatusUpdater(assistantBody) {
+    const lines = [];
+    // Writes textContent directly rather than through historyCtl.updateMessage, which clears the
+    // "still busy" styling/aria state appendActivityMessage set up — that must stay in effect
+    // until the turn genuinely finishes (updateMessage's real call at the end of handleSend).
+    return (phaseOrProgress) => {
+      const label = phaseOrProgress?.message || phaseOrProgress?.phase || phaseOrProgress?.kind || "";
+      if (!label || !assistantBody) {
+        return;
+      }
+      lines.push(`${lines.length + 1}. ${label}`);
+      assistantBody.textContent = lines.slice(-12).join("\n");
+      historyCtl.scrollToBottom();
+    };
+  }
+
   /** json/tjz attachments have no vision call to ride along on — instead their parsed scene JSON
    * is folded into the prompt text itself as an explicit, clearly-labeled reference block, so the
    * plain (non-vision) runAiGenerateTurn call sees it as part of userPrompt. */
@@ -395,6 +421,7 @@ export function createEditorAiGeneratePanel(host) {
         threeBoxTurnContext: createEditorAiTurnContext(userText)
       };
       let resultText;
+      const updateGenerateStatus = createGenerateStatusUpdater(assistantBody);
 
       if (attachment?.kind === "image") {
         const result = await runAiImageGenerateTurn({
@@ -402,6 +429,8 @@ export function createEditorAiGeneratePanel(host) {
           image: attachment.dataUrl,
           providerOptions,
           agentOptions,
+          onGenerationPhase: updateGenerateStatus,
+          onAgentProgress: updateGenerateStatus,
           signal: abortController.signal
         });
         const loaded = await applyScenePayload(host, result.sceneJsonString, "AI 看图生成");
@@ -428,8 +457,8 @@ export function createEditorAiGeneratePanel(host) {
           userPrompt: effectivePrompt,
           providerOptions,
           agentOptions,
-          onDelta: (delta) =>
-            historyCtl.updateMessage(assistantBody, `${t("editor.ai.edit.working", "AI 正在处理...")}\n${delta}`),
+          onGenerationPhase: updateGenerateStatus,
+          onAgentProgress: updateGenerateStatus,
           signal: abortController.signal
         });
         const loaded = await applyScenePayload(host, result.sceneJsonString, "AI 生成", { skipDirtyConfirm: true });

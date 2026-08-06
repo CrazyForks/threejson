@@ -115,11 +115,12 @@ export function loadThreeBoxSettingsBundle() {
   if (cached?.io?.sceneJsonFormat !== "standard" && cached?.io?.sceneJsonFormat !== "friendly") {
     merged.io.sceneJsonFormat = cached?.io?.copyFriendlyJson === true ? "friendly" : "standard";
   }
-  if (!cached?.agent && cached?.ai?.agentDepth && !merged.agent?.depth) {
-    merged.agent = { ...(merged.agent || {}), depth: cached.ai.agentDepth };
-  } else if (!cached?.agent && cached?.ai?.agentDepth) {
-    merged.agent.depth = cached.ai.agentDepth;
-  }
+  // A previously persisted `agent.*`/`ai.agentDepth` (the retired on/off + depth-preset toggle —
+  // see core/ai/sceneAgent.js's module docblock) has nothing left to migrate into: generation is
+  // always draft-then-incrementally-refine now, with only `ai.maxAutoRefineRounds` left to
+  // configure, and THREEBOX_SETTINGS_DEFAULTS already supplies that. A stale `agent` object may
+  // still ride along in an old cached bundle (deepMergeThreeBoxSettings copies overlay keys the
+  // defaults no longer declare too) — harmless, since nothing reads `settings.agent` anymore.
   ensureBuiltinProviderSeeded(merged);
   return merged;
 }

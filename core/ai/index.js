@@ -36,7 +36,6 @@ import {
   createZipDownloadSink
 } from "./browserTextureSink.js";
 import { runSceneAgent } from "./sceneAgent.js";
-import { resolveAgentDepth } from "./agentDepth.js";
 import {
   validateSceneJson,
   listTexturePointersSummary,
@@ -119,7 +118,6 @@ if (typeof window !== "undefined") {
     listTextureUrlPointers,
     resolveVisionImageUrl,
     runSceneAgent,
-    resolveAgentDepth,
     validateSceneJson,
     listTexturePointersSummary,
     summarizeSchema,
@@ -172,7 +170,6 @@ export {
   listTextureUrlPointers,
   resolveVisionImageUrl,
   runSceneAgent,
-  resolveAgentDepth,
   validateSceneJson,
   listTexturePointersSummary,
   summarizeSchema,

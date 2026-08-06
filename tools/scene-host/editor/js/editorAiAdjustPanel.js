@@ -224,6 +224,25 @@ export function createEditorAiAdjustPanel(host) {
     }
   }
 
+  /** Adjustment is always iterative now (no more "agent enabled" gate — see
+   * core/ai/sceneAgent.js's module docblock), so a turn can genuinely take several rounds instead
+   * of one quick cascade. Without progress feedback the status message would just sit frozen on
+   * "正在连接 AI 并分析调整方案…" for the whole thing. Writes textContent directly (not through
+   * historyCtl.updateMessage) so the "still busy" activity styling stays in effect until the turn
+   * actually finishes — same approach as editorAiGeneratePanel.js's createGenerateStatusUpdater. */
+  function createAdjustStatusUpdater(assistantBody) {
+    const lines = [];
+    return (phaseOrProgress) => {
+      const label = phaseOrProgress?.message || phaseOrProgress?.phase || phaseOrProgress?.kind || "";
+      if (!label || !assistantBody) {
+        return;
+      }
+      lines.push(`${lines.length + 1}. ${label}`);
+      assistantBody.textContent = lines.slice(-12).join("\n");
+      historyCtl.scrollToBottom();
+    };
+  }
+
   async function getSceneJsonText() {
     await host.ensureCanvasSyncedBeforeExport?.();
     const scene = host.getScene();
@@ -372,6 +391,7 @@ export function createEditorAiAdjustPanel(host) {
         updateOutputMode,
         strictOutputMode: updateOutputMode !== "auto",
         resolveContextPayload: (sceneJson) => resolveAiAdjustContextPayload(sceneJson, host.getEditorSettings()?.ai || {}),
+        onAgentProgress: createAdjustStatusUpdater(assistantBody),
         capabilityLookup: true,
         onlineTextureHints: true,
         signal: abortController.signal
