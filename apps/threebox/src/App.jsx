@@ -704,23 +704,17 @@ export function App() {
       const adjustTargetString = seedSceneJson || shownSceneJson;
       const adjusting = modeOverride !== "generate" && Boolean(adjustTargetString);
 
-      // Multi-turn Agent options from settings.agent (matching the original's
-      // resolveThreeBoxAgentOptions). When enabled, the orchestrator runs an autonomous refine loop
-      // and reports progress via onAgentProgress: numbered lines go to the streaming block, and each
-      // draft scene is rendered into the card so the user watches the scene build up progressively.
-      const agentOptions = {
-        enabled: settings.agent.enabled === true,
-        depth: settings.agent.depth || "medium",
-        iterativeApply: settings.agent.iterativeAdjust !== false,
-        progressiveGenerate: settings.agent.progressiveGenerate !== false
-      };
-      // For the agent path the assistant card is appended up-front (so drafts can stream into it) and
-      // finalized in place after the turn; the non-agent path appends once at the end as before.
-      let assistantId = null;
+      // There is no more "enable multi-turn Agent" toggle — generation/adjustment is always
+      // draft-then-incrementally-refine now (see core/ai/sceneAgent.js's module docblock and the
+      // matching fix in threeBoxApp.js). The only thing left to resolve from settings is the
+      // round budget; the orchestrator always runs the refine loop and always reports progress via
+      // onAgentProgress: numbered lines go to the streaming block, and each draft scene is
+      // rendered into the card so the user watches the scene build up progressively.
+      const agentOptions = { maxRefineRounds: settings.ai.maxAutoRefineRounds };
+      // The assistant card is always appended up-front now (so drafts can stream into it) and
+      // finalized in place after the turn — there is no more "append once at the end" path.
+      const assistantId = crypto?.randomUUID?.() ?? `m-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const onScenePreview = (draftString) => {
-        if (!assistantId) {
-          return;
-        }
         let obj = null;
         try {
           obj = JSON.parse(draftString);
@@ -729,22 +723,17 @@ export function App() {
         }
         updateMessage(assistantId, { sceneObj: obj, sceneJson: draftString });
       };
-      const onAgentProgress = agentOptions.enabled
-        ? createAgentProgressUpdater(setStream, onScenePreview)
-        : undefined;
-      if (agentOptions.enabled) {
-        assistantId = crypto?.randomUUID?.() ?? `m-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        append({
-          id: assistantId,
-          role: "assistant",
-          text: L("正在生成…", "Generating…"),
-          sceneObj: null,
-          sceneJson: null,
-          label: userPrompt,
-          summary: null,
-          mode: adjusting ? "adjust" : "generate"
-        });
-      }
+      const onAgentProgress = createAgentProgressUpdater(setStream, onScenePreview);
+      append({
+        id: assistantId,
+        role: "assistant",
+        text: L("正在生成…", "Generating…"),
+        sceneObj: null,
+        sceneJson: null,
+        label: userPrompt,
+        summary: null,
+        mode: adjusting ? "adjust" : "generate"
+      });
 
       try {
         let sceneJson;
@@ -782,8 +771,7 @@ export function App() {
             agentOptions,
             onAgentProgress,
             locale,
-            signal: controller.signal,
-            onDelta: (delta) => setStream((prev) => prev + delta)
+            signal: controller.signal
           });
           sceneJson = result.sceneJson;
           sceneJsonString = result.sceneJsonString;
@@ -809,10 +797,19 @@ export function App() {
             maxSceneSegments: settings.ai.maxSceneSegments,
             agentOptions,
             onAgentProgress,
-            onDelta: (delta) => setStream((prev) => prev + delta),
+            // Not `onDelta`: generation is now many small LLM calls (outline, draft, N refine
+            // rounds, reviews), not one big one — see the matching comment in
+            // tools/scene-host/shared/js/aiTurnOrchestrator.js's runAiGenerateTurn. onAgentProgress
+            // above (numbered status lines) plus onSceneDraft-driven onScenePreview are the UI
+            // feedback now instead of raw streamed JSON text.
+            onSceneDraft: onScenePreview,
             onGenerationPhase: (phase) => {
-              if (phase?.phase === "processing") {
+              if (phase?.phase === "compact-retry") {
+                setStream(L("输出过长，正在简化场景并重新生成…", "Output too long — simplifying and regenerating the scene…"));
+              } else if (phase?.phase === "processing") {
                 setStream(L("正在解析生成的 JSON 并准备场景…", "Parsing the generated JSON and preparing the scene…"));
+              } else if (phase?.phase === "capability-review") {
+                setStream(L("正在校验场景是否充分使用相关能力…", "Checking whether the scene makes full use of relevant capabilities…"));
               }
             }
           });
@@ -845,14 +842,9 @@ export function App() {
           turnId: turnRecord?.id ?? null,
           mode: adjusting ? "adjust" : "generate"
         };
-        if (assistantId) {
-          // Agent path: the card was appended early and streamed drafts — finalize it in place so the
-          // last draft is superseded by the real result.
-          updateMessage(assistantId, finalFields);
-        } else {
-          assistantId = crypto?.randomUUID?.() ?? `m-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-          append({ id: assistantId, role: "assistant", summary: null, ...finalFields });
-        }
+        // The card was appended early and streamed drafts (see above) — finalize it in place so
+        // the last draft is superseded by the real result.
+        updateMessage(assistantId, finalFields);
         setShownSceneJson(snapshot);
         setShownTurnId(turnRecord?.id ?? null);
         // Debounced push to the user's self-hosted sync server (no-op unless configured).
@@ -957,7 +949,7 @@ export function App() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [busy, provider, locale, append, updateMessage, history, isAdjust, modeOverride, shownSceneJson, shownTurnId, zh, resolveActiveProviderOptions, settings.ai, settings.agent, attachedContext]
+    [busy, provider, locale, append, updateMessage, history, isAdjust, modeOverride, shownSceneJson, shownTurnId, zh, resolveActiveProviderOptions, settings.ai, attachedContext]
   );
 
   const onComposerKeyDown = (event) => {

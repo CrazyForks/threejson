@@ -41,13 +41,14 @@ export const THREEBOX_SETTINGS_DEFAULTS = {
     capabilityLookupEnabled: true,
     animationCapabilityMode: "auto",
     onlineTextureHints: true,
-    maxSceneSegments: 16
-  },
-  agent: {
-    enabled: false,
-    depth: "medium",
-    iterativeAdjust: true,
-    progressiveGenerate: true
+    maxSceneSegments: 16,
+    // Generation/adjustment is always draft-then-incrementally-refine now — there is no more
+    // on/off "Agent" toggle or depth preset (see core/ai/sceneAgent.js's module docblock). This is
+    // the one knob left: how many automatic refine rounds the model gets before the round budget
+    // stops it (it can always finish earlier by saying it's done). Default matches
+    // core/ai/sceneAgent.js's DEFAULT_MAX_REFINE_ROUNDS; the hard ceiling (60) is enforced there
+    // regardless of what's configured here.
+    maxAutoRefineRounds: 20
   },
   io: {
     exportJsonIndent: 2,
@@ -69,7 +70,6 @@ export const THREEBOX_SETTINGS_DEFAULTS = {
 export const THREEBOX_SETTINGS_SECTIONS = [
   { id: "general", title: "通用" },
   { id: "ai", title: "AI 配置" },
-  { id: "agent", title: "Agent" },
   { id: "io", title: "导入导出" },
   { id: "about", title: "关于" }
 ];
@@ -140,11 +140,14 @@ export const THREEBOX_SETTINGS_FIELDS = [
     min: 1,
     max: 64
   },
-
-  { section: "agent", path: "agent.enabled", type: "checkbox", label: "开启多轮 Agent" },
-  { section: "agent", path: "agent.depth", type: "select", label: "Agent 深度", options: [["simple", "简单"], ["medium", "中等"], ["deep", "深入"], ["auto", "自动"]] },
-  { section: "agent", path: "agent.iterativeAdjust", type: "checkbox", label: "调整时逐轮应用到离屏场景" },
-  { section: "agent", path: "agent.progressiveGenerate", type: "checkbox", label: "允许生成草稿后自主多轮细化" },
+  {
+    section: "ai",
+    path: "ai.maxAutoRefineRounds",
+    type: "number",
+    label: "自动细化最大轮数",
+    min: 1,
+    max: 60
+  },
 
   { section: "io", path: "io.exportJsonIndent", type: "number", label: "导出 JSON 缩进", min: 0, max: 4 },
   { section: "io", path: "io.sceneJsonFormat", type: "select", label: "JSON 输出格式", options: [["standard", "标准格式"], ["friendly", "友好格式"]] },
