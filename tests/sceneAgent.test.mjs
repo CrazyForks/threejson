@@ -600,3 +600,78 @@ test("runSceneAgent update commands falls back to the non-iterative runner witho
     globalThis.fetch = originalFetch;
   }
 });
+
+test("runSceneAgent tolerates an outline failure and still produces a scene", async () => {
+  // The outline is a cheap, best-effort planning aid — an empty/flaky response from that one call
+  // must not abort the whole turn before a single scene JSON call has even been attempted.
+  const scenePayload = JSON.stringify(MINIMAL_SCENE);
+  let call = 0;
+  const fetchMock = mock.fn(async () => {
+    call += 1;
+    const content = call === 1 ? "" : call === 2 ? scenePayload : "# done";
+    return {
+      ok: true,
+      async text() {
+        return "";
+      },
+      async json() {
+        return { choices: [{ message: { content } }] };
+      }
+    };
+  });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = fetchMock;
+  try {
+    const result = await runSceneAgent(
+      { mode: "generate", prompt: "a small floor" },
+      { apiKey: "test-key", provider: "deepseek" }
+    );
+    assert.ok(result.sceneJsonString.includes("objectList"));
+    assert.ok(result.steps.some((s) => s.kind === "outline" && s.ok === false));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("runSceneAgent keeps a valid draft when both capability and layout review rounds fail", async () => {
+  // The prompt asks for a visible text label; the draft only carries it as box metadata (no
+  // objType:"text" item), so evaluateSceneCapabilityFit reports a gap and both the capability and
+  // layout review stages attempt a fix — every one of those attempts (and their full-JSON
+  // fallbacks) fails here (network error). None of that may turn an already-valid draft into a
+  // reported generation failure.
+  const cabinScene = JSON.stringify({
+    threeJsonId: "cabin-scene",
+    objectList: [{ threeJsonId: "cabin", objType: "box", label: "森林之家" }]
+  });
+  const prompt = "在小木屋门口添加文字'森林之家'";
+  let call = 0;
+  const fetchMock = mock.fn(async () => {
+    call += 1;
+    if (call === 1) {
+      return { ok: true, async text() { return ""; }, async json() { return { choices: [{ message: { content: "- cabin\n- label" } }] }; } };
+    }
+    if (call === 2) {
+      return { ok: true, async text() { return ""; }, async json() { return { choices: [{ message: { content: cabinScene } }] }; } };
+    }
+    if (call === 3) {
+      // Draft refinement round: say done immediately to keep the mock sequence small.
+      return { ok: true, async text() { return ""; }, async json() { return { choices: [{ message: { content: "# done" } }] }; } };
+    }
+    // Capability review's attempt + full-JSON fallback, then layout review's attempt + fallback —
+    // all fail.
+    throw new Error("network down");
+  });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = fetchMock;
+  try {
+    const result = await runSceneAgent(
+      { mode: "generate", prompt },
+      { apiKey: "test-key", provider: "deepseek" }
+    );
+    assert.equal(JSON.parse(result.sceneJsonString).threeJsonId, "cabin-scene");
+    assert.ok(result.steps.some((s) => s.kind === "capability_review"));
+    assert.ok(result.steps.some((s) => s.kind === "layout_review"));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

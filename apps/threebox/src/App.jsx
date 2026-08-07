@@ -34,6 +34,7 @@ import {
 } from "@threejson/host-kit/js/threeBoxSessionStore.js";
 import { t } from "@threejson/host-kit/i18n/index.js";
 import { BUILTIN_PROVIDER_TYPE } from "@threejson/host-kit/js/builtinAiProvider.js";
+import { formatAgentProgressLabel } from "@threejson/host-kit/js/aiAgentProgressLabels.js";
 import { renderMarkdownToSafeHtml } from "./lib/markdown.js";
 import { useAiProvider } from "./useAiProvider.js";
 import { useResources } from "./useResources.js";
@@ -89,7 +90,10 @@ function createAgentProgressUpdater(setStream, onScenePreview) {
     ) {
       onScenePreview(progress.sceneJsonString);
     }
-    const label = progress.message || progress.kind || "";
+    // core/ai/sceneAgent.js's progress messages are plain English — always run `kind` through the
+    // shared localized-label mapping instead of showing progress.message directly (see
+    // aiAgentProgressLabels.js and threeBoxApp.js's matching fix).
+    const label = formatAgentProgressLabel(progress, t);
     if (!label) {
       return;
     }

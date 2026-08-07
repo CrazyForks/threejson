@@ -14,6 +14,7 @@ import {
   waitForAiActivityPaint
 } from "./editorAiChatShared.js";
 import { t } from "../../shared/i18n/index.js";
+import { formatAgentProgressLabel } from "../../shared/js/aiAgentProgressLabels.js";
 
 const ATTACHMENT_ICON = { image: "🖼", json: "📄", tjz: "📦" };
 
@@ -352,8 +353,21 @@ export function createEditorAiGeneratePanel(host) {
     // "still busy" styling/aria state appendActivityMessage set up — that must stay in effect
     // until the turn genuinely finishes (updateMessage's real call at the end of handleSend).
     return (phaseOrProgress) => {
-      const label = phaseOrProgress?.message || phaseOrProgress?.phase || phaseOrProgress?.kind || "";
-      if (!label || !assistantBody) {
+      if (!phaseOrProgress || !assistantBody) {
+        return;
+      }
+      // Two different shapes land here: SceneAgentProgress events (`.kind`, from onAgentProgress)
+      // — run through the shared localized-label mapping, same as ThreeBox's chat panel — and the
+      // raw chat-completion `onGenerationPhase` events (`.phase`), which only ever carry a couple
+      // of stable phase codes.
+      const label = phaseOrProgress.kind
+        ? formatAgentProgressLabel(phaseOrProgress, t)
+        : phaseOrProgress.phase === "compact-retry"
+          ? t("aiAgent.progress.compactRetry", "Output too long — simplifying and regenerating the scene…")
+          : phaseOrProgress.phase === "processing"
+            ? t("aiAgent.progress.parsingScene", "Parsing the generated JSON and preparing the scene…")
+            : "";
+      if (!label) {
         return;
       }
       lines.push(`${lines.length + 1}. ${label}`);

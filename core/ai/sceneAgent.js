@@ -110,7 +110,7 @@ function emitProgress(payload, onProgress) {
  * @param {(value: number) => void} params.setStepIndex
  * @param {string} [params.message]
  */
-function emitStagePreview({ sceneJsonString, onProgress, getStepIndex, setStepIndex, message }) {
+function emitStagePreview({ sceneJsonString, onProgress, getStepIndex, setStepIndex, message, stage, round, maxRounds }) {
   if (!sceneJsonString?.trim()) {
     return;
   }
@@ -119,6 +119,12 @@ function emitStagePreview({ sceneJsonString, onProgress, getStepIndex, setStepIn
     {
       step: getStepIndex(),
       kind: "stage_preview",
+      // `stage` is the stable, i18n-friendly identifier (e.g. "initial_draft", "repair",
+      // "draft_refinement", "capability_review", "layout_review"); `message` stays as the
+      // English fallback for non-i18n callers (CLI tools, MCP server).
+      stage,
+      round,
+      maxRounds,
       message: message || "Stage preview ready.",
       sceneJsonString
     },
@@ -211,6 +217,9 @@ async function runSceneAgentCommandsUpdate(params) {
       {
         step: getStepIndex(),
         kind: isRepair ? "repair" : baseContext.objectGetFeedback && round > 1 ? "explore" : "commands",
+        round,
+        maxRounds: maxCommandRounds,
+        error: isRepair ? lastError : undefined,
         message: progressMessage
       },
       onProgress
@@ -429,6 +438,8 @@ async function runSceneAgentCommandsUpdateIterative(params) {
       {
         step: getStepIndex(),
         kind: "refine",
+        round: refineRound,
+        maxRounds: maxRefineRounds,
         message: `Agent refine round ${refineRound}/${maxRefineRounds}...`
       },
       onProgress
@@ -646,6 +657,8 @@ async function runOptionalDraftRefinement(params) {
       {
         step: getStepIndex(),
         kind: "draft_refinement",
+        round,
+        maxRounds,
         message: `Optional draft refinement ${round}/${maxRounds}...`
       },
       onProgress
@@ -724,6 +737,9 @@ async function runOptionalDraftRefinement(params) {
       onProgress,
       getStepIndex,
       setStepIndex,
+      stage: "draft_refinement",
+      round,
+      maxRounds,
       message: `Draft refinement preview ${round} (${refinement.outputMode}).`
     });
   }
@@ -742,6 +758,13 @@ async function runOptionalDraftRefinement(params) {
  * @param {string} sceneJsonString current (valid) scene JSON to fix
  * @param {{chatOptions: object, chatOptionsFullUpdate: object, applyDraftCommands?: Function, refineMaxTokens: number, fullRewriteMaxTokens: number}} config
  * @returns {Promise<string>}
+ */
+/**
+ * Never throws (except on explicit user abort) — a capability/layout review round only ever
+ * exists to *improve* an already-valid scene, so it must never be able to turn that valid scene
+ * into a reported generation failure (timeout, transient network/provider error, empty response,
+ * malformed fix — all just fall through to "keep what we had"). Same discipline as
+ * sceneAiService.js's maybeApplyCapabilityReview, applied at this layer too.
  */
 async function runTargetedFixRound(fixPrompt, sceneJsonString, config) {
   const { chatOptions, chatOptionsFullUpdate, applyDraftCommands, refineMaxTokens, fullRewriteMaxTokens } = config;
@@ -770,11 +793,38 @@ async function runTargetedFixRound(fixPrompt, sceneJsonString, config) {
       throw new Error(validation.error || "Targeted fix produced invalid scene JSON.");
     }
     return candidate;
-  } catch (_error) {
-    return updateSceneJsonString(fixPrompt, sceneJsonString, {
-      ...chatOptionsFullUpdate,
-      maxTokens: fullRewriteMaxTokens
-    });
+  } catch (error) {
+    if (chatOptions?.signal?.aborted) {
+      throw error;
+    }
+    try {
+      return await updateSceneJsonString(fixPrompt, sceneJsonString, {
+        ...chatOptionsFullUpdate,
+        maxTokens: fullRewriteMaxTokens
+      });
+    } catch (fallbackError) {
+      if (chatOptionsFullUpdate?.signal?.aborted) {
+        throw fallbackError;
+      }
+      return sceneJsonString;
+    }
+  }
+}
+
+/**
+ * The outline is a cheap, best-effort planning aid, not a required step — a failure here (empty
+ * response, transient network/provider error) must never abort the whole turn before a single
+ * scene JSON call has even been attempted. Never throws except on explicit user abort; returns ""
+ * (no outline) on any other failure so the caller just proceeds without one.
+ */
+async function requestOptionalOutline({ prompt, mode }, chatOptions, maxTokens) {
+  try {
+    return await requestSceneOutline({ prompt, mode }, { ...chatOptions, maxTokens });
+  } catch (error) {
+    if (chatOptions?.signal?.aborted) {
+      throw error;
+    }
+    return "";
   }
 }
 
@@ -973,14 +1023,8 @@ async function runSceneAgent(input = {}, options = {}) {
         { step: stepIndex, kind: "outline", message: "Planning scene outline..." },
         onProgress
       );
-      outline = await requestSceneOutline(
-        { prompt, mode },
-        {
-          ...chatOptions,
-          maxTokens: preset.outlineMaxTokens
-        }
-      );
-      steps.push({ kind: "outline", ok: true, length: outline.length });
+      outline = await requestOptionalOutline({ prompt, mode }, chatOptions, preset.outlineMaxTokens);
+      steps.push({ kind: "outline", ok: Boolean(outline), length: outline.length });
     }
 
     let commandStepIndex = stepIndex;
@@ -1050,14 +1094,8 @@ async function runSceneAgent(input = {}, options = {}) {
       { step: stepIndex, kind: "outline", message: "Planning scene outline..." },
       onProgress
     );
-    outline = await requestSceneOutline(
-      { prompt, mode },
-      {
-        ...chatOptions,
-        maxTokens: preset.outlineMaxTokens
-      }
-    );
-    steps.push({ kind: "outline", ok: true, length: outline.length });
+    outline = await requestOptionalOutline({ prompt, mode }, chatOptions, preset.outlineMaxTokens);
+    steps.push({ kind: "outline", ok: Boolean(outline), length: outline.length });
   }
 
   stepIndex += 1;
@@ -1113,6 +1151,7 @@ async function runSceneAgent(input = {}, options = {}) {
       setStepIndex: (value) => {
         stepIndex = value;
       },
+      stage: "initial_draft",
       message: "Initial draft ready."
     });
   }
@@ -1125,6 +1164,9 @@ async function runSceneAgent(input = {}, options = {}) {
       {
         step: stepIndex,
         kind: "repair",
+        attempt: repairAttempt,
+        maxAttempts: maxRepairAttempts,
+        error: validation.error,
         message: `Validation failed (attempt ${repairAttempt}/${maxRepairAttempts}): ${validation.error}`
       },
       onProgress
@@ -1136,10 +1178,23 @@ async function runSceneAgent(input = {}, options = {}) {
     const repairPrompt =
       `Fix the scene JSON so it is valid ThreeJSON. Previous error: ${validation.error}. User intent: ${prompt}` +
       (referenceMaterial ? `\n\n${referenceMaterial}` : "");
-    sceneJsonString = await updateSceneJsonString(repairPrompt, sceneJsonString, {
-      ...chatOptionsFullUpdate,
-      maxTokens: preset.repairMaxTokens
-    });
+    // A single flaky repair call (timeout, empty response) must not abort the whole turn — that
+    // just means this attempt didn't help; the loop tries again (or exits and reports the last
+    // real validation error below, same as if this attempt had returned invalid JSON).
+    let repairedSceneJsonString = null;
+    try {
+      repairedSceneJsonString = await updateSceneJsonString(repairPrompt, sceneJsonString, {
+        ...chatOptionsFullUpdate,
+        maxTokens: preset.repairMaxTokens
+      });
+    } catch (error) {
+      if (chatOptionsFullUpdate?.signal?.aborted) {
+        throw error;
+      }
+      steps.push({ kind: "repair", attempt: repairAttempt, ok: false, error: String(error?.message || error) });
+      continue;
+    }
+    sceneJsonString = repairedSceneJsonString;
     validation = await validateSceneJsonWithNormalizer(sceneJsonString);
     steps.push({
       kind: "repair",
@@ -1155,6 +1210,9 @@ async function runSceneAgent(input = {}, options = {}) {
         setStepIndex: (value) => {
           stepIndex = value;
         },
+        stage: "repair",
+        round: repairAttempt,
+        maxRounds: maxRepairAttempts,
         message: `Repair preview (attempt ${repairAttempt}).`
       });
     }
@@ -1202,6 +1260,8 @@ async function runSceneAgent(input = {}, options = {}) {
         {
           step: stepIndex,
           kind: "capability_review",
+          attempt: capAttempt,
+          maxAttempts: maxCapAttempts,
           message: `Capability fit review (attempt ${capAttempt}/${maxCapAttempts})...`
         },
         onProgress
@@ -1238,6 +1298,7 @@ async function runSceneAgent(input = {}, options = {}) {
         setStepIndex: (value) => {
           stepIndex = value;
         },
+        stage: "capability_review",
         message: "Capability review preview."
       });
     }
@@ -1251,6 +1312,7 @@ async function runSceneAgent(input = {}, options = {}) {
       {
         step: stepIndex,
         kind: "layout_review",
+        count: pointerSummary.count,
         message: `Layout/material review (${pointerSummary.count} texture slot(s))...`
       },
       onProgress
@@ -1278,6 +1340,7 @@ async function runSceneAgent(input = {}, options = {}) {
         setStepIndex: (value) => {
           stepIndex = value;
         },
+        stage: "layout_review",
         message: "Layout review preview."
       });
     }
@@ -1290,6 +1353,7 @@ async function runSceneAgent(input = {}, options = {}) {
       {
         step: stepIndex,
         kind: "texture_review",
+        count: summary.count,
         message: `Found ${summary.count} textureUrl slot(s). Planning dry-run...`
       },
       onProgress

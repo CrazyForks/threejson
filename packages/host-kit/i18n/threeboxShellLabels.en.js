@@ -285,5 +285,32 @@ export const THREEBOX_SHELL_LABELS_EN = {
   "threebox.chat.copyAdjustPatch": "Copy JSON Patch",
   "threebox.chat.copyAdjustCommands": "Copy Adjustment Commands",
   "threebox.chat.demoReply": "This is a demo reply used to verify the Markdown rendering pipeline (real AI conversation generation arrives in a future milestone).",
-  "threebox.chat.demoJsonNote": "Placeholder JSON code block"
+  "threebox.chat.demoJsonNote": "Placeholder JSON code block",
+
+  // Status-line labels for core/ai/sceneAgent.js's SceneAgentProgress events — shared by ThreeBox,
+  // the scene editor, and apps/threebox (see packages/host-kit/js/aiAgentProgressLabels.js).
+  "aiAgent.progress.outline": "Planning the scene outline…",
+  "aiAgent.progress.generate": "Generating the scene JSON…",
+  "aiAgent.progress.commandsRound": "Generating scene edit commands (round {round}/{maxRounds})…",
+  "aiAgent.progress.commands": "Generating scene edit commands…",
+  "aiAgent.progress.repairWithError": "Fixing an issue (attempt {attempt}/{maxAttempts}): {error}",
+  "aiAgent.progress.repair": "Fixing an issue (attempt {attempt}/{maxAttempts})…",
+  "aiAgent.progress.explore": "Inspecting the current scene (round {round}/{maxRounds})…",
+  "aiAgent.progress.commandsReady": "Scene edit commands ready.",
+  "aiAgent.progress.commandsApplied": "Applied round {round} to the scene.",
+  "aiAgent.progress.refine": "Auto-refining the scene (round {round}/{maxRounds})…",
+  "aiAgent.progress.draftRefinement": "Refining the draft (round {round}/{maxRounds})…",
+  "aiAgent.progress.capabilityReview": "Checking whether the scene makes full use of relevant capabilities (attempt {attempt}/{maxAttempts})…",
+  "aiAgent.progress.layoutReview": "Reviewing layout and materials ({count} texture slot(s))…",
+  "aiAgent.progress.textureReview": "Found {count} texture slot(s), planning textures…",
+  "aiAgent.progress.fillTextures": "Filling in textures…",
+  "aiAgent.progress.sceneReady": "Scene JSON ready.",
+  "aiAgent.progress.initialDraftReady": "Initial draft ready.",
+  "aiAgent.progress.repairPreview": "Repair preview (attempt {round}/{maxRounds}).",
+  "aiAgent.progress.draftRefinementPreview": "Draft refinement preview (round {round}/{maxRounds}).",
+  "aiAgent.progress.capabilityReviewPreview": "Capability review preview.",
+  "aiAgent.progress.layoutReviewPreview": "Layout review preview.",
+  "aiAgent.progress.previewUpdated": "Preview updated.",
+  "aiAgent.progress.compactRetry": "Output too long — simplifying and regenerating the scene…",
+  "aiAgent.progress.parsingScene": "Parsing the generated JSON and preparing the scene…"
 };

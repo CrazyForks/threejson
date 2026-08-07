@@ -19,6 +19,7 @@ import {
   waitForAiActivityPaint
 } from "./editorAiChatShared.js";
 import { t } from "../../shared/i18n/index.js";
+import { formatAgentProgressLabel } from "../../shared/js/aiAgentProgressLabels.js";
 
 /** "AI 调整" tab: always adjusts the currently loaded scene in place — never generates a fresh
  * one. Split out from the old merged "AI 编辑" tab (editorAiEditPanel.js, now removed) specifically
@@ -232,9 +233,12 @@ export function createEditorAiAdjustPanel(host) {
    * actually finishes — same approach as editorAiGeneratePanel.js's createGenerateStatusUpdater. */
   function createAdjustStatusUpdater(assistantBody) {
     const lines = [];
-    return (phaseOrProgress) => {
-      const label = phaseOrProgress?.message || phaseOrProgress?.phase || phaseOrProgress?.kind || "";
-      if (!label || !assistantBody) {
+    return (progress) => {
+      if (!progress || !assistantBody) {
+        return;
+      }
+      const label = formatAgentProgressLabel(progress, t);
+      if (!label) {
         return;
       }
       lines.push(`${lines.length + 1}. ${label}`);

@@ -1,0 +1,123 @@
+/**
+ * Turns a `core/ai/sceneAgent.js` `SceneAgentProgress` event into a localized, human-readable
+ * status line. `runSceneAgent`'s own `message` field is deliberately plain English (core/ai has no
+ * i18n dependency of its own — see its module docblock) — every UI-facing host must run each
+ * event's stable `kind` (plus whatever structured fields that kind carries: `round`/`maxRounds`,
+ * `attempt`/`maxAttempts`, `count`, `error`, and `stage_preview`'s own `stage`) through its own
+ * `t()` catalog here instead of showing `progress.message` directly, or a Chinese-locale host ends
+ * up displaying raw English text (see this module's call sites in threeBoxApp.js,
+ * editorAiGeneratePanel.js/editorAiAdjustPanel.js, and apps/threebox/src/App.jsx).
+ *
+ * Pure and DOM-free so every host (vanilla-JS ThreeBox/editor, the React port) can share the exact
+ * same mapping — only the `t` function passed in differs.
+ *
+ * @param {{step:number, kind:string, message?:string, round?:number, maxRounds?:number, attempt?:number, maxAttempts?:number, count?:number, error?:string, stage?:string}} progress a core/ai SceneAgentProgress event
+ * @param {(key: string, fallback: string, params?: object) => string} t
+ * @returns {string} empty string for progress kinds with nothing worth showing as a status line
+ *   (e.g. `stream`, which hosts that care about raw streamed text handle separately).
+ */
+export function formatAgentProgressLabel(progress, t) {
+  if (!progress || typeof t !== "function") {
+    return "";
+  }
+  const { kind, round, maxRounds, attempt, maxAttempts, count, error } = progress;
+  const roundNum = round ?? attempt;
+  const roundMax = maxRounds ?? maxAttempts;
+  switch (kind) {
+    case "outline":
+      return t("aiAgent.progress.outline", "Planning the scene outline…");
+    case "generate":
+      return t("aiAgent.progress.generate", "Generating the scene JSON…");
+    case "commands":
+      return roundNum
+        ? t("aiAgent.progress.commandsRound", "Generating scene edit commands (round {round}/{maxRounds})…", {
+            round: roundNum,
+            maxRounds: roundMax
+          })
+        : t("aiAgent.progress.commands", "Generating scene edit commands…");
+    case "repair":
+      return error
+        ? t(
+            "aiAgent.progress.repairWithError",
+            "Fixing an issue (attempt {attempt}/{maxAttempts}): {error}",
+            { attempt: roundNum, maxAttempts: roundMax, error }
+          )
+        : t("aiAgent.progress.repair", "Fixing an issue (attempt {attempt}/{maxAttempts})…", {
+            attempt: roundNum,
+            maxAttempts: roundMax
+          });
+    case "explore":
+      return t("aiAgent.progress.explore", "Inspecting the current scene (round {round}/{maxRounds})…", {
+        round: roundNum,
+        maxRounds: roundMax
+      });
+    case "commands_ready":
+      return t("aiAgent.progress.commandsReady", "Scene edit commands ready.");
+    case "commands_applied":
+      return t("aiAgent.progress.commandsApplied", "Applied round {round} to the scene.", { round: roundNum });
+    case "refine":
+      return t("aiAgent.progress.refine", "Auto-refining the scene (round {round}/{maxRounds})…", {
+        round: roundNum,
+        maxRounds: roundMax
+      });
+    case "draft_refinement":
+      return t("aiAgent.progress.draftRefinement", "Refining the draft (round {round}/{maxRounds})…", {
+        round: roundNum,
+        maxRounds: roundMax
+      });
+    case "capability_review":
+      return t(
+        "aiAgent.progress.capabilityReview",
+        "Checking whether the scene makes full use of relevant capabilities (attempt {attempt}/{maxAttempts})…",
+        { attempt: roundNum, maxAttempts: roundMax }
+      );
+    case "layout_review":
+      return t(
+        "aiAgent.progress.layoutReview",
+        "Reviewing layout and materials ({count} texture slot(s))…",
+        { count: count ?? 0 }
+      );
+    case "texture_review":
+      return t(
+        "aiAgent.progress.textureReview",
+        "Found {count} texture slot(s), planning textures…",
+        { count: count ?? 0 }
+      );
+    case "fill_textures":
+      return t("aiAgent.progress.fillTextures", "Filling in textures…");
+    case "scene_ready":
+      return t("aiAgent.progress.sceneReady", "Scene JSON ready.");
+    case "stage_preview":
+      return formatStagePreviewLabel(progress, t);
+    case "stream":
+      // Raw streamed text is handled separately by hosts that want it; not a status line.
+      return "";
+    default:
+      return progress.message || "";
+  }
+}
+
+function formatStagePreviewLabel(progress, t) {
+  const { stage, round, maxRounds } = progress;
+  switch (stage) {
+    case "initial_draft":
+      return t("aiAgent.progress.initialDraftReady", "Initial draft ready.");
+    case "repair":
+      return t("aiAgent.progress.repairPreview", "Repair preview (attempt {round}/{maxRounds}).", {
+        round,
+        maxRounds
+      });
+    case "draft_refinement":
+      return t(
+        "aiAgent.progress.draftRefinementPreview",
+        "Draft refinement preview (round {round}/{maxRounds}).",
+        { round, maxRounds }
+      );
+    case "capability_review":
+      return t("aiAgent.progress.capabilityReviewPreview", "Capability review preview.");
+    case "layout_review":
+      return t("aiAgent.progress.layoutReviewPreview", "Layout review preview.");
+    default:
+      return t("aiAgent.progress.previewUpdated", "Preview updated.");
+  }
+}

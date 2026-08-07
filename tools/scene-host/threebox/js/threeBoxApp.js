@@ -41,6 +41,7 @@ import {
 } from "../../shared/js/builtinProviderPrivacy.js";
 import { getAiErrorFeedback } from "../../shared/js/aiErrorFeedback.js";
 import { probeEndpoint } from "../../shared/js/endpointProbe.js";
+import { formatAgentProgressLabel } from "../../shared/js/aiAgentProgressLabels.js";
 
 function readRequestedLocaleFromUrl() {
   try {
@@ -401,7 +402,11 @@ async function main() {
       ) {
         onScenePreview(progress.sceneJsonString, progress);
       }
-      const label = progress.message || progress.kind || "";
+      // core/ai/sceneAgent.js's progress messages are plain English (core/ai has no i18n
+      // dependency of its own) — always run `kind` through the shared localized-label mapping
+      // rather than showing progress.message directly, or a Chinese-locale host shows raw English
+      // status lines (see aiAgentProgressLabels.js).
+      const label = formatAgentProgressLabel(progress, t);
       if (!label) {
         return;
       }
