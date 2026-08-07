@@ -97,17 +97,21 @@ export function buildResultDigest(sceneJson) {
 }
 
 /**
- * First-turn (no prior context) generation: builds the structured JSON envelope and always runs
- * it through core/ai's runSceneAgent — draft first (small, structurally can't truncate), then
- * automatic incremental refine rounds until the model says `# done` or the round budget runs out
- * (see core/ai/sceneAgent.js's module docblock). There is no more "single-turn" bypass: a one-shot
- * full-scene-JSON generation is exactly the pattern that made complex scenes truncate/fail, so
- * it's no longer a mode a caller can opt back into here.
+ * First-turn (no prior context) generation: builds the structured JSON envelope and runs it
+ * through core/ai's runSceneAgent, which negotiates complexity itself (see its isComplexTurn
+ * docblock) from `generationStrategy`/`estimatedSegments` — a request the classifier didn't flag
+ * (the default) stays a single fast call, exactly the old single-shot behavior; only a request
+ * flagged "segmented"/"compact" pays for the draft-then-incremental-refine pipeline (draft first,
+ * small so it structurally can't truncate, then automatic refine rounds until the model says
+ * `# done` or the round budget runs out). `onDelta` is safe to always forward here — it's only
+ * ever actually invoked by the one call the fast path makes; a complex, multi-call turn never
+ * receives it (see rawOnDelta in sceneAgent.js), so it can't garble multiple calls' text together.
  * @param {{ userPrompt: string, providerOptions: object, onDelta?: (delta:string)=>void, onGenerationPhase?: (phase:object)=>void|Promise<void>, onSceneDraft?: (sceneJsonString:string)=>void|Promise<void>, signal?: AbortSignal, globalPromptPrefix?: string, agentOptions?: {maxRefineRounds?: number}, onAgentProgress?: (p: object)=>void, includeReferenceLinks?: boolean, locale?: string, onlineTextureHints?: boolean, generationStrategy?: "single"|"segmented"|"compact", estimatedSegments?: number, maxSceneSegments?: number }} input
  */
 export async function runAiGenerateTurn({
   userPrompt,
   providerOptions,
+  onDelta,
   onGenerationPhase,
   onSceneDraft,
   signal,
@@ -138,10 +142,8 @@ export async function runAiGenerateTurn({
     {
       ...providerOptions,
       signal,
-      // Not `stream`/`onDelta`: this turn is now many small LLM calls (outline, draft, N refine
-      // rounds, reviews), not one big one — a single concatenated character stream across all of
-      // them would read as garbled nonsense. The draft (onSceneDraft below) plus onGenerationPhase/
-      // onProgress status text are the UI feedback now instead of raw streamed JSON text.
+      stream: true,
+      onDelta,
       agent: { maxRefineRounds: agentOptions?.maxRefineRounds },
       resolveReferenceUrl: resolveSceneAiReferenceUrl,
       capabilityLookup,
@@ -320,6 +322,8 @@ async function runAiAgentAdjustTurn({
   onlineTextureHints,
   selectedCapabilityIds,
   animationCapabilities,
+  generationStrategy,
+  estimatedSegments,
   signal
 }) {
   const mode = mapUpdateOutputModeToAgentInput(updateOutputMode);
@@ -349,6 +353,8 @@ async function runAiAgentAdjustTurn({
         onlineTextureHints,
         selectedCapabilityIds,
         animationCapabilities,
+        generationStrategy,
+        estimatedSegments,
         locale,
         signal,
         onProgress: onAgentProgress
@@ -394,15 +400,19 @@ async function runAiAgentAdjustTurn({
       },
       {
         ...providerOptions,
-        // applyCommands/refreshContext being supplied here is what makes runSceneAgent's
-        // update-mode commands path always iterative now (see its canIterate check) — there is no
-        // more separate "iterativeApply" toggle to gate that on.
+        // applyCommands/refreshContext being supplied here is necessary but no longer sufficient
+        // for runSceneAgent's update-mode commands path to iterate — it also requires
+        // generationStrategy/estimatedSegments to actually signal complexity (see its
+        // isComplexTurn check), so a plain one-line edit gets one bounded attempt instead of being
+        // invited to keep "refining" for several rounds before it's allowed to say it's done.
         agent: { maxRefineRounds: agentOptions?.maxRefineRounds },
         resolveReferenceUrl: resolveSceneAiReferenceUrl,
         capabilityLookup,
         onlineTextureHints,
         selectedCapabilityIds,
         animationCapabilities,
+        generationStrategy,
+        estimatedSegments,
         locale,
         signal,
         applyCommands,
@@ -482,6 +492,8 @@ export async function runAiAdjustTurn({
   onlineTextureHints,
   selectedCapabilityIds,
   animationCapabilities,
+  generationStrategy,
+  estimatedSegments,
   signal
 }) {
   // strictOutputMode forces exactly the requested single stage with no cascade and no round
@@ -600,6 +612,8 @@ export async function runAiAdjustTurn({
     onlineTextureHints,
     selectedCapabilityIds,
     animationCapabilities,
+    generationStrategy,
+    estimatedSegments,
     signal
   });
 }

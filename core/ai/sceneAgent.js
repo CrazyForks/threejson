@@ -80,6 +80,24 @@ const MAX_CAPABILITY_REVIEW_ATTEMPTS = 1;
 const MAX_REPAIR_ATTEMPTS = 2;
 
 /**
+ * Restores the "negotiation" behavior ThreeBox always had: a follow-up turn's intent classifier
+ * (tools/scene-host/threebox/js/threeBoxTurnState.js's classifyThreeBoxTurnIntent, or a hardcoded
+ * "single"/1 for the unambiguous first turn of a conversation) already decides how complex a
+ * request looks — simple requests should stay fast (one call, no outline/refine/review overhead),
+ * only requests actually flagged as needing segmented/compact handling pay for the full
+ * draft-then-refine pipeline. This was lost when the pipeline briefly became "always full
+ * pipeline, no matter how trivial the request" — that made every request pay the worst case's
+ * cost regardless of whether it needed it, which is the opposite of what the classifier was for.
+ * @param {object} options runSceneAgent's own options bag
+ * @returns {boolean}
+ */
+function isComplexTurn(options) {
+  const strategy = String(options?.generationStrategy || "single").toLowerCase();
+  const segments = Number(options?.estimatedSegments) || 1;
+  return strategy !== "single" || segments > 1;
+}
+
+/**
  * @param {object} agentOptions
  * @returns {{ maxRefineRounds: number }}
  */
@@ -851,6 +869,12 @@ async function runSceneAgent(input = {}, options = {}) {
   let stepIndex = 0;
   const streamPreview = options.streamPreview === true;
   const requestedOutputFormat = options.outputFormat === "friendly" ? "friendly" : "standard";
+  // Raw character streaming only ever makes sense for a turn that ends up making exactly one LLM
+  // call (the "simple" fast path below) — deliberately NOT folded into the shared `chatOptions`
+  // every nested call spreads, or a multi-call complex turn (outline + draft + refine rounds +
+  // reviews) would garble several calls' raw text together into one stream. Kept as its own
+  // variable, threaded explicitly only into the one-shot fast-path calls.
+  const rawOnDelta = typeof options.onDelta === "function" ? options.onDelta : undefined;
   const chatTransport = {
     stream: options.stream === true,
     signal: options.signal,
@@ -862,7 +886,7 @@ async function runSceneAgent(input = {}, options = {}) {
               onProgress
             );
           }
-        : options.onDelta
+        : undefined
   };
   const chatOptions = { ...options, ...chatTransport };
   const applyDraftCommands = options.applyDraftCommands;
@@ -983,10 +1007,48 @@ async function runSceneAgent(input = {}, options = {}) {
     );
   };
 
-  // Every LLM round now flows through the pipeline below — there is no more one-shot bypass to
-  // fall back to (see the module docblock). `preset` is a fixed policy object rather than a
-  // depth-derived lookup: the only thing that's actually user-configurable now is the refine
-  // round budget (maxRefineRounds), everything else here is a stable default.
+  // Fast path: a request the turn classifier (or the unambiguous-first-turn shortcut — see
+  // threeBoxApp.js) did NOT flag as needing segmented/compact handling stays a single call, no
+  // outline/draft-refine-loop/capability-review/layout-review overhead — exactly the old
+  // single-shot behavior, restored deliberately. Paying the full multi-round pipeline's cost for
+  // "add a cube" was the actual regression: the pipeline exists for scenes the classifier already
+  // knows are complex, not as a mandatory tax on every request regardless of size.
+  if ((mode === "generate" || mode === "fromImage") && !isComplexTurn(options)) {
+    if (mode === "fromImage" && (input.image === undefined || input.image === null)) {
+      throw new Error("image is required for fromImage mode.");
+    }
+    if (mode === "generate" && !prompt) {
+      throw new Error("prompt is required for generate mode.");
+    }
+    // Raw streaming text only makes sense here because this really is the only call this turn
+    // makes — see rawOnDelta's docblock above.
+    const fastChatOptions = { ...chatOptions, onDelta: rawOnDelta };
+    const sceneJsonString =
+      mode === "fromImage"
+        ? await generateSceneJsonFromImage({ prompt: prompt || undefined, image: input.image }, fastChatOptions)
+        : await generateSceneJsonString(prompt, fastChatOptions);
+    steps.push({ kind: "single", ok: true });
+    const singleValidation = await validateSceneJsonWithNormalizer(sceneJsonString);
+    if (!singleValidation.ok) {
+      throw new Error(singleValidation.error || "Scene JSON validation failed.");
+    }
+    emitSceneReady(sceneJsonString);
+    const fillResult = await maybeFillTextures(sceneJsonString);
+    return {
+      sceneJsonString: projectFinalScene(fillResult.sceneJsonString),
+      textureFillWarning: fillResult.textureFillWarning,
+      steps,
+      agentUsed: false,
+      tokenHint: { rounds: stepIndex || 1, depth }
+    };
+  }
+
+  // Everything below is the quality-focused pipeline for requests the classifier flagged as
+  // actually needing it (or a plain `update`/`fromImage` call with no complexity signal supplied
+  // at all — repair/capability/layout review still apply defensively there too). `preset` is a
+  // fixed policy object rather than a depth-derived lookup: the only thing that's actually
+  // user-configurable now is the refine round budget (maxRefineRounds), everything else here is a
+  // stable default.
   const preset = {
     maxSteps: maxRefineRounds,
     maxRefineRounds,
@@ -1017,7 +1079,12 @@ async function runSceneAgent(input = {}, options = {}) {
       throw new Error("currentSceneJsonString is required for update mode.");
     }
 
-    if (preset.runOutline) {
+    // Same negotiation restoration as the generate fast path above: an edit the classifier didn't
+    // flag as complex skips the outline call entirely and uses the bounded, non-iterative runner
+    // (one good command batch and done — no "keep refining, or say done?" invitation the model can
+    // ramble through for many rounds on a one-line color change).
+    const complex = isComplexTurn(options);
+    if (complex && preset.runOutline) {
       stepIndex += 1;
       emitProgress(
         { step: stepIndex, kind: "outline", message: "Planning scene outline..." },
@@ -1028,12 +1095,14 @@ async function runSceneAgent(input = {}, options = {}) {
     }
 
     let commandStepIndex = stepIndex;
-    // Iterative (apply-as-you-go, refresh context, ask again) is always preferred now — it's
-    // strictly better than "collect one command batch and let the caller apply it once" (see the
-    // module docblock). The only reason to fall back to the non-iterative runner is a caller that
-    // hasn't wired up applyCommands/refreshContext at all (e.g. a bare core/ai script) —
+    // Iterative (apply-as-you-go, refresh context, ask again) is reserved for edits the classifier
+    // actually flagged as complex — it's strictly better *for those*, but forcing it on a trivial
+    // edit just means more rounds asking "do you want to keep polishing?" before a plain,
+    // already-correct one-shot result. Falls back to the non-iterative runner either way when a
+    // caller hasn't wired up applyCommands/refreshContext at all (e.g. a bare core/ai script) —
     // runSceneAgentCommandsUpdateIterative itself requires both and throws without them.
-    const canIterate = typeof options.applyCommands === "function" && typeof options.refreshContext === "function";
+    const canIterate =
+      complex && typeof options.applyCommands === "function" && typeof options.refreshContext === "function";
     const commandRunner = canIterate
       ? runSceneAgentCommandsUpdateIterative
       : runSceneAgentCommandsUpdate;
@@ -1044,7 +1113,9 @@ async function runSceneAgent(input = {}, options = {}) {
       updateOutputMode,
       preset,
       outline,
-      chatOptions,
+      // Same reasoning as the generate fast path: raw streaming only makes sense when this
+      // realistically resolves in one round, which is what the non-iterative runner is for.
+      chatOptions: complex ? chatOptions : { ...chatOptions, onDelta: rawOnDelta },
       onProgress,
       steps,
       getStepIndex: () => commandStepIndex,

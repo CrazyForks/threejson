@@ -29,11 +29,16 @@ test("listTexturePointersSummary on scene with material", () => {
   assert.equal(r.count, 1);
 });
 
-// Every runSceneAgent call below now always runs the full pipeline (outline -> small draft ->
-// repair-if-invalid -> incremental refine-to-done -> capability review -> layout review) — there
-// is no more "agent disabled" bypass. "# done" replies keep the refine/review rounds from looping
-// needlessly in these tests; a fetchMock's fallback branch (anything not explicitly matched)
-// returns "# done" so any extra round a test doesn't care to assert on still terminates cleanly.
+// runSceneAgent now negotiates complexity the way ThreeBox always did (see isComplexTurn's
+// docblock): a request the classifier didn't flag (the default here — no `generationStrategy`
+// option, matching the unambiguous-first-turn shortcut in threeBoxApp.js) takes the FAST path —
+// one call, `agentUsed: false`, no outline/draft-refine-loop/capability-layout review at all.
+// Tests below that want to exercise the full pipeline (outline -> small draft ->
+// repair-if-invalid -> incremental refine-to-done -> capability review -> layout review) pass
+// `generationStrategy: "segmented"` explicitly, the same signal a real complexity classification
+// would produce. "# done" replies keep the refine/review rounds from looping needlessly in those;
+// a fetchMock's fallback branch (anything not explicitly matched) returns "# done" so any extra
+// round a test doesn't care to assert on still terminates cleanly.
 
 test("runSceneAgent repairs an invalid draft once, then completes via done/reviews", async () => {
   const validScene = JSON.stringify(MINIMAL_SCENE);
@@ -60,7 +65,8 @@ test("runSceneAgent repairs an invalid draft once, then completes via done/revie
       { mode: "generate", prompt: "floor" },
       {
         apiKey: "test-key",
-        provider: "deepseek"
+        provider: "deepseek",
+        generationStrategy: "segmented"
       }
     );
     assert.equal(result.agentUsed, true);
@@ -72,7 +78,7 @@ test("runSceneAgent repairs an invalid draft once, then completes via done/revie
   }
 });
 
-test("runSceneAgent generate always runs the agent pipeline — agentUsed is always true", async () => {
+test("runSceneAgent takes the fast single-call path by default (no generationStrategy) — the negotiated-simple case", async () => {
   const scenePayload = JSON.stringify(MINIMAL_SCENE);
   const fetchMock = mock.fn(async () => ({
     ok: true,
@@ -95,10 +101,50 @@ test("runSceneAgent generate always runs the agent pipeline — agentUsed is alw
         provider: "deepseek"
       }
     );
+    // No `generationStrategy` matches ThreeBox's unambiguous-first-turn shortcut (and any other
+    // request the classifier didn't flag) — no outline/draft-refine-loop/sceneAgent-level
+    // capability+layout review overhead at all. This is the fix for "every request, however
+    // trivial, paid the full pipeline's cost" — see isComplexTurn's docblock. Exactly one call is
+    // the common case; generateSceneJsonString's own lightweight internal capability-fit safety
+    // net (sceneAiService.js's maybeApplyCapabilityReview, unrelated to sceneAgent.js's heavier
+    // review stages) may add one more small call here, same as it always could pre-redesign.
+    assert.equal(result.agentUsed, false);
+    assert.ok(result.sceneJsonString.includes("objectList"));
+    assert.ok(fetchMock.mock.calls.length <= 2, `expected <= 2 calls, got ${fetchMock.mock.calls.length}`);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("runSceneAgent runs the full agent pipeline when generationStrategy signals complexity", async () => {
+  const scenePayload = JSON.stringify(MINIMAL_SCENE);
+  const fetchMock = mock.fn(async () => ({
+    ok: true,
+    async text() {
+      return "";
+    },
+    async json() {
+      return {
+        choices: [{ message: { content: scenePayload } }]
+      };
+    }
+  }));
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = fetchMock;
+  try {
+    const result = await runSceneAgent(
+      { mode: "generate", prompt: "a small floor" },
+      {
+        apiKey: "test-key",
+        provider: "deepseek",
+        generationStrategy: "segmented"
+      }
+    );
     // Every call in this mock returns the same already-valid scene, so the outline is free-text,
     // the draft is immediately valid, the draft-refinement loop sees "json" output matching the
     // unchanged scene every round, and only stops once maxRefineRounds is exhausted — this test
-    // only cares that the pipeline always runs and eventually returns a usable scene.
+    // only cares that the pipeline runs (because it was told to) and eventually returns a usable
+    // scene.
     assert.equal(result.agentUsed, true);
     assert.ok(result.sceneJsonString.includes("objectList"));
     assert.ok(fetchMock.mock.calls.length >= 2);
@@ -132,7 +178,8 @@ test("runSceneAgent respects a caller-configured maxRefineRounds cap", async () 
       {
         agent: { maxRefineRounds: 2 },
         apiKey: "test-key",
-        provider: "deepseek"
+        provider: "deepseek",
+        generationStrategy: "segmented"
       }
     );
     assert.equal(result.agentUsed, true);
@@ -182,6 +229,7 @@ test("runSceneAgent texture fill soft-fails and keeps scene JSON", async () => {
         apiKey: "test-key",
         provider: "deepseek",
         agent: { maxRefineRounds: 1 },
+        generationStrategy: "segmented",
         texture: {
           enabled: true,
           imageProvider: {
@@ -404,6 +452,7 @@ test("runSceneAgent emits scene_ready before texture fill", async () => {
         apiKey: "test-key",
         provider: "deepseek",
         agent: { maxRefineRounds: 1 },
+        generationStrategy: "segmented",
         onProgress: (p) => progress.push(p.kind),
         texture: { enabled: false }
       }
@@ -441,6 +490,7 @@ test("runSceneAgent emits stage_preview after repair", async () => {
         apiKey: "test-key",
         provider: "deepseek",
         agent: { maxRefineRounds: 1 },
+        generationStrategy: "segmented",
         onProgress: (p) => progress.push(p.kind)
       }
     );
@@ -479,6 +529,7 @@ test("runSceneAgent refines a valid draft with mixed-output protocol until done"
         agent: { maxRefineRounds: 5 },
         apiKey: "test-key",
         provider: "deepseek",
+        generationStrategy: "segmented",
         onProgress: (event) => progress.push(event)
       }
     );
@@ -531,6 +582,7 @@ test("runSceneAgent iterative apply execs commands and skips final exec batch", 
       {
         apiKey: "test-key",
         provider: "deepseek",
+        generationStrategy: "segmented",
         applyCommands: async (commands, meta) => {
           if (meta.readOnly) {
             return { ok: true, sceneMutated: false };
@@ -553,6 +605,49 @@ test("runSceneAgent iterative apply execs commands and skips final exec batch", 
     assert.equal(refreshCount, 1);
     assert.ok(progress.includes("commands_applied"));
     assert.ok(progress.includes("refine"));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("runSceneAgent update commands stays non-iterative and skips outline for an edit the classifier did not flag as complex", async () => {
+  // Even with applyCommands/refreshContext both supplied (so iteration COULD run), a request with
+  // no generationStrategy (or "single") must not iterate or pay for an outline call — this is
+  // what keeps a one-line "change the color" adjustment fast instead of being invited to keep
+  // "refining" the scene for several rounds before it's allowed to say it's done.
+  const currentScene = JSON.stringify(MINIMAL_SCENE);
+  const validCommands = 'object.patch id=floor partial={"material":{"color":"#336699"}}';
+  const fetchMock = mock.fn(async () => ({
+    ok: true,
+    async text() {
+      return "";
+    },
+    async json() {
+      return { choices: [{ message: { content: validCommands } }] };
+    }
+  }));
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = fetchMock;
+  try {
+    const result = await runSceneAgent(
+      {
+        mode: "update",
+        prompt: "change floor color",
+        currentSceneJsonString: currentScene,
+        outputMode: "commands",
+        updateContext: { objectList: [{ threeJsonId: "floor", objType: "box" }] }
+      },
+      {
+        apiKey: "test-key",
+        provider: "deepseek",
+        applyCommands: async () => ({ ok: true, sceneMutated: true }),
+        refreshContext: async () => ({ currentSceneJsonString: currentScene, objectList: [] })
+      }
+    );
+    assert.equal(result.outputMode, "commands");
+    assert.equal(result.iterativeApplied, undefined);
+    assert.ok(Array.isArray(result.commands) && result.commands.length > 0);
+    assert.equal(fetchMock.mock.calls.length, 1);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -624,7 +719,7 @@ test("runSceneAgent tolerates an outline failure and still produces a scene", as
   try {
     const result = await runSceneAgent(
       { mode: "generate", prompt: "a small floor" },
-      { apiKey: "test-key", provider: "deepseek" }
+      { apiKey: "test-key", provider: "deepseek", generationStrategy: "segmented" }
     );
     assert.ok(result.sceneJsonString.includes("objectList"));
     assert.ok(result.steps.some((s) => s.kind === "outline" && s.ok === false));
@@ -666,7 +761,7 @@ test("runSceneAgent keeps a valid draft when both capability and layout review r
   try {
     const result = await runSceneAgent(
       { mode: "generate", prompt },
-      { apiKey: "test-key", provider: "deepseek" }
+      { apiKey: "test-key", provider: "deepseek", generationStrategy: "segmented" }
     );
     assert.equal(JSON.parse(result.sceneJsonString).threeJsonId, "cabin-scene");
     assert.ok(result.steps.some((s) => s.kind === "capability_review"));

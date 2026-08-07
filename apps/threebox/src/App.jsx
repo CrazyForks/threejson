@@ -774,6 +774,7 @@ export function App() {
             resolveContextPayload: (json) => resolveAiAdjustContextPayload(json, adjustContextSettings),
             agentOptions,
             onAgentProgress,
+            onDelta: (delta) => setStream((prev) => prev + delta),
             locale,
             signal: controller.signal
           });
@@ -801,11 +802,12 @@ export function App() {
             maxSceneSegments: settings.ai.maxSceneSegments,
             agentOptions,
             onAgentProgress,
-            // Not `onDelta`: generation is now many small LLM calls (outline, draft, N refine
-            // rounds, reviews), not one big one — see the matching comment in
-            // tools/scene-host/shared/js/aiTurnOrchestrator.js's runAiGenerateTurn. onAgentProgress
-            // above (numbered status lines) plus onSceneDraft-driven onScenePreview are the UI
-            // feedback now instead of raw streamed JSON text.
+            // Safe to always pass: core/ai negotiates complexity itself (see
+            // core/ai/sceneAgent.js's isComplexTurn) — onDelta only ever actually fires for a
+            // request that stays a single fast call; a multi-call complex turn never receives it
+            // (see aiTurnOrchestrator.js's runAiGenerateTurn), so it can't garble several calls'
+            // text together.
+            onDelta: (delta) => setStream((prev) => prev + delta),
             onSceneDraft: onScenePreview,
             onGenerationPhase: (phase) => {
               if (phase?.phase === "compact-retry") {

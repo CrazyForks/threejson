@@ -164,6 +164,11 @@ export async function runEditorAiUpdate({
             depth: agentOptions.depth || "medium",
             iterativeApply
           },
+          // core/ai/sceneAgent.js now negotiates complexity itself (see isComplexTurn) — this
+          // legacy caller's own `agentOptions.iterativeApply` was already its explicit "I want
+          // multi-round iteration" signal, so it maps directly rather than defaulting to the
+          // fast/single-attempt path every caller here would otherwise silently get.
+          generationStrategy: iterativeApply ? "segmented" : "single",
           onProgress,
           applyCommands: async function applyAgentCommands(commands, meta = {}) {
             const roundLabel = meta.label || label;

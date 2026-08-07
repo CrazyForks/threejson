@@ -696,7 +696,9 @@ async function main() {
     targetTurnId,
     turnContext = createThreeBoxTurnContext(turnId, text),
     selectedCapabilityIds = [],
-    requiresAnimation = false
+    requiresAnimation = false,
+    generationStrategy = "single",
+    estimatedSegments = 1
   }) {
     const settings = settingsModal.getSettings();
     const selectedProviderId = document.getElementById("composerModelSelect")?.value;
@@ -772,6 +774,12 @@ async function main() {
         onlineTextureHints: settings.ai?.onlineTextureHints !== false,
         selectedCapabilityIds,
         animationCapabilities: requiresAnimation === true,
+        // Restores the same complexity negotiation generate turns get (see
+        // core/ai/sceneAgent.js's isComplexTurn docblock) — a plain one-line edit stays a single
+        // bounded attempt instead of being invited to iterate for several rounds before it's
+        // allowed to say it's done.
+        generationStrategy,
+        estimatedSegments,
         signal: abortController.signal
       });
       clearBusyIfCurrent();
@@ -1071,7 +1079,9 @@ async function main() {
         targetTurnId: route.targetTurnId,
         turnContext,
         selectedCapabilityIds: classified.selectedCapabilityIds,
-        requiresAnimation: classified.requiresAnimation
+        requiresAnimation: classified.requiresAnimation,
+        generationStrategy: classified.generationStrategy,
+        estimatedSegments: classified.estimatedSegments
       });
     } else {
       await handleGenerateTurn(text, api, {
