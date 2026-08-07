@@ -1,11 +1,15 @@
 /**
- * Scene agent: always draft-then-incrementally-refine. There is no more "single-turn vs
- * multi-turn agent" distinction — a one-shot full-JSON generation is exactly the pattern that
- * made large/complex scenes truncate or fail, so it is no longer a mode you can opt into or out
- * of here. What used to be depth-gated ("simple"/"medium"/"deep"/"auto" — see the now-removed
- * agentDepth.js) is now a single user-configurable round budget (see normalizeAgentOptions
- * below): the model can always finish early via `# done`, the cap only guards against a runaway
- * loop.
+ * Scene agent: negotiates fast-vs-thorough per turn instead of hardcoding one for every request.
+ * There is no more manual "enable multi-turn Agent" checkbox or depth preset (see the now-removed
+ * agentDepth.js) — but this was never meant to make every request pay the full pipeline's cost
+ * either. The AI's own structured turn classification already decides this (see isComplexTurn):
+ * a request it flagged as fitting one response — including "compact", which specifically means
+ * "simplify so it fits one response," not "this is complex" — stays a single fast call, exactly
+ * the old single-shot behavior. Only "segmented" (the AI's own signal that it genuinely needs
+ * more than one response) pays for the draft-then-incrementally-refine pipeline below. What used
+ * to be a fixed depth-derived round count is now a single user-configurable round *budget* (see
+ * normalizeAgentOptions below): the model still decides when it's actually done via `# done`; the
+ * cap only guards against a runaway loop, it is never the target round count.
  *
  * Two distinct round loops remain (deliberately not merged into one implementation): `generate`
  * mode's post-draft elaboration goes through runOptionalDraftRefinement (full-scene-context,
@@ -81,20 +85,33 @@ const MAX_REPAIR_ATTEMPTS = 2;
 
 /**
  * Restores the "negotiation" behavior ThreeBox always had: a follow-up turn's intent classifier
- * (tools/scene-host/threebox/js/threeBoxTurnState.js's classifyThreeBoxTurnIntent, or a hardcoded
- * "single"/1 for the unambiguous first turn of a conversation) already decides how complex a
- * request looks — simple requests should stay fast (one call, no outline/refine/review overhead),
- * only requests actually flagged as needing segmented/compact handling pay for the full
- * draft-then-refine pipeline. This was lost when the pipeline briefly became "always full
- * pipeline, no matter how trivial the request" — that made every request pay the worst case's
- * cost regardless of whether it needed it, which is the opposite of what the classifier was for.
+ * (core/ai/sceneChatSession.js's classifyTurnIntent, or a hardcoded "single"/1 for the
+ * unambiguous first turn of a conversation) already decides how complex a request looks and
+ * reports it back in its own structured response — the program doesn't get to override that.
+ *
+ * The classifier's `generationStrategy` has three values, only ONE of which means "this needs
+ * more than a single call":
+ *   - "single":    fits one response as-is.
+ *   - "compact":   ALSO meant to fit in exactly one response — the classifier tells the model to
+ *                  simplify (instancing, bounded samples, fewer explicit records) specifically so
+ *                  it *doesn't* need multiple calls. See sceneChatSession.js's compact
+ *                  instruction. This is NOT a "the request is complex" signal.
+ *   - "segmented": the only one that genuinely means multiple responses are needed.
+ * Treating "compact" as if it meant "run the full draft-then-refine pipeline" was the bug: the
+ * classifier is guided to prefer "compact" over "segmented" whenever it isn't confident segmented
+ * output is supported ("If you are not confident that strict segmented output is supported,
+ * choose compact instead"), so most non-trivial prompts land on "compact" — misreading it as
+ * complex meant almost everything paid the full pipeline's cost regardless of what the AI itself
+ * decided.
+ *
+ * `generationStrategy` is the AI's own structured decision — trust it directly rather than
+ * second-guessing it against `estimatedSegments` (a secondary detail of the same decision, not a
+ * separate vote).
  * @param {object} options runSceneAgent's own options bag
  * @returns {boolean}
  */
 function isComplexTurn(options) {
-  const strategy = String(options?.generationStrategy || "single").toLowerCase();
-  const segments = Number(options?.estimatedSegments) || 1;
-  return strategy !== "single" || segments > 1;
+  return String(options?.generationStrategy || "single").toLowerCase() === "segmented";
 }
 
 /**
@@ -1008,11 +1025,13 @@ async function runSceneAgent(input = {}, options = {}) {
   };
 
   // Fast path: a request the turn classifier (or the unambiguous-first-turn shortcut — see
-  // threeBoxApp.js) did NOT flag as needing segmented/compact handling stays a single call, no
+  // threeBoxApp.js) did NOT flag "segmented" stays a single call, no
   // outline/draft-refine-loop/capability-review/layout-review overhead — exactly the old
-  // single-shot behavior, restored deliberately. Paying the full multi-round pipeline's cost for
-  // "add a cube" was the actual regression: the pipeline exists for scenes the classifier already
-  // knows are complex, not as a mandatory tax on every request regardless of size.
+  // single-shot behavior, restored deliberately. "compact" takes this same fast path too (see
+  // isComplexTurn) — it means "simplify so it fits one response," not "this is complex." Paying
+  // the full multi-round pipeline's cost for "add a cube" (or for any prompt merely classified
+  // "compact") was the actual regression: the pipeline exists for the one case the AI itself says
+  // genuinely needs multiple responses, not as a mandatory tax on every non-trivial request.
   if ((mode === "generate" || mode === "fromImage") && !isComplexTurn(options)) {
     if (mode === "fromImage" && (input.image === undefined || input.image === null)) {
       throw new Error("image is required for fromImage mode.");

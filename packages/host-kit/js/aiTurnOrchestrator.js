@@ -148,6 +148,11 @@ export async function runAiGenerateTurn({
       resolveReferenceUrl: resolveSceneAiReferenceUrl,
       capabilityLookup,
       onlineTextureHints,
+      // `generationStrategy` itself (not just the derived `segmentedOutput` boolean below) has to
+      // reach runSceneAgent — its isComplexTurn check reads this exact field to decide fast vs.
+      // full-pipeline, per what the classifier (or the caller) actually decided. Omitting it here
+      // silently forced every turn through isComplexTurn's "single" default.
+      generationStrategy,
       estimatedSegments,
       segmentedOutput: generationStrategy === "segmented",
       maxSceneSegments,

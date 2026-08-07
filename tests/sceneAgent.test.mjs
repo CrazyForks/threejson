@@ -116,6 +116,43 @@ test("runSceneAgent takes the fast single-call path by default (no generationStr
   }
 });
 
+test('runSceneAgent treats generationStrategy "compact" as the fast single-call path, not as complex', async () => {
+  // Regression test for a real bug: "compact" means "the AI simplified the scene so it fits one
+  // response" (see sceneChatSession.js's compact instruction) — it is NOT a signal that the
+  // request is complex. The classifier is guided to prefer "compact" over "segmented" whenever
+  // it isn't confident segmented output is supported, so most non-trivial prompts land on
+  // "compact" — treating it as complex meant almost every real request paid the full
+  // draft-then-refine pipeline's cost regardless of what the AI itself decided.
+  const scenePayload = JSON.stringify(MINIMAL_SCENE);
+  const fetchMock = mock.fn(async () => ({
+    ok: true,
+    async text() {
+      return "";
+    },
+    async json() {
+      return { choices: [{ message: { content: scenePayload } }] };
+    }
+  }));
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = fetchMock;
+  try {
+    const result = await runSceneAgent(
+      { mode: "generate", prompt: "a large but simplified crowd scene" },
+      {
+        apiKey: "test-key",
+        provider: "deepseek",
+        generationStrategy: "compact",
+        estimatedSegments: 1
+      }
+    );
+    assert.equal(result.agentUsed, false);
+    assert.ok(result.sceneJsonString.includes("objectList"));
+    assert.ok(fetchMock.mock.calls.length <= 2, `expected <= 2 calls, got ${fetchMock.mock.calls.length}`);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("runSceneAgent runs the full agent pipeline when generationStrategy signals complexity", async () => {
   const scenePayload = JSON.stringify(MINIMAL_SCENE);
   const fetchMock = mock.fn(async () => ({
