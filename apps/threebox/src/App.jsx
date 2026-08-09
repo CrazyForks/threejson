@@ -66,13 +66,12 @@ import { useComposerAttach, ATTACH_KIND_ORDER } from "./useComposerAttach.js";
 import { TemplateCard } from "./TemplateCard.jsx";
 
 /**
- * Ported from threeBoxApp.js's createAgentProgressUpdater. Accumulates the agent's progress into a
- * numbered list shown in the streaming block; `{kind:"stream", previewDelta}` progress is appended
- * as raw stream text. When a draft scene arrives (`stage_preview`/`scene_ready` with a
+ * Ported from threeBoxApp.js's createAgentProgressUpdater. Shows the current stage in the existing
+ * compact spinning activity block; `{kind:"stream", previewDelta}` progress is appended as raw
+ * stream text. When a draft scene arrives (`stage_preview`/`scene_ready` with a
  * sceneJsonString), `onScenePreview` renders it into the card so the user watches the scene build up.
  */
 function createAgentProgressUpdater(setStream, onScenePreview) {
-  const lines = [];
   let streamBuffer = "";
   return (progress) => {
     if (!progress) {
@@ -97,14 +96,13 @@ function createAgentProgressUpdater(setStream, onScenePreview) {
     if (!label) {
       return;
     }
-    lines.push(`${lines.length + 1}. ${label}`);
-    setStream(lines.slice(-12).join("\n"));
+    setStream(label);
   };
 }
 
 /** Ported from threeBoxApp.js's buildAgentProcessSummary — a compact markdown recap of the agent's
  * steps, appended to the assistant message when the agent actually ran. */
-function buildAgentProcessSummary(agentResult, heading) {
+function buildAgentProcessSummary(agentResult, heading, budgetMessage) {
   if (!agentResult?.agentUsed || !Array.isArray(agentResult.steps)) {
     return "";
   }
@@ -114,6 +112,9 @@ function buildAgentProcessSummary(agentResult, heading) {
     const extra = step.error ? `: ${step.error}` : step.count != null ? ` (${step.count})` : "";
     return `${index + 1}. ${kind} - ${state}${extra}`;
   });
+  if (agentResult.completed === false && agentResult.stopReason === "budget_exhausted") {
+    lines.unshift(budgetMessage);
+  }
   const more =
     agentResult.steps.length > lines.length ? `\n... ${agentResult.steps.length - lines.length} more step(s)` : "";
   return [`**${heading}**`, ...lines, more].filter(Boolean).join("\n");
@@ -802,11 +803,8 @@ export function App() {
             maxSceneSegments: settings.ai.maxSceneSegments,
             agentOptions,
             onAgentProgress,
-            // Safe to always pass: core/ai negotiates complexity itself (see
-            // core/ai/sceneAgent.js's isComplexTurn) — onDelta only ever actually fires for a
-            // request that stays a single fast call; a multi-call complex turn never receives it
-            // (see aiTurnOrchestrator.js's runAiGenerateTurn), so it can't garble several calls'
-            // text together.
+            // Kept for API compatibility. The multi-call agent reports stage progress and scene
+            // previews instead of concatenating raw deltas from unrelated model calls.
             onDelta: (delta) => setStream((prev) => prev + delta),
             onSceneDraft: onScenePreview,
             onGenerationPhase: (phase) => {
@@ -836,7 +834,14 @@ export function App() {
         });
         const baseText = adjusting ? L(`场景已调整（${stage}）。`, `Scene adjusted (${stage}).`) : L("场景已生成。", "Scene generated.");
         // If the multi-turn agent actually ran, append its step recap (markdown) below the status.
-        const agentProcess = buildAgentProcessSummary(agentResult, L("Agent 过程", "Agent process"));
+        const agentProcess = buildAgentProcessSummary(
+          agentResult,
+          L("Agent 过程", "Agent process"),
+          L(
+            "已达到自动细化轮数上限；当前场景可用，但 AI 未明确确认已经完善完成。",
+            "The automatic refinement limit was reached. The scene is usable, but the AI did not explicitly confirm completion."
+          )
+        );
         const finalFields = {
           text: agentProcess ? `${baseText}\n\n${agentProcess}` : baseText,
           // The orchestrator already handed us the parsed scene object; the message's own SceneCard
@@ -1353,7 +1358,7 @@ export function App() {
                 <img src={LOGO_URL} alt="ThreeBox" />
               </div>
               <div className="chatMessageBody">
-                <pre className="streamingPreview">{stream ? stream.slice(-2000) : L("正在生成…", "Generating…")}</pre>
+                <pre className="streamingPreview streamingPreviewPending streamingPreviewProcessing">{stream ? stream.slice(-2000) : L("正在生成…", "Generating…")}</pre>
               </div>
             </div>
           )}

@@ -384,7 +384,6 @@ async function main() {
   }
 
   function createAgentProgressUpdater(streaming, onScenePreview) {
-    const lines = [];
     let streamBuffer = "";
     return (progress) => {
       if (!progress) {
@@ -410,8 +409,9 @@ async function main() {
       if (!label) {
         return;
       }
-      lines.push(`${lines.length + 1}. ${label}`);
-      streaming.update(lines.slice(-12).join("\n"));
+      // Keep the original compact spinning activity UI. update() clears its processing class, so
+      // using it for a growing numbered debug log unnecessarily removed the polished wait state.
+      streaming.processing(label);
     };
   }
 
@@ -425,6 +425,12 @@ async function main() {
       const extra = step.error ? `: ${step.error}` : step.count != null ? ` (${step.count})` : "";
       return `${index + 1}. ${kind} - ${state}${extra}`;
     });
+    if (agentResult.completed === false && agentResult.stopReason === "budget_exhausted") {
+      lines.unshift(t(
+        "threebox.agent.refineBudgetExhausted",
+        "已达到自动细化轮数上限；当前场景可用，但 AI 未明确确认已经完善完成。"
+      ));
+    }
     const more = agentResult.steps.length > lines.length ? `\n... ${agentResult.steps.length - lines.length} more step(s)` : "";
     return [`**Agent process**`, ...lines, more].filter(Boolean).join("\n");
   }
@@ -730,7 +736,26 @@ async function main() {
     streaming.processing(t("threebox.chat.adjusting", "正在调整…"));
     let streamBuffer = "";
     const agentOptions = resolveThreeBoxAgentOptions(settings);
-    const updateAgentProgress = createAgentProgressUpdater(streaming);
+    const sceneCard = createConfiguredSceneCard();
+    let previewRenderQueue = Promise.resolve();
+    let previewQueueOpen = true;
+    let lastQueuedPreviewJson = "";
+    api.appendToBody(textEl, sceneCard.el);
+    const queueScenePreview = (sceneJsonString) => {
+      if (!sceneJsonString || sceneJsonString === lastQueuedPreviewJson) {
+        return;
+      }
+      lastQueuedPreviewJson = sceneJsonString;
+      previewRenderQueue = previewRenderQueue
+        .catch((error) => {
+          console.warn("[threebox] previous adjustment preview render failed:", error);
+        })
+        .then(() => previewQueueOpen
+          ? sceneCard.render(JSON.parse(sceneJsonString), { label: text, draft: true })
+          : null);
+    };
+    queueScenePreview(targetSceneJsonString);
+    const updateAgentProgress = createAgentProgressUpdater(streaming, queueScenePreview);
 
     // See handleGenerateTurn's matching comment.
     const abortController = new AbortController();
@@ -774,10 +799,8 @@ async function main() {
         onlineTextureHints: settings.ai?.onlineTextureHints !== false,
         selectedCapabilityIds,
         animationCapabilities: requiresAnimation === true,
-        // Restores the same complexity negotiation generate turns get (see
-        // core/ai/sceneAgent.js's isComplexTurn docblock) — a plain one-line edit stays a single
-        // bounded attempt instead of being invited to iterate for several rounds before it's
-        // allowed to say it's done.
+        // Transport metadata remains useful for full-JSON fallbacks, but ordinary adjustment is
+        // always iterative and stops as soon as the model returns # done.
         generationStrategy,
         estimatedSegments,
         signal: abortController.signal
@@ -792,16 +815,16 @@ async function main() {
       streaming.remove();
       const agentSummary = buildAgentProcessSummary(result.agentResult);
       if (agentSummary) {
-        api.appendToBody(textEl, api.buildSummaryBlock(agentSummary));
+        api.insertBeforeBody(textEl, api.buildSummaryBlock(agentSummary), sceneCard.el);
       }
       // Show what the AI actually produced (commands / JSON Patch) above the merged final JSON,
       // so the user can see the diff the model generated instead of only the end result.
       if (result.stage === "commands" && result.commands?.length) {
-        api.appendToBody(textEl, api.buildDiffCollapse("commands", JSON.stringify(result.commands, null, 2)));
+        api.insertBeforeBody(textEl, api.buildDiffCollapse("commands", JSON.stringify(result.commands, null, 2)), sceneCard.el);
       } else if (result.stage === "json-incremental" && result.patch) {
-        api.appendToBody(textEl, api.buildDiffCollapse("patch", JSON.stringify(result.patch, null, 2)));
+        api.insertBeforeBody(textEl, api.buildDiffCollapse("patch", JSON.stringify(result.patch, null, 2)), sceneCard.el);
       }
-      api.appendToBody(textEl, api.buildJsonCollapse(outputSceneJsonString));
+      api.insertBeforeBody(textEl, api.buildJsonCollapse(outputSceneJsonString), sceneCard.el);
 
       // Match handleGenerateTurn: title + recap start together, while the scene card is inserted
       // and rendered immediately. A later title response only updates the card label/file name.
@@ -833,11 +856,13 @@ async function main() {
             }).catch(() => "")
           : Promise.resolve("");
 
-      const sceneCard = createConfiguredSceneCard();
-      api.appendToBody(textEl, sceneCard.el);
       const resolvedTitlePromise = titlePromise.then((title) => {
         sceneCard.setLabel(title || text);
         return title;
+      });
+      previewQueueOpen = false;
+      void previewRenderQueue.catch((error) => {
+        console.warn("[threebox] superseded adjustment preview render failed:", error);
       });
       await sceneCard.render(outputSceneJson, { label: text });
       sceneCardsByTurnId.set(turnId, sceneCard);
@@ -908,7 +933,9 @@ async function main() {
         targetTurnId,
         turnContext,
         selectedCapabilityIds,
-        requiresAnimation
+        requiresAnimation,
+        generationStrategy,
+        estimatedSegments
       }));
       api.finishTurnScroll();
     }
@@ -1039,22 +1066,9 @@ async function main() {
     const allPriorTurns = await getTurnsForConversation(conversationId).catch(() => []);
     const priorTurns = allPriorTurns.filter(isSceneContextTurn);
 
-    // A conversation with no scene context can only be a new generation. Avoid spending a full
-    // provider round-trip on intent negotiation in this unambiguous case; follow-up turns retain
-    // the classifier so generate-vs-adjust routing remains conservative.
-    if (priorTurns.length === 0) {
-      await handleGenerateTurn(text, api, {
-        conversationId,
-        turnId,
-        turnContext,
-        generationStrategy: "single",
-        estimatedSegments: 1,
-        selectedCapabilityIds: [],
-        requiresAnimation: settings.ai?.animationCapabilityMode === "on"
-      });
-      return;
-    }
-
+    // Classify even the first generation turn. Its route is unambiguously "generate", but the
+    // same negotiation also selects detailed ThreeJSON capabilities, animation support and the
+    // optional full-JSON transport strategy. None of those fields controls automatic refinement.
     const history = priorTurns.map((t) => ({
       turnId: t.id,
       summary: t.recapSummary || t.userPrompt,

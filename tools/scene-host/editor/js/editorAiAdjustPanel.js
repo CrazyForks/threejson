@@ -1,7 +1,8 @@
 import { buildStructuredTurnEnvelope, parseSceneJsonString, sceneToStandardJsonSimple } from "threejson";
 import {
   batchResultsHaveSceneMutation,
-  batchResultsHaveSuccessfulAdjustment
+  batchResultsHaveSuccessfulAdjustment,
+  formatObjectGetFeedbackFromBatch
 } from "../../../../core/ai/sceneCommandSkill.js";
 import { resolveAiAdjustContextPayload, runAiAdjustTurn } from "../../shared/js/aiTurnOrchestrator.js";
 import {
@@ -232,7 +233,6 @@ export function createEditorAiAdjustPanel(host) {
    * historyCtl.updateMessage) so the "still busy" activity styling stays in effect until the turn
    * actually finishes — same approach as editorAiGeneratePanel.js's createGenerateStatusUpdater. */
   function createAdjustStatusUpdater(assistantBody) {
-    const lines = [];
     return (progress) => {
       if (!progress || !assistantBody) {
         return;
@@ -241,8 +241,7 @@ export function createEditorAiAdjustPanel(host) {
       if (!label) {
         return;
       }
-      lines.push(`${lines.length + 1}. ${label}`);
-      assistantBody.textContent = lines.slice(-12).join("\n");
+      assistantBody.textContent = label;
       historyCtl.scrollToBottom();
     };
   }
@@ -301,6 +300,16 @@ export function createEditorAiAdjustPanel(host) {
    * extra wiring. Falls back to a full scene replace for the json-full/json-incremental stages,
    * which have no "commands" to replay. */
   async function applyAdjustResult(result, successMessage) {
+    if (result.liveApplied === true) {
+      return notifyCommandBatchOutcome(
+        {
+          ok: true,
+          results: result.liveBatchResults || [],
+          sceneMutated: result.liveSceneMutated === true
+        },
+        successMessage
+      );
+    }
     if (result.stage === "commands" && Array.isArray(result.commands) && result.commands.length) {
       host.getCommandLayer().ensure();
       const batch = await host.getCommandLayer().runBatch(result.commands, { label: "AI 调整" });
@@ -386,6 +395,8 @@ export function createEditorAiAdjustPanel(host) {
         includeReferenceLinks: true
       });
       const updateOutputMode = host.getEditorSettings()?.ai?.updateOutputMode || "auto";
+      const liveBatchResults = [];
+      let liveSceneMutated = false;
       const result = await runAiAdjustTurn({
         userPrompt: effectivePrompt,
         envelope,
@@ -396,11 +407,48 @@ export function createEditorAiAdjustPanel(host) {
         strictOutputMode: updateOutputMode !== "auto",
         resolveContextPayload: (sceneJson) => resolveAiAdjustContextPayload(sceneJson, host.getEditorSettings()?.ai || {}),
         onAgentProgress: createAdjustStatusUpdater(assistantBody),
+        applyCommands: async (commands, meta = {}) => {
+          abortController.signal.throwIfAborted?.();
+          host.getCommandLayer().ensure();
+          const batch = await host.getCommandLayer().runBatch(commands, {
+            label: meta.label || `AI 自动调整第 ${meta.round || 1} 轮`
+          });
+          const results = Array.isArray(batch?.results) ? batch.results : [];
+          liveBatchResults.push(...results);
+          const sceneMutated = batch?.sceneMutated === true || batchResultsHaveSceneMutation(results);
+          liveSceneMutated = liveSceneMutated || sceneMutated;
+          return {
+            ok: batch?.ok !== false,
+            sceneMutated,
+            objectGetFeedback: formatObjectGetFeedbackFromBatch(results),
+            error: results.find((item) => item?.ok === false)?.error
+          };
+        },
+        refreshContext: async () => {
+          const currentSceneJsonString = await getSceneJsonText();
+          const currentSceneJson = parseSceneJsonString(currentSceneJsonString);
+          return {
+            ...resolveAiAdjustContextPayload(currentSceneJson, host.getEditorSettings()?.ai || {}),
+            currentSceneJsonString,
+            fullSceneJson: currentSceneJsonString
+          };
+        },
         capabilityLookup: true,
         onlineTextureHints: true,
         signal: abortController.signal
       });
-      const resultText = await applyAdjustResult(result, t("editor.ai.edit.adjustDone", "AI 已更新场景。"));
+      if (result.liveApplied === true) {
+        result.liveBatchResults = liveBatchResults;
+        result.liveSceneMutated = liveSceneMutated;
+      }
+      let resultText = await applyAdjustResult(result, t("editor.ai.edit.adjustDone", "AI 已更新场景。"));
+      if (result.agentResult?.completed === false) {
+        resultText = t(
+          "editor.ai.message.refineBudgetExhausted",
+          "场景调整已应用，但自动细化达到轮数上限，AI 未明确确认已经完善完成。"
+        );
+        host.showMessage(resultText, "warning");
+      }
 
       historyCtl.updateMessage(assistantBody, resultText);
       void historyCtl.persistTurn("assistant", resultText);

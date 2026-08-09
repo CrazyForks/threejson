@@ -71,6 +71,12 @@ export function formatAgentProgressLabel(progress, t) {
         "Checking whether the scene makes full use of relevant capabilities (attempt {attempt}/{maxAttempts})…",
         { attempt: roundNum, maxAttempts: roundMax }
       );
+    case "adjustment_refinement":
+      return t(
+        "aiAgent.progress.adjustmentRefinementPreview",
+        "Adjustment preview updated (round {round}/{maxRounds}).",
+        { round, maxRounds }
+      );
     case "layout_review":
       return t(
         "aiAgent.progress.layoutReview",

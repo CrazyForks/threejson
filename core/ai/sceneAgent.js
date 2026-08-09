@@ -1,22 +1,15 @@
 /**
- * Scene agent: negotiates fast-vs-thorough per turn instead of hardcoding one for every request.
- * There is no more manual "enable multi-turn Agent" checkbox or depth preset (see the now-removed
- * agentDepth.js) — but this was never meant to make every request pay the full pipeline's cost
- * either. The AI's own structured turn classification already decides this (see isComplexTurn):
- * a request it flagged as fitting one response — including "compact", which specifically means
- * "simplify so it fits one response," not "this is complex" — stays a single fast call, exactly
- * the old single-shot behavior. Only "segmented" (the AI's own signal that it genuinely needs
- * more than one response) pays for the draft-then-incrementally-refine pipeline below. What used
- * to be a fixed depth-derived round count is now a single user-configurable round *budget* (see
- * normalizeAgentOptions below): the model still decides when it's actually done via `# done`; the
- * cap only guards against a runaway loop, it is never the target round count.
+ * Scene agent: every ordinary generation creates a small valid draft and then improves it through
+ * automatic incremental rounds; every ordinary command-based adjustment iterates in the same way
+ * when the host supplies apply/refresh callbacks. `generationStrategy` belongs to the independent
+ * full-JSON transport protocol (single/compact/segmented) and must never disable this quality
+ * pipeline. The model decides when the scene is satisfactory via `# done`; maxRefineRounds is only
+ * a user-configurable runaway guard, not a target round count.
  *
- * Two distinct round loops remain (deliberately not merged into one implementation): `generate`
- * mode's post-draft elaboration goes through runOptionalDraftRefinement (full-scene-context,
- * commands/patch/full-JSON/done cascade, works with or without a live runtime); `update`/adjust
- * mode's editing loop goes through runSceneAgentCommandsUpdateIterative (cheap spatial-summary
- * context, richer exploration/validation hooks tailored to editing an existing live scene). They
- * share the same round-budget setting and the same patch handling (commandsFromPatchResult).
+ * Generation and adjustment share the same commands/patch/full-JSON/done protocol, compact spatial
+ * context and round-budget semantics. Their small host adapters remain separate only because a
+ * generated draft may be applied through a stateless callback while adjustment owns a reusable
+ * live/off-screen runtime with refresh/exploration hooks.
  *
  * Repair/capability-review/layout-review still exist (real domain knowledge lives in
  * evaluateSceneCapabilityFit/buildLayoutReviewPrompt); capability/layout fixes now go through
@@ -51,6 +44,10 @@ import {
 import { fillTextureUrls, createOpenAiImageProvider } from "./textureAiService.js";
 import { matchIntentSignals } from "./sceneCapability.js";
 import { fetchReferenceMaterial } from "./sceneReferenceCatalog.js";
+import {
+  buildObjectSpatialCardsFromSceneJson,
+  buildSceneScaleProfile
+} from "./sceneSpatialContext.js";
 
 /**
  * @typedef {object} SceneAgentProgress
@@ -82,37 +79,6 @@ const DEFAULT_MAX_REFINE_ROUNDS = 20;
 const HARD_MAX_REFINE_ROUNDS = 60;
 const MAX_CAPABILITY_REVIEW_ATTEMPTS = 1;
 const MAX_REPAIR_ATTEMPTS = 2;
-
-/**
- * Restores the "negotiation" behavior ThreeBox always had: a follow-up turn's intent classifier
- * (core/ai/sceneChatSession.js's classifyTurnIntent, or a hardcoded "single"/1 for the
- * unambiguous first turn of a conversation) already decides how complex a request looks and
- * reports it back in its own structured response — the program doesn't get to override that.
- *
- * The classifier's `generationStrategy` has three values, only ONE of which means "this needs
- * more than a single call":
- *   - "single":    fits one response as-is.
- *   - "compact":   ALSO meant to fit in exactly one response — the classifier tells the model to
- *                  simplify (instancing, bounded samples, fewer explicit records) specifically so
- *                  it *doesn't* need multiple calls. See sceneChatSession.js's compact
- *                  instruction. This is NOT a "the request is complex" signal.
- *   - "segmented": the only one that genuinely means multiple responses are needed.
- * Treating "compact" as if it meant "run the full draft-then-refine pipeline" was the bug: the
- * classifier is guided to prefer "compact" over "segmented" whenever it isn't confident segmented
- * output is supported ("If you are not confident that strict segmented output is supported,
- * choose compact instead"), so most non-trivial prompts land on "compact" — misreading it as
- * complex meant almost everything paid the full pipeline's cost regardless of what the AI itself
- * decided.
- *
- * `generationStrategy` is the AI's own structured decision — trust it directly rather than
- * second-guessing it against `estimatedSegments` (a secondary detail of the same decision, not a
- * separate vote).
- * @param {object} options runSceneAgent's own options bag
- * @returns {boolean}
- */
-function isComplexTurn(options) {
-  return String(options?.generationStrategy || "single").toLowerCase() === "segmented";
-}
 
 /**
  * @param {object} agentOptions
@@ -462,12 +428,13 @@ async function runSceneAgentCommandsUpdateIterative(params) {
   let lastRawContent = "";
   let appliedRounds = 0;
   let anySceneMutated = false;
-  let lastCommands = [];
+  const appliedCommands = [];
 
   // Resolved once for the whole turn — see runSceneAgentCommandsUpdate's matching comment.
   const referenceMaterial = await resolveAgentReferenceMaterial(userPrompt, chatOptions);
 
   for (let refineRound = 1; refineRound <= maxRefineRounds; refineRound += 1) {
+    chatOptions?.signal?.throwIfAborted?.();
     setStepIndex(getStepIndex() + 1);
     emitProgress(
       {
@@ -560,12 +527,13 @@ async function runSceneAgentCommandsUpdateIterative(params) {
     }
 
     const commands = commandResult.commands;
-    if (commandScriptIndicatesDone(lastRawContent)) {
+    const modelSaysDone = commandScriptIndicatesDone(lastRawContent);
+    if (commandListIsEmptyOrCommentsOnly(commands) && modelSaysDone) {
       steps.push({ kind: "refine_done", round: refineRound, ok: true, appliedRounds });
       return {
         outputMode: "commands",
         commandScript: commandResult.commandScript,
-        commands: lastCommands,
+        commands: appliedCommands,
         steps,
         agentUsed: true,
         iterativeApplied: true,
@@ -573,6 +541,8 @@ async function runSceneAgentCommandsUpdateIterative(params) {
         appliedRounds,
         sceneMutated: anySceneMutated,
         execOk: true,
+        completed: true,
+        stopReason: "model_done",
         tokenHint: { rounds: getStepIndex(), depth, maxSteps: preset.maxSteps }
       };
     }
@@ -591,6 +561,7 @@ async function runSceneAgentCommandsUpdateIterative(params) {
     }
 
     const readOnly = !commandListHasMutatingOp(commands);
+    chatOptions?.signal?.throwIfAborted?.();
     const applied = await applyCommands(commands, {
       round: refineRound,
       readOnly,
@@ -601,6 +572,7 @@ async function runSceneAgentCommandsUpdateIterative(params) {
       steps.push({ kind: "refine", round: refineRound, ok: false, error: lastError });
       continue;
     }
+    appliedCommands.push(...commands);
     if (applied.objectGetFeedback) {
       baseContext.objectGetFeedback = [baseContext.objectGetFeedback, applied.objectGetFeedback]
         .filter(Boolean)
@@ -609,7 +581,6 @@ async function runSceneAgentCommandsUpdateIterative(params) {
 
     if (!readOnly) {
       appliedRounds += 1;
-      lastCommands = commands;
       anySceneMutated = anySceneMutated || applied.sceneMutated === true;
       emitProgress(
         {
@@ -627,6 +598,18 @@ async function runSceneAgentCommandsUpdateIterative(params) {
     if (fresh && typeof fresh === "object") {
       Object.assign(baseContext, fresh);
     }
+    if (!readOnly && typeof baseContext.currentSceneJsonString === "string") {
+      emitStagePreview({
+        sceneJsonString: baseContext.currentSceneJsonString,
+        onProgress,
+        getStepIndex,
+        setStepIndex,
+        stage: "adjustment_refinement",
+        round: refineRound,
+        maxRounds: maxRefineRounds,
+        message: `Adjustment refinement preview ${refineRound}.`
+      });
+    }
 
     steps.push({
       kind: readOnly ? "explore" : "refine_apply",
@@ -635,11 +618,11 @@ async function runSceneAgentCommandsUpdateIterative(params) {
       count: commands.length
     });
 
-    if (commandScriptIndicatesDone(lastRawContent)) {
+    if (modelSaysDone) {
       return {
         outputMode: "commands",
         commandScript: commandResult.commandScript,
-        commands: lastCommands,
+        commands: appliedCommands,
         steps,
         agentUsed: true,
         iterativeApplied: true,
@@ -647,6 +630,8 @@ async function runSceneAgentCommandsUpdateIterative(params) {
         appliedRounds,
         sceneMutated: anySceneMutated,
         execOk: appliedRounds > 0,
+        completed: true,
+        stopReason: "model_done",
         tokenHint: { rounds: getStepIndex(), depth, maxSteps: preset.maxSteps }
       };
     }
@@ -655,7 +640,7 @@ async function runSceneAgentCommandsUpdateIterative(params) {
   if (appliedRounds > 0) {
     return {
       outputMode: "commands",
-      commands: lastCommands,
+      commands: appliedCommands,
       steps,
       agentUsed: true,
       iterativeApplied: true,
@@ -663,6 +648,8 @@ async function runSceneAgentCommandsUpdateIterative(params) {
       appliedRounds,
       sceneMutated: anySceneMutated,
       execOk: true,
+      completed: false,
+      stopReason: "budget_exhausted",
       tokenHint: { rounds: getStepIndex(), depth, maxSteps: preset.maxSteps }
     };
   }
@@ -670,7 +657,7 @@ async function runSceneAgentCommandsUpdateIterative(params) {
   throw new Error(lastError || "Iterative agent finished without applying changes.");
 }
 
-async function runOptionalDraftRefinement(params) {
+async function runAutomaticDraftRefinement(params) {
   const {
     userPrompt,
     initialSceneJsonString,
@@ -685,8 +672,11 @@ async function runOptionalDraftRefinement(params) {
   } = params;
   let current = initialSceneJsonString;
   let feedback = "";
+  let completed = false;
+  let stopReason = "budget_exhausted";
 
   for (let round = 1; round <= maxRounds; round += 1) {
+    chatOptions?.signal?.throwIfAborted?.();
     setStepIndex(getStepIndex() + 1);
     emitProgress(
       {
@@ -694,17 +684,38 @@ async function runOptionalDraftRefinement(params) {
         kind: "draft_refinement",
         round,
         maxRounds,
-        message: `Optional draft refinement ${round}/${maxRounds}...`
+        message: `Automatic draft refinement ${round}/${maxRounds}...`
       },
       onProgress
     );
 
     let refinement;
     try {
-      refinement = await requestSceneRefinementStep(userPrompt, current, {
+      const currentScene = parseSceneJsonString(current);
+      const spatial = buildObjectSpatialCardsFromSceneJson(currentScene);
+      const sceneScaleProfile = buildSceneScaleProfile(spatial.cards, spatial);
+      const context = {
+        currentSceneJsonString: current,
+        objectSpatialCards: spatial.cards,
+        sceneScaleProfile
+      };
+      context.userMessage = [
+        buildSceneCommandUpdateUserMessage({
+          modificationRequest: userPrompt,
+          objectSpatialCards: spatial.cards,
+          sceneScaleProfile,
+          singleRound: false,
+          agentRound: true
+        }),
+        feedback ? `Previous refinement feedback:\n${feedback}` : ""
+      ].filter(Boolean).join("\n\n");
+      refinement = await requestUpdatedSceneEditCommands(userPrompt, context, {
         ...chatOptions,
-        feedback,
-        allowCommands: typeof applyDraftCommands === "function",
+        outputMode: "auto",
+        fallbackToJson: false,
+        agentRound: true,
+        iterativeApply: true,
+        singleRound: false,
         maxTokens: preset.repairMaxTokens || preset.generateMaxTokens
       });
     } catch (error) {
@@ -713,14 +724,25 @@ async function runOptionalDraftRefinement(params) {
       continue;
     }
 
-    if (refinement.outputMode === "done") {
+    const rawRefinement = String(refinement.rawContent || refinement.commandScript || "");
+    const modelSaysDone = commandScriptIndicatesDone(rawRefinement);
+    if (
+      refinement.outputMode === "done" ||
+      (refinement.outputMode === "commands" && commandListIsEmptyOrCommentsOnly(refinement.commands) && modelSaysDone)
+    ) {
       steps.push({ kind: "draft_refinement_done", round, ok: true });
+      completed = true;
+      stopReason = "model_done";
       break;
     }
 
     let candidate = refinement.sceneJsonString || "";
     if (refinement.outputMode === "commands") {
       try {
+        if (typeof applyDraftCommands !== "function") {
+          throw new Error("This host cannot execute command refinements; return JSON Patch instead.");
+        }
+        chatOptions?.signal?.throwIfAborted?.();
         const applied = await applyDraftCommands(refinement.commands, {
           round,
           sceneJsonString: current,
@@ -777,9 +799,18 @@ async function runOptionalDraftRefinement(params) {
       maxRounds,
       message: `Draft refinement preview ${round} (${refinement.outputMode}).`
     });
+    if (modelSaysDone) {
+      steps.push({ kind: "draft_refinement_done", round, ok: true });
+      completed = true;
+      stopReason = "model_done";
+      break;
+    }
   }
 
-  return current;
+  if (!completed) {
+    steps.push({ kind: "draft_refinement_budget_exhausted", ok: true, maxRounds });
+  }
+  return { sceneJsonString: current, completed, stopReason };
 }
 
 /**
@@ -886,11 +917,8 @@ async function runSceneAgent(input = {}, options = {}) {
   let stepIndex = 0;
   const streamPreview = options.streamPreview === true;
   const requestedOutputFormat = options.outputFormat === "friendly" ? "friendly" : "standard";
-  // Raw character streaming only ever makes sense for a turn that ends up making exactly one LLM
-  // call (the "simple" fast path below) — deliberately NOT folded into the shared `chatOptions`
-  // every nested call spreads, or a multi-call complex turn (outline + draft + refine rounds +
-  // reviews) would garble several calls' raw text together into one stream. Kept as its own
-  // variable, threaded explicitly only into the one-shot fast-path calls.
+  // Raw character streaming is kept only for the fallback non-iterative update runner. Folding it
+  // into every nested call would garble outline, draft, refine and review responses together.
   const rawOnDelta = typeof options.onDelta === "function" ? options.onDelta : undefined;
   const chatTransport = {
     stream: options.stream === true,
@@ -932,7 +960,11 @@ async function runSceneAgent(input = {}, options = {}) {
     ...chatOptions,
     capabilityReview: false,
     allowInvalidSceneDraft: true,
-    planFirst: false
+    planFirst: false,
+    // The first result is deliberately a small blockout, so the legacy full-JSON continuation
+    // protocol is unnecessary here. generationStrategy remains available to direct one-shot/full
+    // JSON APIs, but it no longer controls or complicates the agent quality pipeline.
+    segmentedOutput: false
   };
 
   const maybeFillTextures = async (sceneJsonString) => {
@@ -1024,48 +1056,8 @@ async function runSceneAgent(input = {}, options = {}) {
     );
   };
 
-  // Fast path: a request the turn classifier (or the unambiguous-first-turn shortcut — see
-  // threeBoxApp.js) did NOT flag "segmented" stays a single call, no
-  // outline/draft-refine-loop/capability-review/layout-review overhead — exactly the old
-  // single-shot behavior, restored deliberately. "compact" takes this same fast path too (see
-  // isComplexTurn) — it means "simplify so it fits one response," not "this is complex." Paying
-  // the full multi-round pipeline's cost for "add a cube" (or for any prompt merely classified
-  // "compact") was the actual regression: the pipeline exists for the one case the AI itself says
-  // genuinely needs multiple responses, not as a mandatory tax on every non-trivial request.
-  if ((mode === "generate" || mode === "fromImage") && !isComplexTurn(options)) {
-    if (mode === "fromImage" && (input.image === undefined || input.image === null)) {
-      throw new Error("image is required for fromImage mode.");
-    }
-    if (mode === "generate" && !prompt) {
-      throw new Error("prompt is required for generate mode.");
-    }
-    // Raw streaming text only makes sense here because this really is the only call this turn
-    // makes — see rawOnDelta's docblock above.
-    const fastChatOptions = { ...chatOptions, onDelta: rawOnDelta };
-    const sceneJsonString =
-      mode === "fromImage"
-        ? await generateSceneJsonFromImage({ prompt: prompt || undefined, image: input.image }, fastChatOptions)
-        : await generateSceneJsonString(prompt, fastChatOptions);
-    steps.push({ kind: "single", ok: true });
-    const singleValidation = await validateSceneJsonWithNormalizer(sceneJsonString);
-    if (!singleValidation.ok) {
-      throw new Error(singleValidation.error || "Scene JSON validation failed.");
-    }
-    emitSceneReady(sceneJsonString);
-    const fillResult = await maybeFillTextures(sceneJsonString);
-    return {
-      sceneJsonString: projectFinalScene(fillResult.sceneJsonString),
-      textureFillWarning: fillResult.textureFillWarning,
-      steps,
-      agentUsed: false,
-      tokenHint: { rounds: stepIndex || 1, depth }
-    };
-  }
-
-  // Everything below is the quality-focused pipeline for requests the classifier flagged as
-  // actually needing it (or a plain `update`/`fromImage` call with no complexity signal supplied
-  // at all — repair/capability/layout review still apply defensively there too). `preset` is a
-  // fixed policy object rather than a depth-derived lookup: the only thing that's actually
+  // Fixed quality policy for every ordinary generation/adjustment. `preset` is a fixed policy
+  // object rather than a depth-derived lookup: the only thing that's actually
   // user-configurable now is the refine round budget (maxRefineRounds), everything else here is a
   // stable default.
   const preset = {
@@ -1098,12 +1090,7 @@ async function runSceneAgent(input = {}, options = {}) {
       throw new Error("currentSceneJsonString is required for update mode.");
     }
 
-    // Same negotiation restoration as the generate fast path above: an edit the classifier didn't
-    // flag as complex skips the outline call entirely and uses the bounded, non-iterative runner
-    // (one good command batch and done — no "keep refining, or say done?" invitation the model can
-    // ramble through for many rounds on a one-line color change).
-    const complex = isComplexTurn(options);
-    if (complex && preset.runOutline) {
+    if (preset.runOutline) {
       stepIndex += 1;
       emitProgress(
         { step: stepIndex, kind: "outline", message: "Planning scene outline..." },
@@ -1114,14 +1101,8 @@ async function runSceneAgent(input = {}, options = {}) {
     }
 
     let commandStepIndex = stepIndex;
-    // Iterative (apply-as-you-go, refresh context, ask again) is reserved for edits the classifier
-    // actually flagged as complex — it's strictly better *for those*, but forcing it on a trivial
-    // edit just means more rounds asking "do you want to keep polishing?" before a plain,
-    // already-correct one-shot result. Falls back to the non-iterative runner either way when a
-    // caller hasn't wired up applyCommands/refreshContext at all (e.g. a bare core/ai script) —
-    // runSceneAgentCommandsUpdateIterative itself requires both and throws without them.
     const canIterate =
-      complex && typeof options.applyCommands === "function" && typeof options.refreshContext === "function";
+      typeof options.applyCommands === "function" && typeof options.refreshContext === "function";
     const commandRunner = canIterate
       ? runSceneAgentCommandsUpdateIterative
       : runSceneAgentCommandsUpdate;
@@ -1132,9 +1113,7 @@ async function runSceneAgent(input = {}, options = {}) {
       updateOutputMode,
       preset,
       outline,
-      // Same reasoning as the generate fast path: raw streaming only makes sense when this
-      // realistically resolves in one round, which is what the non-iterative runner is for.
-      chatOptions: complex ? chatOptions : { ...chatOptions, onDelta: rawOnDelta },
+      chatOptions: canIterate ? chatOptions : { ...chatOptions, onDelta: rawOnDelta },
       onProgress,
       steps,
       getStepIndex: () => commandStepIndex,
@@ -1204,7 +1183,7 @@ async function runSceneAgent(input = {}, options = {}) {
   // this (see the "Always elaborate the ... draft" block below) is what actually fills in detail,
   // a small step at a time, without ever risking an output-length truncation on a single call.
   const draftBlockoutHint =
-    mode === "generate"
+    mode === "generate" || mode === "fromImage"
       ? "\n\nThis is a first pass, not the finished scene: give a small, structurally correct blockout — the right groups/objects roughly placed with simple geometry — and skip fine detail, secondary objects, and material/texture polish. Those will be added afterward in follow-up refinement rounds."
       : "";
 
@@ -1316,9 +1295,11 @@ async function runSceneAgent(input = {}, options = {}) {
   // a large scene": no single call after this point ever has to hold the whole finished scene,
   // detail accumulates one small step at a time (see the module docblock). There is no more
   // opt-in flag for this; it always runs for generate mode once a valid draft exists.
-  if (validation.ok && mode === "generate") {
-    sceneJsonString = await runOptionalDraftRefinement({
-      userPrompt: prompt,
+  let refinementCompleted = true;
+  let refinementStopReason = "model_done";
+  if (validation.ok && (mode === "generate" || mode === "fromImage")) {
+    const refinementResult = await runAutomaticDraftRefinement({
+      userPrompt: prompt || "Reconstruct and improve the scene represented by the reference image.",
       initialSceneJsonString: sceneJsonString,
       preset,
       chatOptions,
@@ -1331,6 +1312,9 @@ async function runSceneAgent(input = {}, options = {}) {
       applyDraftCommands,
       maxRounds: preset.maxRefineRounds
     });
+    sceneJsonString = refinementResult.sceneJsonString;
+    refinementCompleted = refinementResult.completed;
+    refinementStopReason = refinementResult.stopReason;
     validation = await validateSceneJsonWithNormalizer(sceneJsonString);
   }
 
@@ -1484,6 +1468,8 @@ async function runSceneAgent(input = {}, options = {}) {
     textureFillWarning: fillResult.textureFillWarning,
     steps,
     agentUsed: true,
+    completed: refinementCompleted,
+    stopReason: refinementStopReason,
     tokenHint: {
       rounds: stepIndex,
       depth,

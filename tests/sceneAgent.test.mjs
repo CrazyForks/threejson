@@ -29,16 +29,10 @@ test("listTexturePointersSummary on scene with material", () => {
   assert.equal(r.count, 1);
 });
 
-// runSceneAgent now negotiates complexity the way ThreeBox always did (see isComplexTurn's
-// docblock): a request the classifier didn't flag (the default here — no `generationStrategy`
-// option, matching the unambiguous-first-turn shortcut in threeBoxApp.js) takes the FAST path —
-// one call, `agentUsed: false`, no outline/draft-refine-loop/capability-layout review at all.
-// Tests below that want to exercise the full pipeline (outline -> small draft ->
-// repair-if-invalid -> incremental refine-to-done -> capability review -> layout review) pass
-// `generationStrategy: "segmented"` explicitly, the same signal a real complexity classification
-// would produce. "# done" replies keep the refine/review rounds from looping needlessly in those;
-// a fetchMock's fallback branch (anything not explicitly matched) returns "# done" so any extra
-// round a test doesn't care to assert on still terminates cleanly.
+// Every ordinary generation runs the quality pipeline (outline -> small draft -> incremental
+// refine-to-done -> capability/layout review). generationStrategy is only a full-JSON transport
+// hint and must not enable/disable this pipeline. Fetch mocks return "# done" for refinement calls
+// they do not otherwise care about so the model-controlled loop terminates cleanly.
 
 test("runSceneAgent repairs an invalid draft once, then completes via done/reviews", async () => {
   const validScene = JSON.stringify(MINIMAL_SCENE);
@@ -78,19 +72,18 @@ test("runSceneAgent repairs an invalid draft once, then completes via done/revie
   }
 });
 
-test("runSceneAgent takes the fast single-call path by default (no generationStrategy) — the negotiated-simple case", async () => {
+test("runSceneAgent refines by default even without generationStrategy", async () => {
   const scenePayload = JSON.stringify(MINIMAL_SCENE);
-  const fetchMock = mock.fn(async () => ({
-    ok: true,
-    async text() {
-      return "";
-    },
-    async json() {
-      return {
-        choices: [{ message: { content: scenePayload } }]
-      };
-    }
-  }));
+  let call = 0;
+  const fetchMock = mock.fn(async () => {
+    call += 1;
+    const content = call === 1 ? "- floor" : call === 2 ? scenePayload : "# done";
+    return {
+      ok: true,
+      async text() { return ""; },
+      async json() { return { choices: [{ message: { content } }] }; }
+    };
+  });
   const originalFetch = globalThis.fetch;
   globalThis.fetch = fetchMock;
   try {
@@ -101,38 +94,27 @@ test("runSceneAgent takes the fast single-call path by default (no generationStr
         provider: "deepseek"
       }
     );
-    // No `generationStrategy` matches ThreeBox's unambiguous-first-turn shortcut (and any other
-    // request the classifier didn't flag) — no outline/draft-refine-loop/sceneAgent-level
-    // capability+layout review overhead at all. This is the fix for "every request, however
-    // trivial, paid the full pipeline's cost" — see isComplexTurn's docblock. Exactly one call is
-    // the common case; generateSceneJsonString's own lightweight internal capability-fit safety
-    // net (sceneAiService.js's maybeApplyCapabilityReview, unrelated to sceneAgent.js's heavier
-    // review stages) may add one more small call here, same as it always could pre-redesign.
-    assert.equal(result.agentUsed, false);
+    assert.equal(result.agentUsed, true);
+    assert.equal(result.completed, true);
     assert.ok(result.sceneJsonString.includes("objectList"));
-    assert.ok(fetchMock.mock.calls.length <= 2, `expected <= 2 calls, got ${fetchMock.mock.calls.length}`);
+    assert.ok(fetchMock.mock.calls.length >= 3);
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test('runSceneAgent treats generationStrategy "compact" as the fast single-call path, not as complex', async () => {
-  // Regression test for a real bug: "compact" means "the AI simplified the scene so it fits one
-  // response" (see sceneChatSession.js's compact instruction) — it is NOT a signal that the
-  // request is complex. The classifier is guided to prefer "compact" over "segmented" whenever
-  // it isn't confident segmented output is supported, so most non-trivial prompts land on
-  // "compact" — treating it as complex meant almost every real request paid the full
-  // draft-then-refine pipeline's cost regardless of what the AI itself decided.
+test('runSceneAgent keeps generationStrategy "compact" independent from automatic refinement', async () => {
   const scenePayload = JSON.stringify(MINIMAL_SCENE);
-  const fetchMock = mock.fn(async () => ({
-    ok: true,
-    async text() {
-      return "";
-    },
-    async json() {
-      return { choices: [{ message: { content: scenePayload } }] };
-    }
-  }));
+  let call = 0;
+  const fetchMock = mock.fn(async () => {
+    call += 1;
+    const content = call === 1 ? "- crowd" : call === 2 ? scenePayload : "# done";
+    return {
+      ok: true,
+      async text() { return ""; },
+      async json() { return { choices: [{ message: { content } }] }; }
+    };
+  });
   const originalFetch = globalThis.fetch;
   globalThis.fetch = fetchMock;
   try {
@@ -145,15 +127,16 @@ test('runSceneAgent treats generationStrategy "compact" as the fast single-call 
         estimatedSegments: 1
       }
     );
-    assert.equal(result.agentUsed, false);
+    assert.equal(result.agentUsed, true);
+    assert.equal(result.completed, true);
     assert.ok(result.sceneJsonString.includes("objectList"));
-    assert.ok(fetchMock.mock.calls.length <= 2, `expected <= 2 calls, got ${fetchMock.mock.calls.length}`);
+    assert.ok(fetchMock.mock.calls.length >= 3);
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test("runSceneAgent runs the full agent pipeline when generationStrategy signals complexity", async () => {
+test("runSceneAgent keeps segmented transport metadata independent from the full agent pipeline", async () => {
   const scenePayload = JSON.stringify(MINIMAL_SCENE);
   const fetchMock = mock.fn(async () => ({
     ok: true,
@@ -180,8 +163,8 @@ test("runSceneAgent runs the full agent pipeline when generationStrategy signals
     // Every call in this mock returns the same already-valid scene, so the outline is free-text,
     // the draft is immediately valid, the draft-refinement loop sees "json" output matching the
     // unchanged scene every round, and only stops once maxRefineRounds is exhausted — this test
-    // only cares that the pipeline runs (because it was told to) and eventually returns a usable
-    // scene.
+    // only cares that segmented transport metadata does not prevent the pipeline from returning a
+    // usable scene.
     assert.equal(result.agentUsed, true);
     assert.ok(result.sceneJsonString.includes("objectList"));
     assert.ok(fetchMock.mock.calls.length >= 2);
@@ -220,6 +203,8 @@ test("runSceneAgent respects a caller-configured maxRefineRounds cap", async () 
       }
     );
     assert.equal(result.agentUsed, true);
+    assert.equal(result.completed, false);
+    assert.equal(result.stopReason, "budget_exhausted");
     assert.ok(result.sceneJsonString.includes("objectList"));
     // outline(1) + draft(1) + at most 2 refine rounds + capability review(<=1) + layout review(1).
     assert.ok(fetchMock.mock.calls.length <= 6, `expected <= 6 calls, got ${fetchMock.mock.calls.length}`);
@@ -548,15 +533,15 @@ test("runSceneAgent refines a valid draft with mixed-output protocol until done"
     "# done" // layout review round
   ];
   const progress = [];
-  const fetchMock = mock.fn(async () => ({
-    ok: true,
-    async text() {
-      return "";
-    },
-    async json() {
-      return { choices: [{ message: { content: replies.shift() || "# done" } }] };
-    }
-  }));
+  const requestBodies = [];
+  const fetchMock = mock.fn(async (_url, init) => {
+    requestBodies.push(JSON.parse(init.body));
+    return {
+      ok: true,
+      async text() { return ""; },
+      async json() { return { choices: [{ message: { content: replies.shift() || "# done" } }] }; }
+    };
+  });
   const originalFetch = globalThis.fetch;
   globalThis.fetch = fetchMock;
   try {
@@ -575,6 +560,8 @@ test("runSceneAgent refines a valid draft with mixed-output protocol until done"
     assert.ok(result.steps.some((step) => step.kind === "draft_refinement" && step.outputMode === "patch"));
     assert.ok(result.steps.some((step) => step.kind === "draft_refinement_done"));
     assert.ok(progress.filter((event) => event.kind === "stage_preview").length >= 1);
+    assert.match(requestBodies[2].messages[1].content, /Object spatial summary/);
+    assert.doesNotMatch(requestBodies[2].messages[1].content, /Current scene JSON/);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -647,22 +634,64 @@ test("runSceneAgent iterative apply execs commands and skips final exec batch", 
   }
 });
 
-test("runSceneAgent update commands stays non-iterative and skips outline for an edit the classifier did not flag as complex", async () => {
-  // Even with applyCommands/refreshContext both supplied (so iteration COULD run), a request with
-  // no generationStrategy (or "single") must not iterate or pay for an outline call — this is
-  // what keeps a one-line "change the color" adjustment fast instead of being invited to keep
-  // "refining" the scene for several rounds before it's allowed to say it's done.
+test("runSceneAgent applies commands before honoring a same-response # done and returns every applied round", async () => {
   const currentScene = JSON.stringify(MINIMAL_SCENE);
-  const validCommands = 'object.patch id=floor partial={"material":{"color":"#336699"}}';
+  const replies = [
+    "- refine colors and camera",
+    'object.patch id=floor partial={"material":{"color":"#112233"}}',
+    'camera.fit mode=scene\n# done'
+  ];
+  const applied = [];
   const fetchMock = mock.fn(async () => ({
     ok: true,
-    async text() {
-      return "";
-    },
-    async json() {
-      return { choices: [{ message: { content: validCommands } }] };
-    }
+    async text() { return ""; },
+    async json() { return { choices: [{ message: { content: replies.shift() || "# done" } }] }; }
   }));
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = fetchMock;
+  try {
+    const result = await runSceneAgent(
+      {
+        mode: "update",
+        prompt: "polish the floor and frame it",
+        currentSceneJsonString: currentScene,
+        outputMode: "commands",
+        updateContext: { objectList: [{ threeJsonId: "floor", objType: "box" }] }
+      },
+      {
+        agent: { maxRefineRounds: 4 },
+        apiKey: "test-key",
+        provider: "deepseek",
+        applyCommands: async (commands) => {
+          applied.push(...commands);
+          return { ok: true, sceneMutated: true };
+        },
+        refreshContext: async () => ({ currentSceneJsonString: currentScene, objectList: [] })
+      }
+    );
+    assert.equal(result.completed, true);
+    assert.equal(result.stopReason, "model_done");
+    assert.equal(applied.length, 2);
+    assert.equal(result.commands.length, 2);
+    assert.equal(result.commands[1].op, "camera.fit");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("runSceneAgent update commands iterates by default when the host supplies apply/refresh callbacks", async () => {
+  const currentScene = JSON.stringify(MINIMAL_SCENE);
+  const validCommands = 'object.patch id=floor partial={"material":{"color":"#336699"}}';
+  let call = 0;
+  const fetchMock = mock.fn(async () => {
+    call += 1;
+    const content = call === 1 ? "- change color" : call === 2 ? validCommands : "# done";
+    return {
+      ok: true,
+      async text() { return ""; },
+      async json() { return { choices: [{ message: { content } }] }; }
+    };
+  });
   const originalFetch = globalThis.fetch;
   globalThis.fetch = fetchMock;
   try {
@@ -682,9 +711,10 @@ test("runSceneAgent update commands stays non-iterative and skips outline for an
       }
     );
     assert.equal(result.outputMode, "commands");
-    assert.equal(result.iterativeApplied, undefined);
+    assert.equal(result.iterativeApplied, true);
+    assert.equal(result.completed, true);
     assert.ok(Array.isArray(result.commands) && result.commands.length > 0);
-    assert.equal(fetchMock.mock.calls.length, 1);
+    assert.equal(fetchMock.mock.calls.length, 3);
   } finally {
     globalThis.fetch = originalFetch;
   }

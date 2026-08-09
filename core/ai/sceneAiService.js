@@ -12,6 +12,7 @@ import {
   buildSceneCommandAutoUpdateSystemPrompt,
   buildSceneCommandUpdateSystemPrompt,
   buildSceneCommandUpdateUserMessage,
+  commandScriptIndicatesDone,
   extractCommandScriptText,
   isAiSceneUpdateCommandOp,
   isLikelyCommandScriptText,
@@ -1237,6 +1238,24 @@ async function requestUpdatedSceneEditCommands(prompt, context = {}, options = {
       { role: "user", content: userContent }
     ]
   });
+
+  // Iterative callers need to observe the model's explicit completion signal. Previously this
+  // comment-only response fell into command parsing, was rejected as "no commands", and the outer
+  // loop retried until its entire budget was exhausted even though the model had already finished.
+  if ((agentRound || iterativeApply) && commandScriptIndicatesDone(content)) {
+    const doneScript = extractCommandScriptText(content);
+    const doneCommands = isLikelyCommandScriptText(doneScript)
+      ? filterCoreUpdateCommands(parseCommandScript(doneScript))
+      : [];
+    if (doneCommands.length === 0) {
+      return {
+        outputMode: "commands",
+        commandScript: doneScript,
+        commands: [],
+        rawContent: String(content || "")
+      };
+    }
+  }
 
   const fallbackToJson = options.fallbackToJson !== false;
   const tryJsonFallback = async (reason) => {

@@ -97,15 +97,10 @@ export function buildResultDigest(sceneJson) {
 }
 
 /**
- * First-turn (no prior context) generation: builds the structured JSON envelope and runs it
- * through core/ai's runSceneAgent, which negotiates complexity itself (see its isComplexTurn
- * docblock) from `generationStrategy`/`estimatedSegments` — a request the classifier didn't flag
- * (the default) stays a single fast call, exactly the old single-shot behavior; only a request
- * flagged "segmented"/"compact" pays for the draft-then-incremental-refine pipeline (draft first,
- * small so it structurally can't truncate, then automatic refine rounds until the model says
- * `# done` or the round budget runs out). `onDelta` is safe to always forward here — it's only
- * ever actually invoked by the one call the fast path makes; a complex, multi-call turn never
- * receives it (see rawOnDelta in sceneAgent.js), so it can't garble multiple calls' text together.
+ * Generation always runs through core/ai's small-draft then automatic incremental-refinement
+ * pipeline. generationStrategy/estimatedSegments describe only the independent legacy full-JSON
+ * transport protocol and never disable quality refinement. Raw deltas are not forwarded across
+ * the multi-call pipeline; hosts receive localized stage progress and scene previews instead.
  * @param {{ userPrompt: string, providerOptions: object, onDelta?: (delta:string)=>void, onGenerationPhase?: (phase:object)=>void|Promise<void>, onSceneDraft?: (sceneJsonString:string)=>void|Promise<void>, signal?: AbortSignal, globalPromptPrefix?: string, agentOptions?: {maxRefineRounds?: number}, onAgentProgress?: (p: object)=>void, includeReferenceLinks?: boolean, locale?: string, onlineTextureHints?: boolean, generationStrategy?: "single"|"segmented"|"compact", estimatedSegments?: number, maxSceneSegments?: number }} input
  */
 export async function runAiGenerateTurn({
@@ -148,10 +143,8 @@ export async function runAiGenerateTurn({
       resolveReferenceUrl: resolveSceneAiReferenceUrl,
       capabilityLookup,
       onlineTextureHints,
-      // `generationStrategy` itself (not just the derived `segmentedOutput` boolean below) has to
-      // reach runSceneAgent — its isComplexTurn check reads this exact field to decide fast vs.
-      // full-pipeline, per what the classifier (or the caller) actually decided. Omitting it here
-      // silently forced every turn through isComplexTurn's "single" default.
+      // Preserve the negotiated full-JSON transport metadata. It is deliberately independent from
+      // automatic refinement, which always runs for ordinary generation.
       generationStrategy,
       estimatedSegments,
       segmentedOutput: generationStrategy === "segmented",
@@ -174,7 +167,7 @@ export async function runAiGenerateTurn({
  * requested `mode: "fromImage"`); this is ported from editor's pre-existing `aiSidebar.js`
  * `onImageGenerate`/`runSidebarSceneAgent(..., {mode:"fromImage", ...})` flow, generalized the
  * same way `runAiGenerateTurn` above is.
- * @param {{ prompt?: string, image: string|{base64:string, mimeType?:string}, providerOptions: object, agentOptions?: object, imageDetail?: "auto"|"low"|"high", maxTokens?: number, onAgentProgress?: (p:object)=>void, onGenerationPhase?: (phase:object)=>void|Promise<void>, signal?: AbortSignal, locale?: string, capabilityLookup?: boolean, onlineTextureHints?: boolean }} input
+ * @param {{ prompt?: string, image: string|{base64:string, mimeType?:string}, providerOptions: object, agentOptions?: object, imageDetail?: "auto"|"low"|"high", maxTokens?: number, onAgentProgress?: (p:object)=>void, onGenerationPhase?: (phase:object)=>void|Promise<void>, onSceneDraft?: (sceneJsonString:string, meta?:object)=>void|Promise<void>, signal?: AbortSignal, locale?: string, capabilityLookup?: boolean, onlineTextureHints?: boolean }} input
  */
 export async function runAiImageGenerateTurn({
   prompt = "",
@@ -185,6 +178,7 @@ export async function runAiImageGenerateTurn({
   maxTokens = 8192,
   onAgentProgress,
   onGenerationPhase,
+  onSceneDraft,
   signal,
   locale,
   capabilityLookup,
@@ -205,6 +199,8 @@ export async function runAiImageGenerateTurn({
       capabilityLookup,
       onlineTextureHints,
       onGenerationPhase,
+      onSceneDraft,
+      applyDraftCommands: applyAiDraftCommands,
       locale,
       onProgress: onAgentProgress
     }
@@ -329,6 +325,8 @@ async function runAiAgentAdjustTurn({
   animationCapabilities,
   generationStrategy,
   estimatedSegments,
+  applyCommands: hostApplyCommands,
+  refreshContext: hostRefreshContext,
   signal
 }) {
   const mode = mapUpdateOutputModeToAgentInput(updateOutputMode);
@@ -374,10 +372,14 @@ async function runAiAgentAdjustTurn({
     };
   }
 
-  const offscreenRuntime = await createOffscreenRuntimeFromSceneJsonString(targetSceneJsonString);
+  const usesHostRuntime =
+    typeof hostApplyCommands === "function" && typeof hostRefreshContext === "function";
+  const offscreenRuntime = usesHostRuntime
+    ? null
+    : await createOffscreenRuntimeFromSceneJsonString(targetSceneJsonString);
   try {
     let latestSceneJsonString = targetSceneJsonString;
-    const refreshContext = async () => {
+    const refreshContext = usesHostRuntime ? hostRefreshContext : async () => {
       latestSceneJsonString = exportRuntimeSceneJsonString(offscreenRuntime);
       const latestSceneJson = parseSceneJsonString(latestSceneJsonString);
       const contextPayload = resolveContextPayload?.(latestSceneJson) || {};
@@ -387,7 +389,7 @@ async function runAiAgentAdjustTurn({
         fullSceneJson: latestSceneJsonString
       };
     };
-    const applyCommands = async (commands) => {
+    const applyCommands = usesHostRuntime ? hostApplyCommands : async (commands) => {
       const ctx = createCommandContextForRuntime(offscreenRuntime);
       const execResult = await executeCommands(ctx, commands);
       const results = Array.isArray(execResult.results) ? execResult.results : [];
@@ -405,11 +407,8 @@ async function runAiAgentAdjustTurn({
       },
       {
         ...providerOptions,
-        // applyCommands/refreshContext being supplied here is necessary but no longer sufficient
-        // for runSceneAgent's update-mode commands path to iterate — it also requires
-        // generationStrategy/estimatedSegments to actually signal complexity (see its
-        // isComplexTurn check), so a plain one-line edit gets one bounded attempt instead of being
-        // invited to keep "refining" for several rounds before it's allowed to say it's done.
+        // These callbacks opt the core runner into apply-as-you-go adjustment. The model stops as
+        // soon as it is satisfied via # done; the configured round count is only a safety budget.
         agent: { maxRefineRounds: agentOptions?.maxRefineRounds },
         resolveReferenceUrl: resolveSceneAiReferenceUrl,
         capabilityLookup,
@@ -439,27 +438,31 @@ async function runAiAgentAdjustTurn({
         throw new Error(applied.error || "Agent command apply failed.");
       }
     }
-    const sceneJsonString = exportRuntimeSceneJsonString(offscreenRuntime);
+    const finalContext = await refreshContext();
+    const sceneJsonString = String(
+      finalContext?.currentSceneJsonString ||
+      finalContext?.fullSceneJson ||
+      latestSceneJsonString
+    );
     return {
       stage: "commands",
       commands: result.commands || [],
       execResult: { ok: result.execOk !== false },
+      liveApplied: usesHostRuntime,
       sceneJson: parseSceneJsonString(sceneJsonString),
       sceneJsonString,
       agentResult: result
     };
   } finally {
-    offscreenRuntime.dispose?.();
+    offscreenRuntime?.dispose?.();
   }
 }
 
 /**
- * Three-stage adjust fallback chain: try operation commands against a private offscreen clone of
- * the target scene first (no full JSON regeneration needed); if that produces no usable mutation,
- * fall back to an RFC 6902 JSON-Patch regeneration; if that also fails, fall back to a full scene
- * JSON regeneration (always succeeds or throws). Never touches any "live" scene — every path
- * returns a fresh `sceneJson`/`sceneJsonString` for the CALLER to apply however it wants (a new
- * chat scene card, or an in-place replace of the caller's own live canvas).
+ * Three-stage adjust fallback chain. Command mode can either apply each refinement round through
+ * caller-supplied live-runtime callbacks or use a private offscreen clone. If commands cannot
+ * produce a usable mutation, the non-strict fallback path tries RFC 6902 JSON Patch and then full
+ * scene JSON. Every path returns the resulting `sceneJson`/`sceneJsonString`.
  *
  * @param {{
  *   userPrompt: string,
@@ -470,6 +473,8 @@ async function runAiAgentAdjustTurn({
  *   agentOptions?: object,
  *   updateOutputMode?: string,
  *   resolveContextPayload?: (sceneJson: object) => object,
+ *   applyCommands?: (commands: object[], meta?: object) => object|Promise<object>,
+ *   refreshContext?: () => object|Promise<object>,
  *   onAgentProgress?: (p: object) => void,
  *   locale?: string,
  *   onlineTextureHints?: boolean,
@@ -499,6 +504,8 @@ export async function runAiAdjustTurn({
   animationCapabilities,
   generationStrategy,
   estimatedSegments,
+  applyCommands,
+  refreshContext,
   signal
 }) {
   // strictOutputMode forces exactly the requested single stage with no cascade and no round
@@ -619,6 +626,8 @@ export async function runAiAdjustTurn({
     animationCapabilities,
     generationStrategy,
     estimatedSegments,
+    applyCommands,
+    refreshContext,
     signal
   });
 }

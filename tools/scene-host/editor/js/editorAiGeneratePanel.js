@@ -345,16 +345,22 @@ export function createEditorAiGeneratePanel(host) {
    * ThreeBox's chat panel uses (see threeBoxApp.js's createAgentProgressUpdater). Reloading the
    * live canvas on every intermediate round (the way ThreeBox's disposable scene card does) isn't
    * viable here — editorApp.js's ingestScenePayload tears down and re-initializes the whole
-   * runtime per call — so the canvas only updates once, with the finished result, same as before;
-   * only the status text updates progressively now. */
-  function createGenerateStatusUpdater(assistantBody) {
-    const lines = [];
+   * runtime per call — so preview loads are serialized and deduplicated while the status text
+   * continues to use the existing compact activity indicator. */
+  function createGenerateStatusUpdater(assistantBody, onScenePreview) {
     // Writes textContent directly rather than through historyCtl.updateMessage, which clears the
     // "still busy" styling/aria state appendActivityMessage set up — that must stay in effect
     // until the turn genuinely finishes (updateMessage's real call at the end of handleSend).
     return (phaseOrProgress) => {
       if (!phaseOrProgress || !assistantBody) {
         return;
+      }
+      if (
+        typeof onScenePreview === "function" &&
+        typeof phaseOrProgress.sceneJsonString === "string" &&
+        (phaseOrProgress.kind === "stage_preview" || phaseOrProgress.kind === "scene_ready")
+      ) {
+        onScenePreview(phaseOrProgress.sceneJsonString);
       }
       // Two different shapes land here: SceneAgentProgress events (`.kind`, from onAgentProgress)
       // — run through the shared localized-label mapping, same as ThreeBox's chat panel — and the
@@ -370,8 +376,8 @@ export function createEditorAiGeneratePanel(host) {
       if (!label) {
         return;
       }
-      lines.push(`${lines.length + 1}. ${label}`);
-      assistantBody.textContent = lines.slice(-12).join("\n");
+      // Preserve appendActivityMessage's existing spinner and show only the current phase.
+      assistantBody.textContent = label;
       historyCtl.scrollToBottom();
     };
   }
@@ -435,9 +441,35 @@ export function createEditorAiGeneratePanel(host) {
         threeBoxTurnContext: createEditorAiTurnContext(userText)
       };
       let resultText;
-      const updateGenerateStatus = createGenerateStatusUpdater(assistantBody);
+      let lastPreviewSceneJsonString = "";
+      let previewQueue = Promise.resolve();
+      const queueScenePreview = (sceneJsonString) => {
+        const next = String(sceneJsonString || "").trim();
+        if (!next || next === lastPreviewSceneJsonString) {
+          return previewQueue;
+        }
+        lastPreviewSceneJsonString = next;
+        previewQueue = previewQueue
+          .then(() => applyScenePayload(host, next, "AI 自动细化预览", {
+            skipDirtyConfirm: true,
+            keepDirtyAfterLoad: true
+          }))
+          .catch((error) => {
+            console.warn("[editor] failed to render AI scene preview:", error);
+          });
+        return previewQueue;
+      };
+      const updateGenerateStatus = createGenerateStatusUpdater(assistantBody, queueScenePreview);
 
       if (attachment?.kind === "image") {
+        const dirty = host.getEditorDocumentState?.()?.isDirty?.();
+        if (dirty) {
+          const ok = await host.confirmOverwriteIfDirty?.({ actionLabel: "开始 AI 看图生成" });
+          if (!ok) {
+            historyCtl.updateMessage(assistantBody, t("editor.ai.message.cancelled", "已取消载入。"));
+            return;
+          }
+        }
         const result = await runAiImageGenerateTurn({
           prompt,
           image: attachment.dataUrl,
@@ -445,14 +477,22 @@ export function createEditorAiGeneratePanel(host) {
           agentOptions,
           onGenerationPhase: updateGenerateStatus,
           onAgentProgress: updateGenerateStatus,
+          onSceneDraft: queueScenePreview,
           signal: abortController.signal
         });
-        const loaded = await applyScenePayload(host, result.sceneJsonString, "AI 看图生成");
+        await previewQueue;
+        const loaded = await applyScenePayload(host, result.sceneJsonString, "AI 看图生成", { skipDirtyConfirm: true });
         resultText = loaded
           ? t("editor.ai.edit.imageDone", "看图生成场景已载入。")
           : t("editor.ai.message.cancelled", "已取消载入。");
         if (loaded) {
-          host.showMessage(resultText, "success");
+          if (result.agentResult?.completed === false) {
+            resultText = t(
+              "editor.ai.message.refineBudgetExhausted",
+              "场景已载入，但自动细化达到轮数上限，AI 未明确确认已经完善完成。"
+            );
+          }
+          host.showMessage(resultText, result.agentResult?.completed === false ? "warning" : "success");
         }
       } else {
         const dirty = host.getEditorDocumentState?.()?.isDirty?.();
@@ -473,13 +513,21 @@ export function createEditorAiGeneratePanel(host) {
           agentOptions,
           onGenerationPhase: updateGenerateStatus,
           onAgentProgress: updateGenerateStatus,
+          onSceneDraft: queueScenePreview,
           signal: abortController.signal
         });
+        await previewQueue;
         const loaded = await applyScenePayload(host, result.sceneJsonString, "AI 生成", { skipDirtyConfirm: true });
         resultText = loaded ? t("editor.ai.edit.generateDone", "AI 场景已载入。") : t("editor.ai.message.cancelled", "已取消载入。");
         if (loaded) {
+          if (result.agentResult?.completed === false) {
+            resultText = t(
+              "editor.ai.message.refineBudgetExhausted",
+              "场景已载入，但自动细化达到轮数上限，AI 未明确确认已经完善完成。"
+            );
+          }
           host.markSceneDirty?.();
-          host.showMessage(resultText, "success");
+          host.showMessage(resultText, result.agentResult?.completed === false ? "warning" : "success");
         }
       }
 
