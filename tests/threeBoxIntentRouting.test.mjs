@@ -14,13 +14,15 @@ test("ThreeBox negotiates generate versus adjust from conversation context", asy
   assert.match(source, /sceneTitle: t\.sceneTitle/);
 });
 
-test("Editor keeps its Generate and Adjust business routes explicit", async () => {
+test("Editor keeps intent explicit while generation still negotiates execution and capabilities", async () => {
   const [generateSource, adjustSource] = await Promise.all([
     read("tools/scene-host/editor/js/editorAiGeneratePanel.js"),
     read("tools/scene-host/editor/js/editorAiAdjustPanel.js")
   ]);
   assert.match(generateSource, /runAiGenerateTurn\(/);
-  assert.doesNotMatch(generateSource, /classifyAiTurnIntent|classifyTurnIntent/);
+  assert.match(generateSource, /classifyAiTurnIntent\(/);
+  assert.match(generateSource, /executionMode:\s*negotiation\.executionMode/);
+  assert.match(generateSource, /requiresAnimation:\s*negotiation\.requiresAnimation/);
   assert.match(adjustSource, /runAiAdjustTurn\(/);
   assert.doesNotMatch(adjustSource, /classifyAiTurnIntent|classifyTurnIntent/);
 });

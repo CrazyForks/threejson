@@ -146,13 +146,9 @@ export const EDITOR_SETTINGS_DEFAULTS = {
       providers: [],
       defaultProviderId: "",
       builtinBackendUrl: DEFAULT_BUILTIN_BACKEND_URL,
-      // Generation/adjustment is always draft-then-incrementally-refine now — there is no more
-      // on/off "Agent" toggle or depth preset (see core/ai/sceneAgent.js's module docblock). This
-      // is the one knob left: how many automatic refine rounds the model gets before the round
-      // budget stops it (it can always finish earlier by saying it's done). Default matches
-      // core/ai/sceneAgent.js's DEFAULT_MAX_REFINE_ROUNDS; the hard ceiling (60) is enforced there
-      // regardless of what's configured here.
-      maxAutoRefineRounds: 20,
+      // Runaway guard used only when a complex generation/adjustment genuinely continues.
+      maxAutoRefineRounds: 6,
+      agentPolicyVersion: 2,
       agentFitViewEachRound: false,
       incrementalUpdate: false,
       updateOutputMode: "auto",
@@ -823,9 +819,9 @@ export const EDITOR_SETTINGS_FIELDS = [
       section: "ai",
       path: "ai.maxAutoRefineRounds",
       type: "number",
-      label: "自动细化最大轮数",
+      label: "复杂场景细化安全上限",
       min: 1,
-      max: 60
+      max: 20
     },
     {
       section: "ai",

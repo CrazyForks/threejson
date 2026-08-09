@@ -159,6 +159,7 @@ function buildGroupRulesFragment() {
     "- Robot, vehicle, kit, or any multi-part assembly: object.add objType group with explicit threeJsonId FIRST, then object.add parent=<that same threeJsonId> for EVERY part (2+ parts still use a group).",
     "- Mixed objTypes (box + sphere + cylinder + …) under the same parent= are supported.",
     "- Move/rotate the whole assembly: object.patch id=<group threeJsonId> partial={\"rotation\":{\"y\":3.14159}} — parts must already be parented under that group.",
+    "- Continuous orbit: create/use a group centered on the orbit center, keep the orbiting child at a non-zero local offset in subScene[], and add animations:[{\"type\":\"rotate\",\"axis\":\"y\",\"speed\":0.2}] to the group; do not fake an orbit by rotating the sphere only.",
     "- Micro DSL (ids must match within the script):",
     "  object.add descriptor={\"objType\":\"group\",\"name\":\"female-robot\",\"threeJsonId\":\"female-robot-grp\"}",
     "  object.add parent=female-robot-grp descriptor={\"objType\":\"box\",\"name\":\"female-robot-body\",...}",
@@ -286,6 +287,7 @@ function buildCommandOnlineTextureFragment(options = {}) {
   return [
     "Online texture setting:",
     "- For newly added objects/surfaces that would be incomplete as flat colors (terrain/grass/water, asphalt, brick/concrete/wood/stone/fabric, signs/screens/maps, paintings, labels, carpets, named planets), use material.textureUrl with a suitable reachable online image URL; it may come from any public web source, not only a CDN, and https is preferred.",
+    "- For named Solar-System bodies prefer bundled same-origin assets under /assets/textures/environment/nature/planet/ (earth.png, moon.png, sun.png, mercury.png, venus.png, mars.png, jupiter.png, saturn.png, saturn_ring.png, uranus.png, neptune.png). They do not need the external texture proxy; use #ffffff as the material tint so the texture is not darkened.",
     "- Add textureRepeat for large tiled surfaces. Keep flat colors for generic blockouts and plain colored objects."
   ].join("\n");
 }
@@ -401,10 +403,11 @@ export function buildSceneCommandAutoUpdateSystemPrompt(options = {}) {
   const workflow = iterativeApply
     ? [
         "Agent iterative apply workflow:",
-        "1. Each round output a SMALL mutating patch (object.patch, object.add, material.patch, etc.) — it is applied immediately to the live scene.",
-        "2. Intermediate rounds MAY use object.get to inspect descriptors (results are fed back).",
-        "3. When the scene matches the user request, output # done only (or comment-only script).",
-        "4. Prefer incremental steps over one huge batch; refine based on updated scene context each round."
+        "1. Finish bounded requests in ONE response whenever possible: output the complete minimal mutating command batch, then append a final `# done` line in the SAME response.",
+        "2. Use another round only when the change genuinely needs inspection or several independently verifiable stages. Never split work merely because iterative mode is available.",
+        "3. Intermediate rounds MAY use object.get to inspect descriptors (results are fed back), but do not inspect data already present in the supplied scene context.",
+        "4. If the scene already matches the request, output `# done` only. If your current commands finish the request, append `# done` after those commands.",
+        "5. Every non-final round must make a meaningful new change; never repeat an earlier command batch or manufacture cosmetic work to consume rounds."
       ]
     : agentRound
     ? [
@@ -561,7 +564,7 @@ export function buildSceneCommandUpdateUserMessage({
     );
   } else if (agentRound) {
     parts.push(
-      "Agent round: if you output object.get this round, the next round will receive descriptors. End the session with mutating commands or full scene JSON."
+      "Agent round: finish the request now when possible. If the scene already satisfies it, output # done only. If this round's mutating commands finish it, append # done after the commands in the same response. Use another round only when inspection or a genuinely separate stage is still required; never repeat work or create changes just to continue."
     );
   } else {
     parts.push("Output ONLY the command script (micro DSL or JSONL).");

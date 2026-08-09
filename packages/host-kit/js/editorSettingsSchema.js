@@ -148,9 +148,9 @@ export const EDITOR_SETTINGS_DEFAULTS = {
       providers: [],
       defaultProviderId: "",
       builtinBackendUrl: DEFAULT_BUILTIN_BACKEND_URL,
-      agentEnabled: false,
-      agentDepth: "medium",
-      agentIterativeApply: false,
+      // Runaway guard used only when a complex generation/adjustment genuinely continues.
+      maxAutoRefineRounds: 6,
+      agentPolicyVersion: 2,
       agentFitViewEachRound: false,
       incrementalUpdate: false,
       updateOutputMode: "auto",
@@ -816,20 +816,14 @@ export const EDITOR_SETTINGS_FIELDS = [
       placeholder: "https://api.threebox.org",
       testEndpoint: "builtinBackend"
     },
-    { section: "ai", path: "ai.agentEnabled", type: "checkbox", label: "启用 Agent" },
-    { section: "ai", path: "ai.agentIterativeApply", type: "checkbox", label: "迭代应用到画布" },
     { section: "ai", path: "ai.agentFitViewEachRound", type: "checkbox", label: "每轮变更后自适应取景" },
     {
       section: "ai",
-      path: "ai.agentDepth",
-      type: "select",
-      label: "Agent 深度",
-      options: [
-        { value: "simple", label: "simple" },
-        { value: "medium", label: "medium" },
-        { value: "deep", label: "deep" },
-        { value: "auto", label: "auto" }
-      ]
+      path: "ai.maxAutoRefineRounds",
+      type: "number",
+      label: "复杂场景细化安全上限",
+      min: 1,
+      max: 20
     },
     {
       section: "ai",

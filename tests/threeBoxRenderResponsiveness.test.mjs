@@ -17,7 +17,7 @@ test("ThreeBox starts its scene runtime before asynchronous deployment finishes"
 test("ThreeBox final Agent result supersedes queued draft previews", async () => {
   const source = await readWorkspaceFile("tools/scene-host/threebox/js/threeBoxApp.js");
   const closeIndex = source.indexOf("previewQueueOpen = false;");
-  const finalRenderIndex = source.indexOf("await sceneCard.render(outputSceneJson", closeIndex);
+  const finalRenderIndex = source.indexOf("await sceneCard.finalize(outputSceneJson", closeIndex);
   assert.ok(closeIndex >= 0);
   assert.ok(finalRenderIndex > closeIndex);
   assert.doesNotMatch(source.slice(closeIndex, finalRenderIndex), /await previewRenderQueue/);

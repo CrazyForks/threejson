@@ -169,7 +169,7 @@ export const EDITOR_SETTINGS_LABELS_EN = {
   "settings.fields.ai.apiKey": "API Key",
   "settings.fields.ai.customApiBase": "Custom API Base",
   "settings.fields.ai.agentFitViewEachRound": "Auto-Fit View After Each Round of Changes",
-  "settings.fields.ai.maxAutoRefineRounds": "Maximum Auto-Refine Rounds",
+  "settings.fields.ai.maxAutoRefineRounds": "Complex-Scene Refinement Safety Limit",
   "settings.fields.ai.updateOutputMode": "Default Adjust Output Mode",
   "settings.options.ai.updateOutputMode.commands": "Command Script",
   "settings.options.ai.updateOutputMode.json-full": "JSON Full",

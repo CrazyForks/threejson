@@ -44,9 +44,9 @@ test("generation system prompt covers core ThreeJSON capabilities", () => {
   assert.match(prompt, /single standard objectList/);
   assert.match(prompt, /renderLoop\.updateAnimations/);
   assert.match(prompt, /motion perceptible/);
-  assert.match(prompt, /self-evidently incomplete as a flat color/);
-  assert.match(prompt, /reachable online image URL/);
-  assert.match(prompt, /not limited to CDNs/);
+  assert.match(prompt, /identity or material would be self-evidently incomplete as a flat color/);
+  assert.match(prompt, /reachable https image URL/);
+  assert.match(prompt, /bundled same-origin assets/);
   assert.match(prompt, /textureRepeat/);
   assert.match(prompt, /Do not force a textureUrl onto generic\/abstract shapes/);
   assert.match(prompt, /sceneConfig/);
@@ -125,14 +125,15 @@ test("generation prompt hides particle capabilities when particle intent is abse
 
 test("online texture hints can be disabled in scene prompts", () => {
   const enabled = buildSceneGenerationSystemPrompt();
-  assert.match(enabled, /Online resources are not limited to CDNs/);
-  assert.match(enabled, /any suitable public web image URL/);
+  assert.match(enabled, /\/assets\/textures\/environment\/nature\/planet\/earth\.png/);
+  assert.match(enabled, /do not require the external texture proxy/);
+  assert.match(enabled, /without a bundled asset.*reachable https image URL/);
 
   const disabled = buildSceneGenerationSystemPrompt({ onlineTextureHints: false });
   assert.match(disabled, /host disabled proactive online texture hints/);
   assert.match(disabled, /Do not add new material\.textureUrl fields/);
   assert.doesNotMatch(disabled, /self-evidently incomplete as a flat color/);
-  assert.doesNotMatch(disabled, /any suitable public web image URL/);
+  assert.doesNotMatch(disabled, /planet\/earth\.png/);
 });
 
 test("buildIntentHints maps solar system prompt to sphere capability", () => {
@@ -185,6 +186,13 @@ test("matchIntentSignals finds lighting and declarative animation intents", () =
   const signals = matchIntentSignals("make the scene brighter with a point light and rotate the sun");
   assert.ok(signals.some((s) => s.id === "lighting"));
   assert.ok(signals.some((s) => s.id === "declarativeAnimation"));
+});
+
+test("matchIntentSignals recognizes orbital motion in English and Chinese", () => {
+  for (const prompt of ["make the moon orbit Earth", "让月球围绕地球公转"]) {
+    const signals = matchIntentSignals(prompt);
+    assert.ok(signals.some((signal) => signal.id === "declarativeAnimation"));
+  }
 });
 
 test("matchIntentSignals recognizes Chinese machine-room domain intent", () => {

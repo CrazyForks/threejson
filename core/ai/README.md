@@ -61,7 +61,7 @@ import {
 - `updateSceneJsonFile(prompt, sceneFilePath, options?)`（`core/util/nodeSceneFile.js`，不要在浏览器里调用）
 - `planTextures(sceneJsonStringOrObject, userHint, options?)`
 - `fillTextureUrls(sceneJsonStringOrObject, options?)`
-- `runSceneAgent(input, options?)` — 可选多轮 Agent；**默认 `agent.enabled: false`**（与单次生成相同，不额外消耗轮次）
+- `runSceneAgent(input, options?)` — 自适应场景执行器；默认 `executionMode: "direct"`，仅复杂场景或真实输出截断进入增量构建
 
 浏览器全局（非模块脚本可用）：
 
@@ -81,15 +81,19 @@ window.ThreeJsonAI.runSceneAgent
 
 不提供 `updateSceneJsonFile` 的全局挂载（避免在无 Node API 的环境下误用）。纹理相关接口会暴露密钥与计费风险，生产环境请放在服务端或本地脚本。
 
-## 接口：可选场景 Agent（`runSceneAgent`）
+## 接口：自适应场景执行（`runSceneAgent`）
 
-仅当显式传入 `agent.enabled: true` 时启用多轮流程（大纲 → 生成 → 结构修复 → **能力匹配审查** → 布局审查 → 可选纹理位点 dry-plan）。**未启用时**仍走单次 API，但会注入 intent hints，并在默认情况下做一次 capability review。
+`runSceneAgent` 不再区分含义模糊的“单轮/多轮 Agent”。`executionMode: "direct"` 是默认值：一次生成完整、可直接使用的场景，然后只做本地结构校验；只有本地能力检查发现用户明确要求的能力缺失时，才追加一次针对性修正。`executionMode: "draft_refine"` 仅供方案协商模型判定为真正复杂的场景使用；直接生成遇到供应商输出上限时也会自动切换到该模式。布局/材质 LLM 审查默认关闭。
+
+增量模式的模型用 `# done` 按实际完成情况结束。`agent.maxRefineRounds` 只是防失控上限（默认 6、硬上限 20），不是要执行的目标轮数；重复命令和无变化输出也会立即终止。一次 `runSceneAgent` 的所有模型调用还共享总截止时间（默认 180 秒，可通过 `turnTimeoutMs` 或绝对的 `turnDeadlineAt` 调整），因此多个卡住的供应商请求不会串成几十分钟。
 
 ```js
 const result = await aiClient.runSceneAgent(
   { mode: "generate", prompt: "智慧园区，含道路与两栋建筑" },
   {
-    agent: { enabled: true, depth: "medium" }, // simple | medium | deep | auto
+    executionMode: "direct", // 真正复杂时由方案协商传入 "draft_refine"
+    agent: { maxRefineRounds: 6 }, // 仅为增量路径的安全上限
+    turnTimeoutMs: 180000, // 整个场景任务的总时限，不是单轮时限
     onProgress: ({ step, kind, message }) => console.log(step, kind, message),
     apiKey: "...",
     provider: "chatgpt"
@@ -97,8 +101,6 @@ const result = await aiClient.runSceneAgent(
 );
 // result.sceneJsonString, result.steps, result.agentUsed, result.tokenHint
 ```
-
-`depth` 预设：`simple`（1 轮）、`medium`（大纲+修复）、`deep`（+纹理位点 dry-plan）、`auto`（在 deep 预算内尽量校验通过）。
 
 浏览器内 Agent **不会**默认调用 `fillTextureUrls` 写入本地 `assets/textures/`；编辑器可配置 `texture.sink`（目录授权 / 图床 / ZIP），外置批处理见 `tools/threejson-agent/`。
 
@@ -113,7 +115,7 @@ const abort = new AbortController();
 const { sceneJsonString } = await client.runSceneAgent(
   { mode: "update", prompt, currentSceneJsonString: currentJson },
   {
-    agent: { enabled: true, depth: "medium" },
+    agent: { maxRefineRounds: 6 },
     updateMode: "incremental", // 可选，默认 full
     stream: true, // 可选，默认 false
     streamPreview: true, // 可选：onProgress 携带 previewDelta

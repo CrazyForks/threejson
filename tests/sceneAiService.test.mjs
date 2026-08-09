@@ -323,6 +323,43 @@ test("requestChatCompletion respects AbortSignal", async () => {
   await assert.rejects(pending, (err) => err.name === "AbortError");
 });
 
+test("requestChatCompletion bounds a provider request that never responds", { timeout: 3000 }, async () => {
+  globalThis.fetch = async (_url, init) =>
+    new Promise((_resolve, reject) => {
+      init.signal?.addEventListener("abort", () => reject(init.signal.reason));
+    });
+
+  const startedAt = Date.now();
+  await assert.rejects(
+    requestChatCompletion({
+      provider: "deepseek",
+      apiKey: "test-key",
+      messages: [{ role: "user", content: "x" }],
+      requestTimeoutMs: 1
+    }),
+    /timed out/
+  );
+  assert.ok(Date.now() - startedAt < 2000);
+});
+
+test("requestChatCompletion enforces a shared scene-turn deadline before starting another round", async () => {
+  let fetchCalled = false;
+  globalThis.fetch = async () => {
+    fetchCalled = true;
+    throw new Error("fetch should not start after the turn deadline");
+  };
+  await assert.rejects(
+    requestChatCompletion({
+      provider: "deepseek",
+      apiKey: "test-key",
+      messages: [{ role: "user", content: "x" }],
+      turnDeadlineAt: Date.now() - 1
+    }),
+    (error) => error?.code === "AI_TURN_TIMEOUT"
+  );
+  assert.equal(fetchCalled, false);
+});
+
 test("parseSceneJsonString removes unused empty scene collection arrays", () => {
   const parsed = parseSceneJsonString(JSON.stringify({
     threeJsonId: "compact-lists",
@@ -1069,6 +1106,7 @@ test("classifyTurnIntent returns a bounded scene segment estimate", async () => 
   assert.equal(result.intent, "generate");
   assert.equal(result.generationStrategy, "segmented");
   assert.equal(result.estimatedSegments, 16);
+  assert.equal(result.executionMode, "direct");
 });
 
 test("classifyTurnIntent negotiates a compact strategy even when there are no prior turns", async () => {
@@ -1098,6 +1136,73 @@ test("classifyTurnIntent negotiates a compact strategy even when there are no pr
   assert.match(requestBody.messages[0].content, /If you are not confident that strict segmented output is supported, choose "compact"/);
   assert.equal(result.generationStrategy, "compact");
   assert.equal(result.estimatedSegments, 1);
+  assert.equal(result.executionMode, "direct");
+});
+
+test("classifyTurnIntent negotiates incremental execution independently from transport", async () => {
+  globalThis.fetch = async () => ({
+    ok: true,
+    async json() {
+      return {
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              intent: "generate",
+              targetTurnId: null,
+              note: "several independently detailed districts",
+              generationStrategy: "compact",
+              estimatedSegments: 1,
+              executionMode: "draft_refine",
+              refinementGoals: ["build four districts", "add transit network", "add district landmarks"]
+            })
+          }
+        }]
+      };
+    }
+  });
+
+  const result = await classifyTurnIntent(
+    { userPrompt: "build a detailed city with four districts and transit", history: [] },
+    { provider: "chatgpt", apiKey: "test-key" }
+  );
+
+  assert.equal(result.generationStrategy, "compact");
+  assert.equal(result.executionMode, "draft_refine");
+  assert.deepEqual(result.refinementGoals, ["build four districts", "add transit network", "add district landmarks"]);
+});
+
+test("classifyTurnIntent prompt keeps bounded planet scenes in direct mode", async () => {
+  let systemPrompt = "";
+  globalThis.fetch = async (_url, init = {}) => {
+    const request = JSON.parse(init.body);
+    systemPrompt = request.messages[0].content;
+    return {
+      ok: true,
+      async json() {
+        return {
+          choices: [{ message: { content: JSON.stringify({
+            intent: "generate",
+            targetTurnId: null,
+            note: "bounded planet scene",
+            generationStrategy: "single",
+            estimatedSegments: 1,
+            executionMode: "direct",
+            refinementGoals: [],
+            selectedCapabilityIds: ["declarativeAnimation"],
+            requiresAnimation: true
+          }) } }]
+        };
+      }
+    };
+  };
+
+  const result = await classifyTurnIntent(
+    { userPrompt: "Earth and Moon orbiting and rotating", history: [] },
+    { provider: "chatgpt", apiKey: "test-key" }
+  );
+  assert.match(systemPrompt, /conventional Solar System scene.*direct/);
+  assert.equal(result.executionMode, "direct");
+  assert.equal(result.requiresAnimation, true);
 });
 
 test("classifyTurnIntent preserves an adjust decision when the model omits its target id", async () => {

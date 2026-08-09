@@ -23,7 +23,7 @@ Supported providers: `chatgpt`, `deepseek`, `custom` (OpenAI-compatible; require
 - `texturePrompt.js` — texture task planning templates (RFC 6901 pointers).
 - `textureAiService.js` — `planTextures`, `fillTextureUrls`, image provider helpers.
 - `sceneAiService.js` — HTTP, `extractJsonText`, validation, `requestUpdatedSceneEditCommands`.
-- `sceneAgent.js` / `agentDepth.js` / `agentTools.js` — optional multi-step agent.
+- `sceneAgent.js` / `agentTools.js` — adaptive direct or incremental scene execution (`agentDepth.js` remains only for legacy compatibility).
 - `index.js` — public entry; mounts `window.ThreeJsonAI` in the browser.
 
 Human-readable skill: [`SKILL.md`](./SKILL.md). Related docs: [`docs/en/json-format.md`](../../docs/en/json-format.md), [`docs/en/extensions.md`](../../docs/en/extensions.md), [`docs/en/glossary.md`](../../docs/en/glossary.md). Gap matrix (archived): [`lab/archive/ai-skill-gap-matrix.md`](../../lab/archive/ai-skill-gap-matrix.md).
@@ -59,7 +59,7 @@ import {
 - `updateSceneJsonString` — optional `updateMode: "incremental"`
 - `requestUpdatedSceneEditCommands` — `outputMode: "commands"|"json"`
 - `planTextures` / `fillTextureUrls`
-- `runSceneAgent` — **default `agent.enabled: false`**
+- `runSceneAgent` — defaults to `executionMode: "direct"`; complex/output-limited scenes can use `"draft_refine"`
 
 Browser globals:
 
@@ -98,15 +98,17 @@ const result = await requestUpdatedSceneEditCommands(
 
 Common ops: `object.patch`, `material.patch`, `object.add`, `object.reconcile`, `camera.fit`, `scene.applyPatch`. Editor wraps with `editor.*` separately.
 
-## Optional agent (`runSceneAgent`)
+## Adaptive scene execution (`runSceneAgent`)
 
-Enabled only when `agent.enabled: true`. Depth: `simple` | `medium` | `deep` | `auto`.
+There is no separate single-turn/multi-turn quality switch. `executionMode: "direct"` returns one complete usable scene and is the default. `"draft_refine"` is reserved for genuinely complex scenes selected during negotiation, or for a detected direct output-limit fallback. Layout/material LLM review is off by default. The model ends incremental work with `# done`; `agent.maxRefineRounds` (default 6, hard maximum 20) is only a runaway guard, and repeated/no-op output also terminates immediately. All provider calls in one `runSceneAgent` share a total deadline (180 seconds by default, configurable through `turnTimeoutMs` or absolute `turnDeadlineAt`), so several stalled requests cannot accumulate into a many-minute hang.
 
 ```js
 const result = await aiClient.runSceneAgent(
   { mode: "generate", prompt: "Small campus with roads and two buildings" },
   {
-    agent: { enabled: true, depth: "medium" },
+    executionMode: "direct",
+    agent: { maxRefineRounds: 6 },
+    turnTimeoutMs: 180000,
     apiKey: "...",
     provider: "chatgpt"
   }

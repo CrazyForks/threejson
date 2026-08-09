@@ -65,7 +65,7 @@ Command and patch editing:
 
 const THREE_JSON_AGENT_ONLINE_TEXTURE_INDEX = `
 Online texture hints:
-- When enabled, use a real reachable online material.textureUrl by default when a described object or surface would look wrong or ambiguous as a flat color: named planets, terrain/grass/water, asphalt, brick/concrete/wood/stone/fabric, signs/screens/maps, paintings, labels, carpets, and other recognizable image-bearing or patterned things. The URL can come from any suitable public web source, not only a CDN; https is preferred when available. Add textureRepeat for large tiled surfaces. Keep flat colors for abstract/simple blockouts and plain colored objects.
+- When enabled, use material.textureUrl by default when a described object or surface would look wrong or ambiguous as a flat color: named planets, terrain/grass/water, asphalt, brick/concrete/wood/stone/fabric, signs/screens/maps, paintings, labels, carpets, and other recognizable image-bearing or patterned things. For Solar-System bodies prefer the bundled same-origin files under /assets/textures/environment/nature/planet/ (earth.png, moon.png, sun.png, mercury.png, venus.png, mars.png, jupiter.png, saturn.png, saturn_ring.png, uranus.png, neptune.png) with a white material tint; they need no texture proxy. For other subjects use a reachable https resource, add textureRepeat for large tiled surfaces, and keep flat colors for abstract/simple blockouts and plain colored objects.
 `;
 
 function buildAgentCapabilityIndex(options = {}) {

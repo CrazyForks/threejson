@@ -30,9 +30,8 @@ export function formatAgentProgressLabel(progress, t) {
       return t("aiAgent.progress.generate", "Generating the scene JSON…");
     case "commands":
       return roundNum
-        ? t("aiAgent.progress.commandsRound", "Generating scene edit commands (round {round}/{maxRounds})…", {
-            round: roundNum,
-            maxRounds: roundMax
+        ? t("aiAgent.progress.commandsRound", "Generating scene edit commands (step {round})…", {
+            round: roundNum
           })
         : t("aiAgent.progress.commands", "Generating scene edit commands…");
     case "repair":
@@ -47,23 +46,20 @@ export function formatAgentProgressLabel(progress, t) {
             maxAttempts: roundMax
           });
     case "explore":
-      return t("aiAgent.progress.explore", "Inspecting the current scene (round {round}/{maxRounds})…", {
-        round: roundNum,
-        maxRounds: roundMax
+      return t("aiAgent.progress.explore", "Inspecting the current scene (step {round})…", {
+        round: roundNum
       });
     case "commands_ready":
       return t("aiAgent.progress.commandsReady", "Scene edit commands ready.");
     case "commands_applied":
       return t("aiAgent.progress.commandsApplied", "Applied round {round} to the scene.", { round: roundNum });
     case "refine":
-      return t("aiAgent.progress.refine", "Auto-refining the scene (round {round}/{maxRounds})…", {
-        round: roundNum,
-        maxRounds: roundMax
+      return t("aiAgent.progress.refine", "Applying the next meaningful scene change (step {round})…", {
+        round: roundNum
       });
     case "draft_refinement":
-      return t("aiAgent.progress.draftRefinement", "Refining the draft (round {round}/{maxRounds})…", {
-        round: roundNum,
-        maxRounds: roundMax
+      return t("aiAgent.progress.draftRefinement", "Improving the complex-scene draft (step {round})…", {
+        round: roundNum
       });
     case "capability_review":
       return t(
@@ -74,14 +70,19 @@ export function formatAgentProgressLabel(progress, t) {
     case "adjustment_refinement":
       return t(
         "aiAgent.progress.adjustmentRefinementPreview",
-        "Adjustment preview updated (round {round}/{maxRounds}).",
-        { round, maxRounds }
+        "Adjustment preview updated (step {round}).",
+        { round }
       );
     case "layout_review":
       return t(
         "aiAgent.progress.layoutReview",
         "Reviewing layout and materials ({count} texture slot(s))…",
         { count: count ?? 0 }
+      );
+    case "execution_fallback":
+      return t(
+        "aiAgent.progress.executionFallback",
+        "The scene is too large for one response; switching to incremental construction…"
       );
     case "texture_review":
       return t(
@@ -116,9 +117,11 @@ function formatStagePreviewLabel(progress, t) {
     case "draft_refinement":
       return t(
         "aiAgent.progress.draftRefinementPreview",
-        "Draft refinement preview (round {round}/{maxRounds}).",
-        { round, maxRounds }
+        "Complex-scene preview updated (step {round}).",
+        { round }
       );
+    case "direct_scene":
+      return t("aiAgent.progress.directSceneReady", "Usable scene preview ready.");
     case "capability_review":
       return t("aiAgent.progress.capabilityReviewPreview", "Capability review preview.");
     case "layout_review":

@@ -419,6 +419,17 @@ async function main() {
     if (!agentResult?.agentUsed || !Array.isArray(agentResult.steps)) {
       return "";
     }
+    if (
+      agentResult.executionMode === "direct" &&
+      !agentResult.steps.some((step) =>
+        step.ok === false ||
+        step.kind === "execution_fallback" ||
+        step.kind === "repair" ||
+        (step.kind === "capability_review" && step.attempt)
+      )
+    ) {
+      return "";
+    }
     const lines = agentResult.steps.slice(0, 10).map((step, index) => {
       const kind = step.kind || "step";
       const state = step.ok === false ? "failed" : "ok";
@@ -458,15 +469,20 @@ async function main() {
     turnId,
     turnContext = createThreeBoxTurnContext(turnId, text),
     generationStrategy = "single",
+    executionMode = "direct",
+    refinementGoals = [],
+    turnDeadlineAt = Date.now() + 180000,
+    abortController: providedAbortController,
     estimatedSegments = 1,
-    selectedCapabilityIds = [],
-    requiresAnimation = false
+    selectedCapabilityIds,
+    requiresAnimation
   }) {
     const settings = settingsModal.getSettings();
     const selectedProviderId = document.getElementById("composerModelSelect")?.value;
     const providerOptions = {
       ...await resolveProviderOptionsForRequest(settings, selectedProviderId),
-      threeBoxTurnContext: turnContext
+      threeBoxTurnContext: turnContext,
+      turnDeadlineAt
     };
 
     const initialActivity = api.takeInitialActivity?.();
@@ -478,10 +494,8 @@ async function main() {
     streaming.processing(t("threebox.chat.generating", "正在生成…"));
     let streamBuffer = "";
     const agentOptions = resolveThreeBoxAgentOptions(settings);
-    // Generation is always draft-then-incrementally-refine now (see core/ai/sceneAgent.js's module
-    // docblock) — there is no more "agent enabled" branch, so this is the only scene card and it
-    // always renders progressively: the draft first (onSceneDraft below), then every subsequent
-    // refine/review round's stage_preview/scene_ready progress event (queueScenePreview below).
+    // One card serves both policies: direct generation paints one usable preview; genuinely
+    // complex generation keeps that runtime and applies command refinements in place.
     const sceneCard = createConfiguredSceneCard();
     let draftPreviewStarted = false;
     let draftPreviewPromise = null;
@@ -489,7 +503,7 @@ async function main() {
     let previewQueueOpen = true;
     let lastQueuedPreviewJson = "";
     api.appendToBody(textEl, sceneCard.el);
-    const queueScenePreview = (sceneJsonString) => {
+    const queueScenePreview = (sceneJsonString, progress = {}) => {
       if (!sceneJsonString || sceneJsonString === lastQueuedPreviewJson) {
         return;
       }
@@ -502,7 +516,23 @@ async function main() {
           if (!previewQueueOpen) {
             return null;
           }
-          return sceneCard.render(JSON.parse(sceneJsonString), { label: text, draft: true });
+          const sceneJson = JSON.parse(sceneJsonString);
+          if (
+            progress.outputMode === "commands" &&
+            Array.isArray(progress.commands) &&
+            progress.commands.length > 0 &&
+            sceneCard.getRuntime()
+          ) {
+            return sceneCard.applyCommands(progress.commands, {
+              sceneJson,
+              label: text,
+              draft: true
+            });
+          }
+          return sceneCard.render(sceneJson, {
+            label: text,
+            draft: progress.stage !== "direct_scene"
+          });
         });
     };
     const updateAgentProgress = createAgentProgressUpdater(streaming, queueScenePreview);
@@ -511,7 +541,7 @@ async function main() {
     // wired to abort this controller via onStopRequested. Cleared as soon as the cancelable
     // network call settles (success or failure) rather than held for the whole function — title/
     // recap/render afterward are fast and not worth blocking a new message on.
-    const abortController = new AbortController();
+    const abortController = providedAbortController || new AbortController();
     activeAbortController = abortController;
     chatPanel.setBusy(true);
     const clearBusyIfCurrent = () => {
@@ -571,6 +601,8 @@ async function main() {
         capabilityLookup: settings.ai?.capabilityLookupEnabled !== false,
         onlineTextureHints: settings.ai?.onlineTextureHints !== false,
         generationStrategy,
+        executionMode,
+        refinementGoals,
         estimatedSegments,
         maxSceneSegments: settings.ai?.maxSceneSegments,
         selectedCapabilityIds,
@@ -631,7 +663,7 @@ async function main() {
       void previewRenderQueue.catch((error) => {
         console.warn("[threebox] superseded agent preview render failed:", error);
       });
-      await sceneCard.render(outputSceneJson, { label: text });
+      await sceneCard.finalize(outputSceneJson, { label: text });
       sceneCardsByTurnId.set(turnId, sceneCard);
 
       const sceneTitle = await resolvedTitlePromise;
@@ -688,6 +720,8 @@ async function main() {
         turnId,
         turnContext,
         generationStrategy,
+        executionMode,
+        refinementGoals,
         estimatedSegments,
         selectedCapabilityIds,
         requiresAnimation
@@ -701,8 +735,10 @@ async function main() {
     turnId,
     targetTurnId,
     turnContext = createThreeBoxTurnContext(turnId, text),
-    selectedCapabilityIds = [],
-    requiresAnimation = false,
+    turnDeadlineAt = Date.now() + 180000,
+    abortController: providedAbortController,
+    selectedCapabilityIds,
+    requiresAnimation,
     generationStrategy = "single",
     estimatedSegments = 1
   }) {
@@ -710,20 +746,33 @@ async function main() {
     const selectedProviderId = document.getElementById("composerModelSelect")?.value;
     const providerOptions = {
       ...await resolveProviderOptionsForRequest(settings, selectedProviderId),
-      threeBoxTurnContext: turnContext
+      threeBoxTurnContext: turnContext,
+      turnDeadlineAt
     };
 
     const targetTurn = await getTurn(targetTurnId);
     if (!targetTurn) {
       // Safe fallback: target turn vanished from cache (e.g. cleared) — treat as a fresh generate.
-      return handleGenerateTurn(text, api, { conversationId, turnId, turnContext });
+      return handleGenerateTurn(text, api, {
+        conversationId,
+        turnId,
+        turnContext,
+        turnDeadlineAt,
+        abortController: providedAbortController
+      });
     }
     let targetSceneJsonString;
     try {
       targetSceneJsonString = await resolveSceneJsonStringForTurn(targetTurn, conversationId);
     } catch (error) {
       console.error("[threebox] failed to resolve target scene JSON:", error);
-      return handleGenerateTurn(text, api, { conversationId, turnId, turnContext });
+      return handleGenerateTurn(text, api, {
+        conversationId,
+        turnId,
+        turnContext,
+        turnDeadlineAt,
+        abortController: providedAbortController
+      });
     }
     const targetSceneJson = JSON.parse(targetSceneJsonString);
 
@@ -741,7 +790,7 @@ async function main() {
     let previewQueueOpen = true;
     let lastQueuedPreviewJson = "";
     api.appendToBody(textEl, sceneCard.el);
-    const queueScenePreview = (sceneJsonString) => {
+    const queueScenePreview = (sceneJsonString, progress = {}) => {
       if (!sceneJsonString || sceneJsonString === lastQueuedPreviewJson) {
         return;
       }
@@ -750,15 +799,31 @@ async function main() {
         .catch((error) => {
           console.warn("[threebox] previous adjustment preview render failed:", error);
         })
-        .then(() => previewQueueOpen
-          ? sceneCard.render(JSON.parse(sceneJsonString), { label: text, draft: true })
-          : null);
+        .then(() => {
+          if (!previewQueueOpen) {
+            return null;
+          }
+          const sceneJson = JSON.parse(sceneJsonString);
+          if (
+            progress.outputMode === "commands" &&
+            Array.isArray(progress.commands) &&
+            progress.commands.length > 0 &&
+            sceneCard.getRuntime()
+          ) {
+            return sceneCard.applyCommands(progress.commands, {
+              sceneJson,
+              label: text,
+              draft: true
+            });
+          }
+          return sceneCard.render(sceneJson, { label: text, draft: true });
+        });
     };
     queueScenePreview(targetSceneJsonString);
     const updateAgentProgress = createAgentProgressUpdater(streaming, queueScenePreview);
 
     // See handleGenerateTurn's matching comment.
-    const abortController = new AbortController();
+    const abortController = providedAbortController || new AbortController();
     activeAbortController = abortController;
     chatPanel.setBusy(true);
     const clearBusyIfCurrent = () => {
@@ -864,7 +929,7 @@ async function main() {
       void previewRenderQueue.catch((error) => {
         console.warn("[threebox] superseded adjustment preview render failed:", error);
       });
-      await sceneCard.render(outputSceneJson, { label: text });
+      await sceneCard.finalize(outputSceneJson, { label: text });
       sceneCardsByTurnId.set(turnId, sceneCard);
 
       const sceneTitle = await resolvedTitlePromise;
@@ -995,7 +1060,14 @@ async function main() {
       // user instead of vanishing — an unhandled rejection here would otherwise leave the chat
       // looking like it did nothing at all after Send was clicked.
       console.error("[threebox] handleUserMessage failed:", error);
-      if (!api.finishInitialActivityError?.(error)) {
+      activeAbortController?.abort();
+      activeAbortController = null;
+      chatPanel.setBusy(false);
+      if (isAbortError(error)) {
+        if (!api.finishInitialActivity?.(t("threebox.app.generateStopped", "已停止生成。"))) {
+          api.appendAssistantMessage(t("threebox.app.generateStopped", "已停止生成。"));
+        }
+      } else if (!api.finishInitialActivityError?.(error)) {
         const textEl = api.appendAssistantMessage("");
         api.updateAssistantError(textEl, error);
       }
@@ -1063,12 +1135,16 @@ async function main() {
     const conversationId = sidebar.ensureActiveConversation().id;
     const turnId = createTurnId();
     const turnContext = createThreeBoxTurnContext(turnId, text);
+    const turnDeadlineAt = Date.now() + 180000;
+    const turnAbortController = new AbortController();
+    activeAbortController = turnAbortController;
+    chatPanel.setBusy(true);
     const allPriorTurns = await getTurnsForConversation(conversationId).catch(() => []);
     const priorTurns = allPriorTurns.filter(isSceneContextTurn);
 
-    // Classify even the first generation turn. Its route is unambiguously "generate", but the
-    // same negotiation also selects detailed ThreeJSON capabilities, animation support and the
-    // optional full-JSON transport strategy. None of those fields controls automatic refinement.
+    // Clearly bounded first requests take the local direct fast path (animation/capability hints
+    // are inferred locally), so an Earth/Moon scene does not pay for a separate classifier call.
+    // Follow-ups and explicitly large requests still use model negotiation for routing/execution.
     const history = priorTurns.map((t) => ({
       turnId: t.id,
       summary: t.recapSummary || t.userPrompt,
@@ -1077,12 +1153,15 @@ async function main() {
       targetTurnId: t.targetTurnId,
       sceneTitle: t.sceneTitle
     }));
+    const animationCapabilityMode = settings.ai?.animationCapabilityMode || "auto";
     const classified = await classifyThreeBoxTurnIntent(
       { userPrompt: text, history },
       {
         ...providerOptions,
         threeBoxTurnContext: turnContext,
-        animationCapabilityMode: settings.ai?.animationCapabilityMode || "auto"
+        turnDeadlineAt,
+        signal: turnAbortController.signal,
+        animationCapabilityMode
       }
     );
     const route = resolveThreeBoxNegotiatedRoute(classified, priorTurns);
@@ -1092,9 +1171,13 @@ async function main() {
         turnId,
         targetTurnId: route.targetTurnId,
         turnContext,
+        turnDeadlineAt,
+        abortController: turnAbortController,
         selectedCapabilityIds: classified.selectedCapabilityIds,
         requiresAnimation: classified.requiresAnimation,
         generationStrategy: classified.generationStrategy,
+        executionMode: classified.executionMode,
+        refinementGoals: classified.refinementGoals,
         estimatedSegments: classified.estimatedSegments
       });
     } else {
@@ -1102,7 +1185,11 @@ async function main() {
         conversationId,
         turnId,
         turnContext,
+        turnDeadlineAt,
+        abortController: turnAbortController,
         generationStrategy: classified.generationStrategy,
+        executionMode: classified.executionMode,
+        refinementGoals: classified.refinementGoals,
         estimatedSegments: classified.estimatedSegments,
         selectedCapabilityIds: classified.selectedCapabilityIds,
         requiresAnimation: classified.requiresAnimation

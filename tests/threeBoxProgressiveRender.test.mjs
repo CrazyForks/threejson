@@ -6,11 +6,11 @@ const appUrl = new URL("../tools/scene-host/threebox/js/threeBoxApp.js", import.
 const cardUrl = new URL("../tools/scene-host/threebox/js/threeBoxSceneCard.js", import.meta.url);
 const panelUrl = new URL("../tools/scene-host/threebox/js/threeBoxChatPanel.js", import.meta.url);
 
-test("ThreeBox keeps first-turn capability negotiation without hard-coding a single-pass route", async () => {
+test("ThreeBox routes every request through adaptive local-or-model negotiation", async () => {
   const source = await readFile(appUrl, "utf8");
-  assert.match(source, /classifyThreeBoxTurnIntent\(/);
+  assert.match(source, /const classified = await classifyThreeBoxTurnIntent\(/);
   assert.match(source, /resolveThreeBoxNegotiatedRoute\(classified, priorTurns\)/);
-  assert.doesNotMatch(source, /if \(priorTurns\.length === 0\) \{[\s\S]*?generationStrategy:\s*"single"/);
+  assert.doesNotMatch(source, /priorTurns\.length === 0\s*\?\s*\{/);
 });
 
 test("ThreeBox can start a draft preview before final AI post-processing completes", async () => {
@@ -25,6 +25,10 @@ test("ThreeBox can start a draft preview before final AI post-processing complet
   assert.match(coreSource, /options\.onSceneDraft\(sceneJsonString\)/);
   assert.match(cardSource, /onRuntimeReady:/);
   assert.match(cardSource, /showCompactLoadingProgress\(\)/);
+  assert.match(cardSource, /async function applyCommands\(/);
+  assert.match(cardSource, /async function finalize\(/);
+  assert.match(appSource, /sceneCard\.applyCommands\(progress\.commands/);
+  assert.match(appSource, /sceneCard\.finalize\(outputSceneJson/);
   assert.match(appSource, /insertBeforeBody\(textEl, api\.buildJsonCollapse\(outputSceneJsonString\), sceneCard\.el\)/);
   assert.match(panelSource, /insertBeforeBody,\s*createStreamingBlock/);
 });

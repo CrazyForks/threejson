@@ -353,6 +353,31 @@ async function readSseChatCompletionStream(body, onDelta, onCompletionMetadata) 
   return content;
 }
 
+function createRequestAbortScope(parentSignal, timeoutMs, minimumTimeoutMs = 1000, timeoutCode = "") {
+  const controller = new AbortController();
+  const boundedTimeout = Number.isFinite(Number(timeoutMs)) && Number(timeoutMs) > 0
+    ? Math.max(minimumTimeoutMs, Math.min(300000, Math.round(Number(timeoutMs))))
+    : 120000;
+  const forwardAbort = () => controller.abort(parentSignal?.reason);
+  if (parentSignal?.aborted) {
+    forwardAbort();
+  } else {
+    parentSignal?.addEventListener?.("abort", forwardAbort, { once: true });
+  }
+  const timer = setTimeout(() => {
+    const error = new Error(`AI request timed out after ${boundedTimeout}ms.`);
+    if (timeoutCode) error.code = timeoutCode;
+    controller.abort(error);
+  }, boundedTimeout);
+  return {
+    signal: controller.signal,
+    cleanup() {
+      clearTimeout(timer);
+      parentSignal?.removeEventListener?.("abort", forwardAbort);
+    }
+  };
+}
+
 async function requestChatCompletion({
   provider = "chatgpt",
   apiKey,
@@ -363,6 +388,8 @@ async function requestChatCompletion({
   baseUrl,
   stream = false,
   signal,
+  requestTimeoutMs,
+  turnDeadlineAt,
   onDelta,
   onCompletionMetadata,
   extraHeaders,
@@ -405,86 +432,117 @@ async function requestChatCompletion({
   const threeBoxContext = normalizedProvider === "threebox-builtin"
     ? buildThreeBoxRequestContext(threeBoxTurnContext)
     : undefined;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${normalizedApiKey}`,
-      ...extraHeaders
-    },
-    signal,
-    body: JSON.stringify({
-      model: model || providerConfig.defaultModel,
-      temperature,
-      max_tokens: maxTokens,
-      messages,
-      stream: stream === true,
-      ...(normalizedProvider === "deepseek" && normalizedUserId ? { user_id: normalizedUserId } : {}),
-      ...(threeBoxContext ? { threebox_context: threeBoxContext } : {})
-    })
-  });
-  applyThreeBoxModerationHeaders(threeBoxTurnContext, response.headers);
-
-  if (!response.ok) {
-    const detail = await response.text();
-    // threebox-server (the built-in provider's backend, tmpserver/threebox-server) reports trial
-    // quota exhaustion as `{ "error": "QUOTA_EXCEEDED" }` — tag it so hosts can distinguish "buy
-    // your own key" from a generic failure without string-matching the message text.
-    let errorCode = null;
-    let providerError = null;
-    try {
-      const parsed = JSON.parse(detail);
-      providerError = parsed && typeof parsed === "object" ? parsed : null;
-      if (parsed && parsed.error === "QUOTA_EXCEEDED") {
-        errorCode = "BUILTIN_QUOTA_EXCEEDED";
-      } else if (parsed?.error === "SAFETY_POLICY_WARNING") {
-        errorCode = "BUILTIN_SAFETY_WARNING";
-      } else if (parsed?.error === "DEVICE_BANNED") {
-        errorCode = "BUILTIN_DEVICE_BANNED";
-      } else if (parsed?.error === "DEVICE_PERMANENTLY_BANNED") {
-        errorCode = "BUILTIN_DEVICE_PERMANENTLY_BANNED";
-      } else if (parsed?.error === "DEVICE_MUTED") {
-        errorCode = "BUILTIN_DEVICE_MUTED";
-      }
-    } catch {
-      /* not JSON, ignore */
+  const numericDeadline = Number(turnDeadlineAt);
+  let effectiveRequestTimeoutMs = requestTimeoutMs;
+  let minimumRequestTimeoutMs = 1000;
+  let requestTimeoutCode = "";
+  if (Number.isFinite(numericDeadline) && numericDeadline > 0) {
+    const remainingTurnMs = Math.floor(numericDeadline - Date.now());
+    if (remainingTurnMs <= 0) {
+      const error = new Error("AI scene turn exceeded its total time limit.");
+      error.code = "AI_TURN_TIMEOUT";
+      throw error;
     }
-    const error = new Error(`AI request failed (${response.status}): ${detail}`);
-    error.httpStatus = response.status;
-    error.providerError = providerError;
-    if (errorCode) {
-      error.code = errorCode;
+    const ordinaryRequestTimeout = Number.isFinite(Number(requestTimeoutMs)) && Number(requestTimeoutMs) > 0
+      ? Number(requestTimeoutMs)
+      : 120000;
+    effectiveRequestTimeoutMs = Math.min(ordinaryRequestTimeout, remainingTurnMs);
+    minimumRequestTimeoutMs = 1;
+    if (remainingTurnMs <= ordinaryRequestTimeout) {
+      requestTimeoutCode = "AI_TURN_TIMEOUT";
     }
-    throw error;
   }
+  const abortScope = createRequestAbortScope(
+    signal,
+    effectiveRequestTimeoutMs,
+    minimumRequestTimeoutMs,
+    requestTimeoutCode
+  );
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${normalizedApiKey}`,
+        ...extraHeaders
+      },
+      signal: abortScope.signal,
+      body: JSON.stringify({
+        model: model || providerConfig.defaultModel,
+        temperature,
+        max_tokens: maxTokens,
+        messages,
+        stream: stream === true,
+        ...(normalizedProvider === "deepseek" && normalizedUserId ? { user_id: normalizedUserId } : {}),
+        ...(threeBoxContext ? { threebox_context: threeBoxContext } : {})
+      })
+    });
+    applyThreeBoxModerationHeaders(threeBoxTurnContext, response.headers);
 
-  if (stream === true && response.body) {
-    const content = await readSseChatCompletionStream(response.body, onDelta, onCompletionMetadata);
-    if (!content.trim()) {
-      throw new Error("AI stream response content is empty.");
+    if (!response.ok) {
+      const detail = await response.text();
+      // threebox-server reports trial quota exhaustion as `{ "error": "QUOTA_EXCEEDED" }` —
+      // tag it so hosts can distinguish "buy your own key" from a generic failure without
+      // string-matching the message text.
+      let errorCode = null;
+      let providerError = null;
+      try {
+        const parsed = JSON.parse(detail);
+        providerError = parsed && typeof parsed === "object" ? parsed : null;
+        if (parsed && parsed.error === "QUOTA_EXCEEDED") {
+          errorCode = "BUILTIN_QUOTA_EXCEEDED";
+        } else if (parsed?.error === "SAFETY_POLICY_WARNING") {
+          errorCode = "BUILTIN_SAFETY_WARNING";
+        } else if (parsed?.error === "DEVICE_BANNED") {
+          errorCode = "BUILTIN_DEVICE_BANNED";
+        } else if (parsed?.error === "DEVICE_PERMANENTLY_BANNED") {
+          errorCode = "BUILTIN_DEVICE_PERMANENTLY_BANNED";
+        } else if (parsed?.error === "DEVICE_MUTED") {
+          errorCode = "BUILTIN_DEVICE_MUTED";
+        }
+      } catch {
+        /* not JSON, ignore */
+      }
+      const error = new Error(`AI request failed (${response.status}): ${detail}`);
+      error.httpStatus = response.status;
+      error.providerError = providerError;
+      if (errorCode) {
+        error.code = errorCode;
+      }
+      throw error;
+    }
+
+    if (stream === true && response.body) {
+      const content = await readSseChatCompletionStream(response.body, onDelta, onCompletionMetadata);
+      if (!content.trim()) {
+        throw new Error("AI stream response content is empty.");
+      }
+      return content;
+    }
+
+    const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content;
+    if (typeof content !== "string" || !content.trim()) {
+      throw new Error("AI response content is empty.");
+    }
+    if (typeof onCompletionMetadata === "function") {
+      onCompletionMetadata({ finishReason: data?.choices?.[0]?.finish_reason || null });
     }
     return content;
+  } finally {
+    abortScope.cleanup();
   }
-
-  const data = await response.json();
-  const content = data?.choices?.[0]?.message?.content;
-  if (typeof content !== "string" || !content.trim()) {
-    throw new Error("AI response content is empty.");
-  }
-  if (typeof onCompletionMetadata === "function") {
-    onCompletionMetadata({ finishReason: data?.choices?.[0]?.finish_reason || null });
-  }
-  return content;
 }
 
 /**
- * Strip streaming / UI-only fields before passing options to nested LLM calls.
+ * Strip streaming / UI-only fields before passing options to nested LLM calls. Keep the caller's
+ * AbortSignal and shared turn deadline: outline/review/refinement requests are part of the same
+ * user turn and must stop immediately when that turn is cancelled.
  * @param {object} options
  */
 function stripChatTransportOptions(options = {}) {
   const next = { ...options };
   delete next.stream;
-  delete next.signal;
   delete next.onDelta;
   delete next.streamPreview;
   delete next.updateMode;
@@ -636,8 +694,8 @@ function isLengthFinishReason(value) {
   return reason === "length" || reason === "max_tokens" || reason === "max_output_tokens";
 }
 
-function shouldRetryCompactSceneOutput(content, completionMetadata, options) {
-  if (options.compactRetryOnTruncation === false || !isLikelyTruncatedJsonText(content)) {
+function isSceneOutputCutoff(content, completionMetadata, options) {
+  if (!isLikelyTruncatedJsonText(content)) {
     return false;
   }
   if (isLengthFinishReason(completionMetadata?.finishReason)) {
@@ -650,6 +708,17 @@ function shouldRetryCompactSceneOutput(content, completionMetadata, options) {
     1000000
   );
   return String(content || "").length >= minChars;
+}
+
+function shouldRetryCompactSceneOutput(content, completionMetadata, options) {
+  return options.compactRetryOnTruncation !== false &&
+    isSceneOutputCutoff(content, completionMetadata, options);
+}
+
+function createSceneOutputLimitError(message) {
+  const error = new Error(message);
+  error.code = "SCENE_OUTPUT_LIMIT";
+  return error;
 }
 
 function buildCompactSceneRetryMessage(prompt, referenceMaterial = "", options = {}) {
@@ -720,7 +789,7 @@ async function requestSegmentedSceneJsonContent(messages, options, maxTokens) {
     );
   }
 
-  throw new Error(
+  throw createSceneOutputLimitError(
     `Scene JSON was not completed after ${maxSegments} response segments. Try a provider/model with a larger context window or raise maxSceneSegments.`
   );
 }
@@ -887,6 +956,14 @@ async function generateSceneJsonString(prompt, options = {}) {
         }
       }
     });
+    if (
+      options.compactRetryOnTruncation === false &&
+      isSceneOutputCutoff(content, completionMetadata, options)
+    ) {
+      throw createSceneOutputLimitError(
+        "Scene JSON exceeded the provider output limit. Switch to planned incremental construction."
+      );
+    }
     if (shouldRetryCompactSceneOutput(content, completionMetadata, options)) {
       await emitSceneGenerationPhase(options, {
         phase: "compact-retry",
@@ -908,7 +985,7 @@ async function generateSceneJsonString(prompt, options = {}) {
         }
       });
       if (shouldRetryCompactSceneOutput(content, retryMetadata, { ...options, compactRetryOnTruncation: true })) {
-        throw new Error(
+        throw createSceneOutputLimitError(
           "Scene JSON exceeded the provider output limit even after one compact full-regeneration attempt. " +
           "Use planned segmented output or simplify the requested scene."
         );

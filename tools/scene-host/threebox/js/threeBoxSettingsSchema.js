@@ -44,13 +44,10 @@ export const THREEBOX_SETTINGS_DEFAULTS = {
     animationCapabilityMode: "auto",
     onlineTextureHints: true,
     maxSceneSegments: 16,
-    // Generation/adjustment is always draft-then-incrementally-refine now — there is no more
-    // on/off "Agent" toggle or depth preset (see core/ai/sceneAgent.js's module docblock). This is
-    // the one knob left: how many automatic refine rounds the model gets before the round budget
-    // stops it (it can always finish earlier by saying it's done). Default matches
-    // core/ai/sceneAgent.js's DEFAULT_MAX_REFINE_ROUNDS; the hard ceiling (60) is enforced there
-    // regardless of what's configured here.
-    maxAutoRefineRounds: 20
+    // Runaway guard used only for genuinely complex draft_refine turns. Direct generation is the
+    // default and never consumes this budget. The model/no-op guards normally stop much earlier.
+    maxAutoRefineRounds: 6,
+    agentPolicyVersion: 2
   },
   io: {
     exportJsonIndent: 2,
@@ -148,9 +145,9 @@ export const THREEBOX_SETTINGS_FIELDS = [
     section: "ai",
     path: "ai.maxAutoRefineRounds",
     type: "number",
-    label: "自动细化最大轮数",
+    label: "复杂场景细化安全上限",
     min: 1,
-    max: 60
+    max: 20
   },
 
   { section: "io", path: "io.exportJsonIndent", type: "number", label: "导出 JSON 缩进", min: 0, max: 4 },

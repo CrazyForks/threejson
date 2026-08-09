@@ -1,10 +1,9 @@
 /**
- * Scene agent: every ordinary generation creates a small valid draft and then improves it through
- * automatic incremental rounds; every ordinary command-based adjustment iterates in the same way
- * when the host supplies apply/refresh callbacks. `generationStrategy` belongs to the independent
- * full-JSON transport protocol (single/compact/segmented) and must never disable this quality
- * pipeline. The model decides when the scene is satisfactory via `# done`; maxRefineRounds is only
- * a user-configurable runaway guard, not a target round count.
+ * Scene agent with two independent concerns: `generationStrategy` controls full-JSON transport,
+ * while `executionMode` controls whether a scene is authored directly or built incrementally.
+ * Direct is the default and produces one complete, immediately usable scene. `draft_refine` is
+ * reserved for genuinely complex scenes or a direct output-limit fallback. Incremental loops stop
+ * on `# done`, repeated/no-op output, or their runaway guard; the guard is never a target.
  *
  * Generation and adjustment share the same commands/patch/full-JSON/done protocol, compact spatial
  * context and round-budget semantics. Their small host adapters remain separate only because a
@@ -70,13 +69,11 @@ const REFINE_ROUND_MAX_TOKENS = 3000;
 /** Only reached when a round has no incremental-apply mechanism available at all (bare `core/ai`
  * callers with no live/offscreen runtime) — the lowest-priority fallback, not the common path. */
 const FULL_REWRITE_MAX_TOKENS = 6000;
-/** Generous default so a complex scene has real room to converge — the model can always finish
- * earlier via `# done`; this only guards against never finishing. User-configurable per host
- * settings (e.g. ThreeBox's `ai.maxAutoRefineRounds`), clamped to HARD_MAX_REFINE_ROUNDS. */
-const DEFAULT_MAX_REFINE_ROUNDS = 20;
+/** Default runaway guard for the comparatively rare incremental path. */
+const DEFAULT_MAX_REFINE_ROUNDS = 6;
 /** Hard ceiling enforced regardless of what a caller/user configures — a stuck loop (model never
  * emits `# done`) must still terminate. */
-const HARD_MAX_REFINE_ROUNDS = 60;
+const HARD_MAX_REFINE_ROUNDS = 20;
 const MAX_CAPABILITY_REVIEW_ATTEMPTS = 1;
 const MAX_REPAIR_ATTEMPTS = 2;
 
@@ -91,6 +88,160 @@ function normalizeAgentOptions(agentOptions = {}) {
       ? Math.max(1, Math.min(HARD_MAX_REFINE_ROUNDS, Math.round(raw)))
       : DEFAULT_MAX_REFINE_ROUNDS;
   return { maxRefineRounds };
+}
+
+function normalizeExecutionMode(value) {
+  return value === "draft_refine" ? "draft_refine" : "direct";
+}
+
+/** Scene hosts pass a JSON envelope so routing/capability metadata reaches the generation prompt.
+ * Local semantic checks must inspect only the actual user request: matching the envelope field
+ * name `requiresAnimation` used to create a false animation gap even when its value was `false`. */
+function extractUserRequest(prompt) {
+  const raw = String(prompt || "").trim();
+  try {
+    const envelope = JSON.parse(raw);
+    if (envelope && typeof envelope === "object" && typeof envelope.userRequest === "string") {
+      return envelope.userRequest.trim() || raw;
+    }
+  } catch {
+    /* plain prompt or an envelope followed by extra authoring guidance */
+  }
+  return raw;
+}
+
+function normalizedSceneSignature(sceneJsonString) {
+  try {
+    return JSON.stringify(parseSceneJsonString(sceneJsonString));
+  } catch {
+    return String(sceneJsonString || "").trim();
+  }
+}
+
+function isSceneOutputLimitError(error) {
+  if (error?.code === "SCENE_OUTPUT_LIMIT") {
+    return true;
+  }
+  return /output limit|not completed after .*segments|maximum output|token limit/i.test(
+    String(error?.message || error || "")
+  );
+}
+
+const KNOWN_PLANET_TEXTURES = Object.freeze([
+  { file: "earth.png", aliases: ["earth", "地球"] },
+  { file: "moon.png", aliases: ["moon", "月球"] },
+  { file: "sun.png", aliases: ["sun", "太阳"] },
+  { file: "mercury.png", aliases: ["mercury", "水星"] },
+  { file: "venus.png", aliases: ["venus", "金星"] },
+  { file: "mars.png", aliases: ["mars", "火星"] },
+  { file: "jupiter.png", aliases: ["jupiter", "木星"] },
+  { file: "saturn.png", aliases: ["saturn", "土星"] },
+  { file: "uranus.png", aliases: ["uranus", "天王星"] },
+  { file: "neptune.png", aliases: ["neptune", "海王星"] }
+]);
+
+function textContainsAlias(text, alias) {
+  const haystack = String(text || "").toLowerCase();
+  const needle = String(alias || "").toLowerCase();
+  if (!needle) return false;
+  if (/^[a-z]+$/.test(needle)) {
+    return new RegExp(`(^|[^a-z])${needle}([^a-z]|$)`, "i").test(haystack);
+  }
+  return haystack.includes(needle);
+}
+
+/**
+ * Applies deterministic same-origin textures for named spherical Solar-System bodies. This is a
+ * narrow asset-catalog fallback, not a general semantic rewrite: it only runs when texture hints
+ * are enabled and both the user request and descriptor name identify the same body. Unless the
+ * user explicitly supplied a URL, a remote/model-invented planet map is normalized to the stable
+ * local asset as well. A white tint avoids the common black-map failure.
+ */
+function applyKnownPlanetTextureDefaults(sceneJsonString, userPrompt, enabled) {
+  if (enabled !== true) {
+    return { sceneJsonString, applied: [] };
+  }
+  let scene;
+  try {
+    scene = parseSceneJsonString(sceneJsonString);
+  } catch {
+    return { sceneJsonString, applied: [] };
+  }
+  const promptText = String(userPrompt || "");
+  const wholeSolarSystem = /solar\s+system|太阳系/i.test(promptText);
+  const earthMoonSystem = /earth\s*[-+&/]?\s*moon\s+system|地月系统/i.test(promptText);
+  const requested = KNOWN_PLANET_TEXTURES.filter((entry) =>
+    wholeSolarSystem ||
+    (earthMoonSystem && ["earth.png", "moon.png"].includes(entry.file)) ||
+    entry.aliases.some((alias) => textContainsAlias(promptText, alias))
+  );
+  if (!requested.length) {
+    return { sceneJsonString, applied: [] };
+  }
+  const userProvidedTextureUrl = /(?:https?:\/\/|data:image\/|blob:|\/assets\/)/i.test(String(userPrompt || ""));
+  const applied = [];
+  const visit = (descriptor, listName = "") => {
+    if (!descriptor || typeof descriptor !== "object") return;
+    const semanticText = [descriptor.threeJsonId, descriptor.name, descriptor.label].filter(Boolean).join(" ");
+    const looksSpherical =
+      descriptor.objType === "sphere" ||
+      descriptor.geometry?.type === "sphere" ||
+      listName === "sphereModelList" ||
+      Number.isFinite(Number(descriptor.geometry?.radius));
+    if (looksSpherical) {
+      const match = requested.find((entry) =>
+        entry.aliases.some((alias) => textContainsAlias(semanticText, alias))
+      );
+      const targetTextureUrl = match
+        ? `/assets/textures/environment/nature/planet/${match.file}`
+        : "";
+      const currentTextureUrl = String(descriptor.material?.textureUrl || "").trim();
+      const currentColor = String(descriptor.material?.color || "").trim().toLowerCase();
+      if (
+        match &&
+        !userProvidedTextureUrl &&
+        (currentTextureUrl !== targetTextureUrl || currentColor !== "#ffffff")
+      ) {
+        if (!descriptor.material || typeof descriptor.material !== "object") {
+          descriptor.material = { type: "standard" };
+        }
+        descriptor.material.textureUrl = targetTextureUrl;
+        descriptor.material.color = "#ffffff";
+        applied.push({ threeJsonId: descriptor.threeJsonId || "", textureUrl: descriptor.material.textureUrl });
+      }
+    }
+    const saturnRequested = requested.some((entry) => entry.file === "saturn.png");
+    const looksLikeSaturnRing =
+      saturnRequested &&
+      (textContainsAlias(semanticText, "saturn ring") || textContainsAlias(semanticText, "土星环")) &&
+      (descriptor.objType === "ring" || descriptor.objType === "torus" || /ring|torus/i.test(String(descriptor.geometry?.type || "")));
+    if (looksLikeSaturnRing && !userProvidedTextureUrl) {
+      if (!descriptor.material || typeof descriptor.material !== "object") {
+        descriptor.material = { type: "standard" };
+      }
+      const ringTextureUrl = "/assets/textures/environment/nature/planet/saturn_ring.png";
+      if (descriptor.material.textureUrl !== ringTextureUrl || String(descriptor.material.color || "").toLowerCase() !== "#ffffff") {
+        descriptor.material.textureUrl = ringTextureUrl;
+        descriptor.material.color = "#ffffff";
+        applied.push({ threeJsonId: descriptor.threeJsonId || "", textureUrl: ringTextureUrl });
+      }
+    }
+    for (const key of ["children", "objectList", "joins", "inters", "holes"]) {
+      if (Array.isArray(descriptor[key])) descriptor[key].forEach((child) => visit(child, key));
+    }
+  };
+  if (Array.isArray(scene.objectList)) scene.objectList.forEach((descriptor) => visit(descriptor, "objectList"));
+  if (scene.worldInfo && typeof scene.worldInfo === "object") {
+    for (const [listName, descriptors] of Object.entries(scene.worldInfo)) {
+      if (Array.isArray(descriptors)) {
+        descriptors.forEach((descriptor) => visit(descriptor, listName));
+      }
+    }
+  }
+  if (!applied.length) {
+    return { sceneJsonString, applied };
+  }
+  return { sceneJsonString: JSON.stringify(scene, null, 2), applied };
 }
 
 /**
@@ -111,7 +262,7 @@ function emitProgress(payload, onProgress) {
  * @param {(value: number) => void} params.setStepIndex
  * @param {string} [params.message]
  */
-function emitStagePreview({ sceneJsonString, onProgress, getStepIndex, setStepIndex, message, stage, round, maxRounds }) {
+function emitStagePreview({ sceneJsonString, onProgress, getStepIndex, setStepIndex, message, stage, round, maxRounds, commands, outputMode }) {
   if (!sceneJsonString?.trim()) {
     return;
   }
@@ -126,6 +277,8 @@ function emitStagePreview({ sceneJsonString, onProgress, getStepIndex, setStepIn
       stage,
       round,
       maxRounds,
+      commands,
+      outputMode,
       message: message || "Stage preview ready.",
       sceneJsonString
     },
@@ -429,6 +582,7 @@ async function runSceneAgentCommandsUpdateIterative(params) {
   let appliedRounds = 0;
   let anySceneMutated = false;
   const appliedCommands = [];
+  let previousMutatingSignature = "";
 
   // Resolved once for the whole turn — see runSceneAgentCommandsUpdate's matching comment.
   const referenceMaterial = await resolveAgentReferenceMaterial(userPrompt, chatOptions);
@@ -561,6 +715,26 @@ async function runSceneAgentCommandsUpdateIterative(params) {
     }
 
     const readOnly = !commandListHasMutatingOp(commands);
+    const mutatingSignature = readOnly ? "" : JSON.stringify(commands);
+    if (mutatingSignature && mutatingSignature === previousMutatingSignature) {
+      steps.push({ kind: "refine_done", round: refineRound, ok: true, appliedRounds, reason: "repeated_output" });
+      return {
+        outputMode: "commands",
+        commandScript: commandResult.commandScript,
+        commands: appliedCommands,
+        steps,
+        agentUsed: true,
+        iterativeApplied: true,
+        skipFinalExec: true,
+        appliedRounds,
+        sceneMutated: anySceneMutated,
+        execOk: appliedRounds > 0,
+        completed: true,
+        stopReason: "repeated_output",
+        tokenHint: { rounds: getStepIndex(), depth, maxSteps: preset.maxSteps }
+      };
+    }
+    const sceneSignatureBeforeApply = normalizedSceneSignature(baseContext.currentSceneJsonString);
     chatOptions?.signal?.throwIfAborted?.();
     const applied = await applyCommands(commands, {
       round: refineRound,
@@ -572,6 +746,7 @@ async function runSceneAgentCommandsUpdateIterative(params) {
       steps.push({ kind: "refine", round: refineRound, ok: false, error: lastError });
       continue;
     }
+
     appliedCommands.push(...commands);
     if (applied.objectGetFeedback) {
       baseContext.objectGetFeedback = [baseContext.objectGetFeedback, applied.objectGetFeedback]
@@ -580,6 +755,7 @@ async function runSceneAgentCommandsUpdateIterative(params) {
     }
 
     if (!readOnly) {
+      previousMutatingSignature = mutatingSignature;
       appliedRounds += 1;
       anySceneMutated = anySceneMutated || applied.sceneMutated === true;
       emitProgress(
@@ -598,6 +774,10 @@ async function runSceneAgentCommandsUpdateIterative(params) {
     if (fresh && typeof fresh === "object") {
       Object.assign(baseContext, fresh);
     }
+    const sceneUnchanged =
+      !readOnly &&
+      typeof baseContext.currentSceneJsonString === "string" &&
+      normalizedSceneSignature(baseContext.currentSceneJsonString) === sceneSignatureBeforeApply;
     if (!readOnly && typeof baseContext.currentSceneJsonString === "string") {
       emitStagePreview({
         sceneJsonString: baseContext.currentSceneJsonString,
@@ -607,6 +787,8 @@ async function runSceneAgentCommandsUpdateIterative(params) {
         stage: "adjustment_refinement",
         round: refineRound,
         maxRounds: maxRefineRounds,
+        commands: readOnly ? undefined : commands,
+        outputMode: commandResult.outputMode,
         message: `Adjustment refinement preview ${refineRound}.`
       });
     }
@@ -617,6 +799,25 @@ async function runSceneAgentCommandsUpdateIterative(params) {
       ok: true,
       count: commands.length
     });
+
+    if (sceneUnchanged && !modelSaysDone) {
+      steps.push({ kind: "refine_done", round: refineRound, ok: true, appliedRounds, reason: "no_change" });
+      return {
+        outputMode: "commands",
+        commandScript: commandResult.commandScript,
+        commands: appliedCommands,
+        steps,
+        agentUsed: true,
+        iterativeApplied: true,
+        skipFinalExec: true,
+        appliedRounds,
+        sceneMutated: anySceneMutated,
+        execOk: true,
+        completed: true,
+        stopReason: "no_change",
+        tokenHint: { rounds: getStepIndex(), depth, maxSteps: preset.maxSteps }
+      };
+    }
 
     if (modelSaysDone) {
       return {
@@ -668,12 +869,14 @@ async function runAutomaticDraftRefinement(params) {
     getStepIndex,
     setStepIndex,
     applyDraftCommands,
-    maxRounds
+    maxRounds,
+    refinementGoals = []
   } = params;
   let current = initialSceneJsonString;
   let feedback = "";
   let completed = false;
   let stopReason = "budget_exhausted";
+  let previousOutputSignature = "";
 
   for (let round = 1; round <= maxRounds; round += 1) {
     chatOptions?.signal?.throwIfAborted?.();
@@ -684,7 +887,7 @@ async function runAutomaticDraftRefinement(params) {
         kind: "draft_refinement",
         round,
         maxRounds,
-        message: `Automatic draft refinement ${round}/${maxRounds}...`
+        message: `Improving the draft (step ${round})...`
       },
       onProgress
     );
@@ -707,6 +910,9 @@ async function runAutomaticDraftRefinement(params) {
           singleRound: false,
           agentRound: true
         }),
+        refinementGoals.length
+          ? `Concrete refinement goals (finish as many as possible now; do not invent extra goals):\n${refinementGoals.map((goal) => `- ${goal}`).join("\n")}`
+          : "Complete only meaningful work still required by the original request; do not add ceremonial polish or review-only changes.",
         feedback ? `Previous refinement feedback:\n${feedback}` : ""
       ].filter(Boolean).join("\n\n");
       refinement = await requestUpdatedSceneEditCommands(userPrompt, context, {
@@ -735,6 +941,15 @@ async function runAutomaticDraftRefinement(params) {
       stopReason = "model_done";
       break;
     }
+
+    const outputSignature = rawRefinement.trim() || JSON.stringify(refinement.commands || refinement.patch || []);
+    if (outputSignature && outputSignature === previousOutputSignature) {
+      steps.push({ kind: "draft_refinement_done", round, ok: true, reason: "repeated_output" });
+      completed = true;
+      stopReason = "repeated_output";
+      break;
+    }
+    previousOutputSignature = outputSignature;
 
     let candidate = refinement.sceneJsonString || "";
     if (refinement.outputMode === "commands") {
@@ -768,6 +983,12 @@ async function runAutomaticDraftRefinement(params) {
       }
     }
 
+    const knownAssetResult = applyKnownPlanetTextureDefaults(
+      candidate,
+      userPrompt,
+      chatOptions?.onlineTextureHints === true
+    );
+    candidate = knownAssetResult.sceneJsonString;
     const validation = await validateSceneJsonWithNormalizer(candidate);
     steps.push({
       kind: "draft_refinement",
@@ -787,6 +1008,13 @@ async function runAutomaticDraftRefinement(params) {
       continue;
     }
 
+    if (normalizedSceneSignature(candidate) === normalizedSceneSignature(current)) {
+      steps.push({ kind: "draft_refinement_done", round, ok: true, reason: "no_change" });
+      completed = true;
+      stopReason = "no_change";
+      break;
+    }
+
     current = candidate;
     feedback = "The previous refinement was applied successfully. Continue only if another meaningful improvement is needed.";
     emitStagePreview({
@@ -797,6 +1025,11 @@ async function runAutomaticDraftRefinement(params) {
       stage: "draft_refinement",
       round,
       maxRounds,
+      commands:
+        refinement.outputMode === "commands" && knownAssetResult.applied.length === 0
+          ? refinement.commands
+          : undefined,
+      outputMode: knownAssetResult.applied.length > 0 ? "json" : refinement.outputMode,
       message: `Draft refinement preview ${round} (${refinement.outputMode}).`
     });
     if (modelSaysDone) {
@@ -908,7 +1141,12 @@ async function requestOptionalOutline({ prompt, mode }, chatOptions, maxTokens) 
 async function runSceneAgent(input = {}, options = {}) {
   const mode = input.mode || "generate";
   const prompt = String(input.prompt || "").trim();
+  const userRequest = extractUserRequest(prompt);
   const { maxRefineRounds } = normalizeAgentOptions(options.agent);
+  const requestedExecutionMode = normalizeExecutionMode(options.executionMode ?? options.agent?.executionMode);
+  const refinementGoals = Array.isArray(options.refinementGoals)
+    ? [...new Set(options.refinementGoals.map((goal) => String(goal || "").trim()).filter(Boolean))].slice(0, 4)
+    : [];
   // Fixed metadata label — there is no more "depth" concept to report (see the module docblock);
   // kept only so tokenHint's shape doesn't change for anything reading it.
   const depth = "standard";
@@ -934,6 +1172,13 @@ async function runSceneAgent(input = {}, options = {}) {
         : undefined
   };
   const chatOptions = { ...options, ...chatTransport };
+  const configuredTurnTimeoutMs = Number(options.turnTimeoutMs);
+  if (!(Number.isFinite(Number(chatOptions.turnDeadlineAt)) && Number(chatOptions.turnDeadlineAt) > 0)) {
+    const turnTimeoutMs = Number.isFinite(configuredTurnTimeoutMs) && configuredTurnTimeoutMs > 0
+      ? Math.max(1000, Math.min(600000, Math.round(configuredTurnTimeoutMs)))
+      : 180000;
+    chatOptions.turnDeadlineAt = Date.now() + turnTimeoutMs;
+  }
   const applyDraftCommands = options.applyDraftCommands;
   const textureOptions = options.texture || {};
   delete chatOptions.agent;
@@ -961,10 +1206,9 @@ async function runSceneAgent(input = {}, options = {}) {
     capabilityReview: false,
     allowInvalidSceneDraft: true,
     planFirst: false,
-    // The first result is deliberately a small blockout, so the legacy full-JSON continuation
-    // protocol is unnecessary here. generationStrategy remains available to direct one-shot/full
-    // JSON APIs, but it no longer controls or complicates the agent quality pipeline.
-    segmentedOutput: false
+    // SceneAgent emits the first validated, asset-normalized preview itself. Letting the lower
+    // layer emit earlier would briefly render an untextured version and race the stage queue.
+    onSceneDraft: undefined
   };
 
   const maybeFillTextures = async (sceneJsonString) => {
@@ -1009,7 +1253,7 @@ async function runSceneAgent(input = {}, options = {}) {
         onProgress
       );
       const filled = await fillTextureUrls(sceneJsonString, {
-        userHint: prompt,
+        userHint: userRequest,
         sink,
         imageProvider,
         projectRoot: textureOptions.projectRoot,
@@ -1018,11 +1262,14 @@ async function runSceneAgent(input = {}, options = {}) {
         chatOptions: {
           provider: chatOptions.provider,
           apiKey: chatOptions.apiKey,
-          model: chatOptions.model,
-          baseUrl: chatOptions.baseUrl,
-          temperature: chatOptions.temperature
-        }
-      });
+           model: chatOptions.model,
+           baseUrl: chatOptions.baseUrl,
+           temperature: chatOptions.temperature,
+           signal: chatOptions.signal,
+           requestTimeoutMs: chatOptions.requestTimeoutMs,
+           turnDeadlineAt: chatOptions.turnDeadlineAt
+         }
+       });
       steps.push({
         kind: "fill_textures",
         ok: true,
@@ -1056,28 +1303,32 @@ async function runSceneAgent(input = {}, options = {}) {
     );
   };
 
-  // Fixed quality policy for every ordinary generation/adjustment. `preset` is a fixed policy
-  // object rather than a depth-derived lookup: the only thing that's actually
-  // user-configurable now is the refine round budget (maxRefineRounds), everything else here is a
-  // stable default.
+  // Layout/material review is opt-in. Capability review is local-first and only spends another
+  // model call when a concrete requested capability is missing.
   const preset = {
     maxSteps: maxRefineRounds,
     maxRefineRounds,
     outlineMaxTokens: OUTLINE_MAX_TOKENS,
-    generateMaxTokens: DRAFT_MAX_TOKENS,
+    generateMaxTokens:
+      requestedExecutionMode === "draft_refine"
+        ? DRAFT_MAX_TOKENS
+        : Number.isFinite(Number(options.maxTokens))
+          ? Number(options.maxTokens)
+          : FULL_REWRITE_MAX_TOKENS,
     repairMaxTokens: REFINE_ROUND_MAX_TOKENS,
     layoutReviewMaxTokens: REFINE_ROUND_MAX_TOKENS,
     reviewMaxTokens: 800,
-    runOutline: true,
+    runOutline: requestedExecutionMode === "draft_refine",
     runRepair: true,
     runCapabilityReview: true,
-    runLayoutReview: true,
+    runLayoutReview: options.agent?.layoutReview === true,
     runTextureReview: false,
     maxCapabilityReviewAttempts: MAX_CAPABILITY_REVIEW_ATTEMPTS,
     maxRepairAttempts: MAX_REPAIR_ATTEMPTS
   };
   let outline = "";
   let sceneJsonString = "";
+  let effectiveExecutionMode = requestedExecutionMode;
 
   const updateOutputMode = String(input.outputMode || options.outputMode || "json").toLowerCase();
   const commandUpdateModes = new Set(["commands", "auto"]);
@@ -1096,7 +1347,7 @@ async function runSceneAgent(input = {}, options = {}) {
         { step: stepIndex, kind: "outline", message: "Planning scene outline..." },
         onProgress
       );
-      outline = await requestOptionalOutline({ prompt, mode }, chatOptions, preset.outlineMaxTokens);
+      outline = await requestOptionalOutline({ prompt: userRequest, mode }, chatOptions, preset.outlineMaxTokens);
       steps.push({ kind: "outline", ok: Boolean(outline), length: outline.length });
     }
 
@@ -1107,7 +1358,7 @@ async function runSceneAgent(input = {}, options = {}) {
       ? runSceneAgentCommandsUpdateIterative
       : runSceneAgentCommandsUpdate;
     const commandResult = await commandRunner({
-      userPrompt: prompt,
+      userPrompt: userRequest,
       currentSceneJsonString: input.currentSceneJsonString,
       updateContext: input.updateContext || {},
       updateOutputMode,
@@ -1163,7 +1414,7 @@ async function runSceneAgent(input = {}, options = {}) {
       { step: stepIndex, kind: "outline", message: "Planning scene outline..." },
       onProgress
     );
-    outline = await requestOptionalOutline({ prompt, mode }, chatOptions, preset.outlineMaxTokens);
+    outline = await requestOptionalOutline({ prompt: userRequest, mode }, chatOptions, preset.outlineMaxTokens);
     steps.push({ kind: "outline", ok: Boolean(outline), length: outline.length });
   }
 
@@ -1177,39 +1428,80 @@ async function runSceneAgent(input = {}, options = {}) {
   // directly into the plain-text prompt strings below (rather than a message-builder field) since
   // this generate/repair path already passes prompt as free text to generateSceneJsonString /
   // updateSceneJsonString.
-  const referenceMaterial = await resolveAgentReferenceMaterial(prompt, chatOptions);
+  const referenceMaterial = await resolveAgentReferenceMaterial(userRequest, chatOptions);
 
-  // Ask for a rough first pass, not the finished scene — the incremental refine loop right after
-  // this (see the "Always elaborate the ... draft" block below) is what actually fills in detail,
-  // a small step at a time, without ever risking an output-length truncation on a single call.
-  const draftBlockoutHint =
-    mode === "generate" || mode === "fromImage"
-      ? "\n\nThis is a first pass, not the finished scene: give a small, structurally correct blockout — the right groups/objects roughly placed with simple geometry — and skip fine detail, secondary objects, and material/texture polish. Those will be added afterward in follow-up refinement rounds."
-      : "";
-
-  const generatePrompt =
-    (outline && preset.runOutline ? `${prompt}\n\nFollow this outline:\n${outline}` : prompt) +
-    draftBlockoutHint +
-    (referenceMaterial ? `\n\n${referenceMaterial}` : "");
-
-  if (mode === "update") {
-    sceneJsonString = await updateSceneJsonString(
-      generatePrompt || prompt,
-      input.currentSceneJsonString,
-      { ...chatOptionsGenerate, maxTokens: preset.generateMaxTokens }
+  const buildInitialPrompt = () => {
+    const draftHint =
+      effectiveExecutionMode === "draft_refine" && (mode === "generate" || mode === "fromImage")
+        ? "\n\nThis is the first usable structural draft of an incrementally built scene. Keep it compact, but include every primary subject, identity-defining bundled texture (especially named planets), requested primary animation, basic lighting, and a fitted camera now. Defer only secondary detail and large repeated populations; do not make a deliberately textureless placeholder."
+        : "\n\nReturn the complete, immediately usable scene now. Include identity-defining textures, requested animation, lighting, and a fitted camera in this response; do not reserve ordinary work for later review rounds.";
+    return (
+      (outline && effectiveExecutionMode === "draft_refine" ? `${prompt}\n\nFollow this outline:\n${outline}` : prompt) +
+      (mode === "generate" || mode === "fromImage" ? draftHint : "") +
+      (referenceMaterial ? `\n\n${referenceMaterial}` : "")
     );
-  } else if (mode === "fromImage") {
-    sceneJsonString = await generateSceneJsonFromImage(
-      { prompt: generatePrompt || prompt || undefined, image: input.image },
-      { ...chatOptionsGenerate, maxTokens: preset.generateMaxTokens }
-    );
-  } else {
-    sceneJsonString = await generateSceneJsonString(generatePrompt, {
+  };
+
+  const generateInitialScene = async () => {
+    const generatePrompt = buildInitialPrompt();
+    const generationOptions = {
       ...chatOptionsGenerate,
-      maxTokens: preset.generateMaxTokens
-    });
+      maxTokens: effectiveExecutionMode === "draft_refine" ? DRAFT_MAX_TOKENS : preset.generateMaxTokens,
+      // SceneAgent has a better fallback than repeating another whole scene: one detected direct
+      // cutoff switches to a small validated draft plus incremental commands immediately.
+      compactRetryOnTruncation: false,
+      segmentedOutput:
+        effectiveExecutionMode === "draft_refine" ? false : chatOptionsGenerate.segmentedOutput
+    };
+    if (mode === "update") {
+      return updateSceneJsonString(generatePrompt || prompt, input.currentSceneJsonString, generationOptions);
+    }
+    if (mode === "fromImage") {
+      return generateSceneJsonFromImage(
+        { prompt: generatePrompt || prompt || undefined, image: input.image },
+        generationOptions
+      );
+    }
+    return generateSceneJsonString(generatePrompt, generationOptions);
+  };
+
+  try {
+    sceneJsonString = await generateInitialScene();
+  } catch (error) {
+    const canEscalate =
+      effectiveExecutionMode === "direct" &&
+      (mode === "generate" || mode === "fromImage") &&
+      isSceneOutputLimitError(error);
+    if (!canEscalate) throw error;
+
+    effectiveExecutionMode = "draft_refine";
+    stepIndex += 1;
+    emitProgress(
+      {
+        step: stepIndex,
+        kind: "execution_fallback",
+        message: "The complete scene exceeded the provider output limit; switching to incremental construction."
+      },
+      onProgress
+    );
+    outline = await requestOptionalOutline({ prompt: userRequest, mode }, chatOptions, OUTLINE_MAX_TOKENS);
+    steps.push({ kind: "execution_fallback", ok: true, reason: "output_limit" });
+    steps.push({ kind: "outline", ok: Boolean(outline), length: outline.length });
+    sceneJsonString = await generateInitialScene();
   }
-  steps.push({ kind: "generate", ok: true });
+
+  const knownAssetResult = applyKnownPlanetTextureDefaults(
+    sceneJsonString,
+    userRequest,
+    chatOptions.onlineTextureHints === true
+  );
+  sceneJsonString = knownAssetResult.sceneJsonString;
+  steps.push({
+    kind: "generate",
+    ok: true,
+    executionMode: effectiveExecutionMode,
+    knownAssetsApplied: knownAssetResult.applied.length
+  });
 
   let validation = await validateSceneJsonWithNormalizer(sceneJsonString);
   if (validation.ok) {
@@ -1220,8 +1512,8 @@ async function runSceneAgent(input = {}, options = {}) {
       setStepIndex: (value) => {
         stepIndex = value;
       },
-      stage: "initial_draft",
-      message: "Initial draft ready."
+      stage: effectiveExecutionMode === "draft_refine" ? "initial_draft" : "direct_scene",
+      message: effectiveExecutionMode === "draft_refine" ? "Initial draft ready." : "Scene preview ready."
     });
   }
   const maxRepairAttempts = preset.maxRepairAttempts ?? (preset.stopWhenValid ? 3 : 1);
@@ -1245,7 +1537,7 @@ async function runSceneAgent(input = {}, options = {}) {
     // already-*valid* draft and starts by re-parsing the current scene, so it isn't a good fit
     // here; a full-scene-JSON rewrite stays the direct, single-call repair path.
     const repairPrompt =
-      `Fix the scene JSON so it is valid ThreeJSON. Previous error: ${validation.error}. User intent: ${prompt}` +
+      `Fix the scene JSON so it is valid ThreeJSON. Previous error: ${validation.error}. User intent: ${userRequest}` +
       (referenceMaterial ? `\n\n${referenceMaterial}` : "");
     // A single flaky repair call (timeout, empty response) must not abort the whole turn — that
     // just means this attempt didn't help; the loop tries again (or exits and reports the last
@@ -1263,7 +1555,11 @@ async function runSceneAgent(input = {}, options = {}) {
       steps.push({ kind: "repair", attempt: repairAttempt, ok: false, error: String(error?.message || error) });
       continue;
     }
-    sceneJsonString = repairedSceneJsonString;
+    sceneJsonString = applyKnownPlanetTextureDefaults(
+      repairedSceneJsonString,
+      userRequest,
+      chatOptions.onlineTextureHints === true
+    ).sceneJsonString;
     validation = await validateSceneJsonWithNormalizer(sceneJsonString);
     steps.push({
       kind: "repair",
@@ -1290,16 +1586,17 @@ async function runSceneAgent(input = {}, options = {}) {
     }
   }
 
-  // Always elaborate the (deliberately small — see DRAFT_MAX_TOKENS) draft with incremental
-  // commands/JSON-Patch rounds now — this is the actual fix for "one giant JSON call truncates on
-  // a large scene": no single call after this point ever has to hold the whole finished scene,
-  // detail accumulates one small step at a time (see the module docblock). There is no more
-  // opt-in flag for this; it always runs for generate mode once a valid draft exists.
+  // Only genuinely incremental scenes enter the refine loop. Direct scenes finish after local
+  // validation (plus a targeted capability fix only when a concrete requested feature is absent).
   let refinementCompleted = true;
-  let refinementStopReason = "model_done";
-  if (validation.ok && (mode === "generate" || mode === "fromImage")) {
+  let refinementStopReason = effectiveExecutionMode === "direct" ? "direct_complete" : "model_done";
+  if (
+    validation.ok &&
+    effectiveExecutionMode === "draft_refine" &&
+    (mode === "generate" || mode === "fromImage")
+  ) {
     const refinementResult = await runAutomaticDraftRefinement({
-      userPrompt: prompt || "Reconstruct and improve the scene represented by the reference image.",
+      userPrompt: userRequest || "Reconstruct and improve the scene represented by the reference image.",
       initialSceneJsonString: sceneJsonString,
       preset,
       chatOptions,
@@ -1310,7 +1607,8 @@ async function runSceneAgent(input = {}, options = {}) {
         stepIndex = value;
       },
       applyDraftCommands,
-      maxRounds: preset.maxRefineRounds
+      maxRounds: preset.maxRefineRounds,
+      refinementGoals
     });
     sceneJsonString = refinementResult.sceneJsonString;
     refinementCompleted = refinementResult.completed;
@@ -1321,9 +1619,10 @@ async function runSceneAgent(input = {}, options = {}) {
   if (validation.ok && preset.runCapabilityReview) {
     const maxCapAttempts = preset.maxCapabilityReviewAttempts ?? 1;
     let capAttempt = 0;
+    let capabilityFixApplied = false;
     while (capAttempt < maxCapAttempts) {
       const parsed = parseSceneJsonString(sceneJsonString);
-      const fit = evaluateSceneCapabilityFit(prompt, parsed);
+      const fit = evaluateSceneCapabilityFit(userRequest, parsed);
       if (fit.ok) {
         steps.push({ kind: "capability_review", ok: true, matchedSignals: fit.matchedSignals });
         break;
@@ -1340,7 +1639,8 @@ async function runSceneAgent(input = {}, options = {}) {
         },
         onProgress
       );
-      const fixPrompt = buildCapabilityFixPrompt(prompt, fit);
+      const fixPrompt = buildCapabilityFixPrompt(userRequest, fit);
+      const beforeFixSignature = normalizedSceneSignature(sceneJsonString);
       sceneJsonString = await runTargetedFixRound(fixPrompt, sceneJsonString, {
         chatOptions,
         chatOptionsFullUpdate,
@@ -1348,23 +1648,31 @@ async function runSceneAgent(input = {}, options = {}) {
         refineMaxTokens: preset.repairMaxTokens || preset.generateMaxTokens,
         fullRewriteMaxTokens: FULL_REWRITE_MAX_TOKENS
       });
+      sceneJsonString = applyKnownPlanetTextureDefaults(
+        sceneJsonString,
+        userRequest,
+        chatOptions.onlineTextureHints === true
+      ).sceneJsonString;
+      capabilityFixApplied = normalizedSceneSignature(sceneJsonString) !== beforeFixSignature;
       validation = await validateSceneJsonWithNormalizer(sceneJsonString);
+      const refit = validation.ok
+        ? evaluateSceneCapabilityFit(userRequest, parseSceneJsonString(sceneJsonString))
+        : null;
       steps.push({
         kind: "capability_review",
         attempt: capAttempt,
-        ok: fit.ok,
+        ok: refit?.ok === true,
         gaps: fit.gaps,
         validationOk: validation.ok
       });
       if (!validation.ok) {
         break;
       }
-      const refit = evaluateSceneCapabilityFit(prompt, parseSceneJsonString(sceneJsonString));
-      if (refit.ok) {
+      if (refit?.ok) {
         break;
       }
     }
-    if (validation.ok) {
+    if (validation.ok && capabilityFixApplied) {
       emitStagePreview({
         sceneJsonString,
         onProgress,
@@ -1381,7 +1689,7 @@ async function runSceneAgent(input = {}, options = {}) {
   if (validation.ok && preset.runLayoutReview) {
     stepIndex += 1;
     const pointerSummary = listTexturePointersSummary(sceneJsonString);
-    const capabilityFit = evaluateSceneCapabilityFit(prompt, parseSceneJsonString(sceneJsonString));
+    const capabilityFit = evaluateSceneCapabilityFit(userRequest, parseSceneJsonString(sceneJsonString));
     emitProgress(
       {
         step: stepIndex,
@@ -1393,7 +1701,7 @@ async function runSceneAgent(input = {}, options = {}) {
     );
     const reviewPrompt = buildLayoutReviewPrompt(
       sceneJsonString,
-      prompt,
+      userRequest,
       pointerSummary,
       capabilityFit
     );
@@ -1433,7 +1741,7 @@ async function runSceneAgent(input = {}, options = {}) {
       onProgress
     );
     try {
-      const dry = await planTexturesDry(sceneJsonString, prompt, {
+      const dry = await planTexturesDry(sceneJsonString, userRequest, {
         ...chatOptions,
         maxTokens: preset.reviewMaxTokens || 800
       });
@@ -1468,6 +1776,7 @@ async function runSceneAgent(input = {}, options = {}) {
     textureFillWarning: fillResult.textureFillWarning,
     steps,
     agentUsed: true,
+    executionMode: effectiveExecutionMode,
     completed: refinementCompleted,
     stopReason: refinementStopReason,
     tokenHint: {

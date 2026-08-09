@@ -15,6 +15,7 @@ import { useHostI18n, useConversations } from "@threejson/react";
 import {
   runAiGenerateTurn,
   runAiAdjustTurn,
+  classifyAiTurnIntent,
   resolveAiAdjustContextPayload,
   buildResultDigest,
   runAiSceneTitle,
@@ -104,6 +105,17 @@ function createAgentProgressUpdater(setStream, onScenePreview) {
  * steps, appended to the assistant message when the agent actually ran. */
 function buildAgentProcessSummary(agentResult, heading, budgetMessage) {
   if (!agentResult?.agentUsed || !Array.isArray(agentResult.steps)) {
+    return "";
+  }
+  if (
+    agentResult.executionMode === "direct" &&
+    !agentResult.steps.some((step) =>
+      step.ok === false ||
+      step.kind === "execution_fallback" ||
+      step.kind === "repair" ||
+      (step.kind === "capability_review" && step.attempt)
+    )
+  ) {
     return "";
   }
   const lines = agentResult.steps.slice(0, 10).map((step, index) => {
@@ -706,15 +718,13 @@ export function App() {
 
       const controller = new AbortController();
       abortRef.current = controller;
+      const turnDeadlineAt = Date.now() + 180000;
+      const sceneProviderOptions = { ...resolved.options, turnDeadlineAt };
       const adjustTargetString = seedSceneJson || shownSceneJson;
       const adjusting = modeOverride !== "generate" && Boolean(adjustTargetString);
 
-      // There is no more "enable multi-turn Agent" toggle — generation/adjustment is always
-      // draft-then-incrementally-refine now (see core/ai/sceneAgent.js's module docblock and the
-      // matching fix in threeBoxApp.js). The only thing left to resolve from settings is the
-      // round budget; the orchestrator always runs the refine loop and always reports progress via
-      // onAgentProgress: numbered lines go to the streaming block, and each draft scene is
-      // rendered into the card so the user watches the scene build up progressively.
+      // Direct generation is the default. This budget is only a runaway guard when core/ai
+      // escalates a genuinely complex/output-limited scene to incremental construction.
       const agentOptions = { maxRefineRounds: settings.ai.maxAutoRefineRounds };
       // The assistant card is always appended up-front now (so drafts can stream into it) and
       // finalized in place after the turn — there is no more "append once at the end" path.
@@ -770,7 +780,7 @@ export function App() {
             userPrompt,
             envelope,
             targetSceneJsonString: adjustTargetString,
-            providerOptions: resolved.options,
+            providerOptions: sceneProviderOptions,
             updateOutputMode: settings.ai.updateOutputMode,
             resolveContextPayload: (json) => resolveAiAdjustContextPayload(json, adjustContextSettings),
             agentOptions,
@@ -789,9 +799,17 @@ export function App() {
             diff = { kind: "patch", text: JSON.stringify(result.patch, null, 2) };
           }
         } else {
+          const negotiation = await classifyAiTurnIntent(
+            { userPrompt, history: [] },
+            {
+              ...sceneProviderOptions,
+              signal: controller.signal,
+              animationCapabilityMode: settings.ai.animationCapabilityMode || "auto"
+            }
+          );
           const result = await runAiGenerateTurn({
             userPrompt,
-            providerOptions: resolved.options,
+            providerOptions: sceneProviderOptions,
             locale,
             signal: controller.signal,
             // Persisted AI settings: a global prompt prefix prepended to every request, whether to
@@ -801,6 +819,12 @@ export function App() {
             includeReferenceLinks: settings.ai.attachReferenceLinks,
             onlineTextureHints: settings.ai.onlineTextureHints,
             maxSceneSegments: settings.ai.maxSceneSegments,
+            generationStrategy: negotiation.generationStrategy,
+            executionMode: negotiation.executionMode,
+            refinementGoals: negotiation.refinementGoals,
+            estimatedSegments: negotiation.estimatedSegments,
+            selectedCapabilityIds: negotiation.selectedCapabilityIds,
+            requiresAnimation: negotiation.requiresAnimation,
             agentOptions,
             onAgentProgress,
             // Kept for API compatibility. The multi-call agent reports stage progress and scene
@@ -833,7 +857,7 @@ export function App() {
           sceneTitle: ""
         });
         const baseText = adjusting ? L(`场景已调整（${stage}）。`, `Scene adjusted (${stage}).`) : L("场景已生成。", "Scene generated.");
-        // If the multi-turn agent actually ran, append its step recap (markdown) below the status.
+        // Only show a recap when adaptive execution actually performed meaningful extra work.
         const agentProcess = buildAgentProcessSummary(
           agentResult,
           L("Agent 过程", "Agent process"),

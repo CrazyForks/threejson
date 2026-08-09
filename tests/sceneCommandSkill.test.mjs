@@ -54,6 +54,8 @@ test("buildSceneCommandUpdateSystemPrompt teaches single-round mutating commands
 test("buildSceneCommandUpdateSystemPrompt respects online texture hint toggle", () => {
   const enabled = buildSceneCommandUpdateSystemPrompt();
   assert.match(enabled, /any public web source, not only a CDN/);
+  assert.match(enabled, /bundled same-origin assets/);
+  assert.match(enabled, /do not need the external texture proxy/);
 
   const disabled = buildSceneCommandUpdateSystemPrompt({ onlineTextureHints: false });
   assert.match(disabled, /Proactive online texture hints are disabled/);
@@ -81,6 +83,8 @@ test("buildSceneCommandAutoUpdateSystemPrompt distinguishes agent vs single roun
   const iterative = buildSceneCommandAutoUpdateSystemPrompt({ iterativeApply: true });
   assert.ok(iterative.includes("iterative apply"));
   assert.ok(iterative.includes("# done"));
+  assert.match(iterative, /append a final `# done` line in the SAME response/);
+  assert.doesNotMatch(iterative, /MUST end with mutating commands or full scene JSON/);
 });
 
 test("commandScriptIndicatesDone detects comment-only done scripts", () => {
@@ -136,6 +140,18 @@ test("buildSceneCommandUpdateUserMessage uses spatial cards instead of thin obje
   assert.ok(message.includes("Placement hints"));
   assert.equal(message.includes("Scene objects (1)"), false);
   assert.equal(message.includes("hidden"), false);
+});
+
+test("agent user message permits immediate done instead of forcing another mutation", () => {
+  const message = buildSceneCommandUpdateUserMessage({
+    modificationRequest: "polish the scene",
+    objectList: [{ threeJsonId: "box-1", objType: "box" }],
+    singleRound: false,
+    agentRound: true
+  });
+  assert.match(message, /already satisfies it, output # done only/);
+  assert.match(message, /append # done after the commands in the same response/);
+  assert.doesNotMatch(message, /End the session with mutating commands or full scene JSON/);
 });
 
 test("extractCommandScriptText and isLikelyCommandScriptText handle micro DSL", () => {

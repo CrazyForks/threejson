@@ -43,9 +43,8 @@ test("ThreeBox defaults remember API keys locally", () => {
   assert.equal(THREEBOX_SETTINGS_DEFAULTS.general.previewAuxiliaryLights, true);
   assert.equal(THREEBOX_SETTINGS_DEFAULTS.io.sceneJsonFormat, "standard");
   assert.equal(THREEBOX_SETTINGS_DEFAULTS.io.showMeshExportWarnings, true);
-  // Generation/adjustment is always draft-then-incrementally-refine now — there is no more
-  // "agent" section (see core/ai/sceneAgent.js's module docblock); only a round-budget number.
-  assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.maxAutoRefineRounds, 20);
+  assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.maxAutoRefineRounds, 6);
+  assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.agentPolicyVersion, 2);
   const settings = loadThreeBoxSettingsBundle();
   assert.equal(settings.ai.rememberKeys, true);
   assert.equal(settings.ai.animationCapabilityMode, "auto");
@@ -54,7 +53,19 @@ test("ThreeBox defaults remember API keys locally", () => {
   assert.equal(settings.general.previewAuxiliaryLights, true);
   assert.equal(settings.io.sceneJsonFormat, "standard");
   assert.equal(settings.io.showMeshExportWarnings, true);
-  assert.equal(settings.ai.maxAutoRefineRounds, 20);
+  assert.equal(settings.ai.maxAutoRefineRounds, 6);
+  assert.equal(settings.ai.agentPolicyVersion, 2);
+});
+
+test("ThreeBox migrates the legacy always-refine limit away from 20", () => {
+  const store = installMemoryLocalStorage();
+  store.set(
+    THREEBOX_SETTINGS_STORAGE_KEY,
+    JSON.stringify({ ai: { maxAutoRefineRounds: 20 } })
+  );
+  const settings = loadThreeBoxSettingsBundle();
+  assert.equal(settings.ai.maxAutoRefineRounds, 6);
+  assert.equal(settings.ai.agentPolicyVersion, 2);
 });
 
 test("ThreeBox persists the animation capability negotiation mode", () => {

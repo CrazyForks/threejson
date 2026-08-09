@@ -23,6 +23,7 @@ import {
   buildStructuredTurnEnvelope,
   buildObjectSpatialCardsFromSceneJson,
   buildSceneScaleProfile,
+  matchIntentSignals,
   requestUpdatedSceneEditCommands,
   updateSceneJsonString as requestUpdatedSceneJsonString,
   executeCommands,
@@ -97,11 +98,11 @@ export function buildResultDigest(sceneJson) {
 }
 
 /**
- * Generation always runs through core/ai's small-draft then automatic incremental-refinement
- * pipeline. generationStrategy/estimatedSegments describe only the independent legacy full-JSON
- * transport protocol and never disable quality refinement. Raw deltas are not forwarded across
- * the multi-call pipeline; hosts receive localized stage progress and scene previews instead.
- * @param {{ userPrompt: string, providerOptions: object, onDelta?: (delta:string)=>void, onGenerationPhase?: (phase:object)=>void|Promise<void>, onSceneDraft?: (sceneJsonString:string)=>void|Promise<void>, signal?: AbortSignal, globalPromptPrefix?: string, agentOptions?: {maxRefineRounds?: number}, onAgentProgress?: (p: object)=>void, includeReferenceLinks?: boolean, locale?: string, onlineTextureHints?: boolean, generationStrategy?: "single"|"segmented"|"compact", estimatedSegments?: number, maxSceneSegments?: number }} input
+ * Generation uses an execution policy independent from the JSON transport policy. `direct`
+ * returns a complete usable scene in one generation call; `draft_refine` is reserved for scenes
+ * that genuinely need incremental construction. A direct output-limit failure may still escalate
+ * safely inside core/ai. Raw deltas are forwarded only for the direct generation call.
+ * @param {{ userPrompt: string, providerOptions: object, onDelta?: (delta:string)=>void, onGenerationPhase?: (phase:object)=>void|Promise<void>, onSceneDraft?: (sceneJsonString:string)=>void|Promise<void>, signal?: AbortSignal, globalPromptPrefix?: string, agentOptions?: {maxRefineRounds?: number}, onAgentProgress?: (p: object)=>void, includeReferenceLinks?: boolean, locale?: string, onlineTextureHints?: boolean, generationStrategy?: "single"|"segmented"|"compact", executionMode?: "direct"|"draft_refine", refinementGoals?: string[], estimatedSegments?: number, maxSceneSegments?: number }} input
  */
 export async function runAiGenerateTurn({
   userPrompt,
@@ -118,17 +119,28 @@ export async function runAiGenerateTurn({
   capabilityLookup,
   onlineTextureHints,
   generationStrategy = "single",
+  executionMode = "direct",
+  refinementGoals = [],
   estimatedSegments,
   maxSceneSegments,
   selectedCapabilityIds,
   requiresAnimation
 }) {
+  const animationCapabilities = typeof requiresAnimation === "boolean"
+    ? requiresAnimation
+    : Array.isArray(selectedCapabilityIds)
+      ? selectedCapabilityIds.some((id) => ["events", "lifecycle", "declarativeAnimation", "animationGraph"].includes(id))
+      : matchIntentSignals(userPrompt).some((signal) =>
+          ["events", "lifecycle", "declarativeAnimation", "animationGraph"].includes(signal.id)
+        );
   const envelope = buildStructuredTurnEnvelope({
     userPrompt,
     intent: "generate",
     globalPromptPrefix,
     includeReferenceLinks,
     generationStrategy,
+    executionMode,
+    refinementGoals,
     selectedCapabilityIds,
     requiresAnimation
   });
@@ -140,17 +152,18 @@ export async function runAiGenerateTurn({
       stream: true,
       onDelta,
       agent: { maxRefineRounds: agentOptions?.maxRefineRounds },
+      executionMode,
+      refinementGoals,
       resolveReferenceUrl: resolveSceneAiReferenceUrl,
       capabilityLookup,
       onlineTextureHints,
-      // Preserve the negotiated full-JSON transport metadata. It is deliberately independent from
-      // automatic refinement, which always runs for ordinary generation.
+      // Full-JSON transport metadata remains independent from the execution policy above.
       generationStrategy,
       estimatedSegments,
       segmentedOutput: generationStrategy === "segmented",
       maxSceneSegments,
       selectedCapabilityIds,
-      animationCapabilities: requiresAnimation === true,
+      animationCapabilities,
       onGenerationPhase,
       onSceneDraft,
       applyDraftCommands: applyAiDraftCommands,
@@ -167,7 +180,7 @@ export async function runAiGenerateTurn({
  * requested `mode: "fromImage"`); this is ported from editor's pre-existing `aiSidebar.js`
  * `onImageGenerate`/`runSidebarSceneAgent(..., {mode:"fromImage", ...})` flow, generalized the
  * same way `runAiGenerateTurn` above is.
- * @param {{ prompt?: string, image: string|{base64:string, mimeType?:string}, providerOptions: object, agentOptions?: object, imageDetail?: "auto"|"low"|"high", maxTokens?: number, onAgentProgress?: (p:object)=>void, onGenerationPhase?: (phase:object)=>void|Promise<void>, onSceneDraft?: (sceneJsonString:string, meta?:object)=>void|Promise<void>, signal?: AbortSignal, locale?: string, capabilityLookup?: boolean, onlineTextureHints?: boolean }} input
+ * @param {{ prompt?: string, image: string|{base64:string, mimeType?:string}, providerOptions: object, agentOptions?: object, imageDetail?: "auto"|"low"|"high", maxTokens?: number, executionMode?: "direct"|"draft_refine", refinementGoals?: string[], selectedCapabilityIds?: string[], requiresAnimation?: boolean, onAgentProgress?: (p:object)=>void, onGenerationPhase?: (phase:object)=>void|Promise<void>, onSceneDraft?: (sceneJsonString:string, meta?:object)=>void|Promise<void>, signal?: AbortSignal, locale?: string, capabilityLookup?: boolean, onlineTextureHints?: boolean }} input
  */
 export async function runAiImageGenerateTurn({
   prompt = "",
@@ -176,6 +189,10 @@ export async function runAiImageGenerateTurn({
   agentOptions,
   imageDetail = "auto",
   maxTokens = 8192,
+  executionMode = "direct",
+  refinementGoals = [],
+  selectedCapabilityIds,
+  requiresAnimation,
   onAgentProgress,
   onGenerationPhase,
   onSceneDraft,
@@ -187,6 +204,13 @@ export async function runAiImageGenerateTurn({
   if (!image) {
     throw new Error("runAiImageGenerateTurn: image is required.");
   }
+  const animationCapabilities = typeof requiresAnimation === "boolean"
+    ? requiresAnimation
+    : Array.isArray(selectedCapabilityIds)
+      ? selectedCapabilityIds.some((id) => ["events", "lifecycle", "declarativeAnimation", "animationGraph"].includes(id))
+      : matchIntentSignals(prompt).some((signal) =>
+          ["events", "lifecycle", "declarativeAnimation", "animationGraph"].includes(signal.id)
+        );
   const result = await runSceneAgent(
     { mode: "fromImage", prompt, image },
     {
@@ -194,10 +218,14 @@ export async function runAiImageGenerateTurn({
       signal,
       imageDetail,
       maxTokens,
+      executionMode,
+      refinementGoals,
       agent: { maxRefineRounds: agentOptions?.maxRefineRounds },
       resolveReferenceUrl: resolveSceneAiReferenceUrl,
       capabilityLookup,
       onlineTextureHints,
+      selectedCapabilityIds,
+      animationCapabilities,
       onGenerationPhase,
       onSceneDraft,
       applyDraftCommands: applyAiDraftCommands,
@@ -215,7 +243,50 @@ export async function runAiImageGenerateTurn({
  * @param {object} providerOptions
  */
 export async function classifyAiTurnIntent({ userPrompt, history }, providerOptions) {
+  const immediate = resolveImmediateDirectGeneration({ userPrompt, history }, providerOptions);
+  if (immediate) {
+    return immediate;
+  }
   return classifyTurnIntent({ userPrompt, history }, providerOptions);
+}
+
+/**
+ * Avoids spending a complete provider round trip to rediscover that a short, clearly bounded
+ * first request is a direct generation. Capability syntax is still inferred locally by
+ * runAiGenerateTurn, including declarative animation for rotation/orbit prompts. Ambiguous
+ * follow-ups and requests with explicit large-scale complexity continue through model
+ * negotiation; a direct response that genuinely hits the provider output limit can also escalate
+ * inside core/ai without being regenerated wholesale.
+ */
+export function resolveImmediateDirectGeneration({ userPrompt, history }, providerOptions = {}) {
+  if (Array.isArray(history) && history.length > 0) {
+    return null;
+  }
+  const text = String(userPrompt || "").trim();
+  if (!text || text.length > 280) {
+    return null;
+  }
+  const explicitlyLarge = /(?:very\s+large|massive|large[- ]scale|\bcomplex\b|\bmany\b|multi[- ]district|\bdistricts?\b|\bmetropolis\b|\bcity(?:scape)?\b|\binfrastructure\b|\bhundreds?\b|\bthousands?\b|\bevery\s+building\b|复杂|超大|巨型|大规模|大量|许多|众多|多区域|多个区域|分区|城市|基础设施|数百|上千|每栋建筑)/i.test(text);
+  const numericCounts = [...text.matchAll(/(?:^|\D)(\d{2,})(?=\D|$)/g)]
+    .map((match) => Number(match[1]))
+    .filter(Number.isFinite);
+  if (explicitlyLarge || numericCounts.some((count) => count > 32)) {
+    return null;
+  }
+  const animationMode = providerOptions?.animationCapabilityMode;
+  return {
+    intent: "generate",
+    targetTurnId: null,
+    note: "local fast path: clearly bounded first generation",
+    classificationFailed: false,
+    generationStrategy: "single",
+    estimatedSegments: 1,
+    executionMode: "direct",
+    refinementGoals: [],
+    // Undefined deliberately enables the local capability matcher in runAiGenerateTurn.
+    selectedCapabilityIds: undefined,
+    requiresAnimation: animationMode === "on" ? true : animationMode === "off" ? false : undefined
+  };
 }
 
 /**
@@ -604,12 +675,10 @@ export async function runAiAdjustTurn({
     }
   }
 
-  // Everything else always goes through the iterative agent loop now — commands preferred, JSON
-  // Patch next, a full-scene-JSON rewrite as the last resort within a round (see
-  // core/ai/sceneAgent.js's module docblock) — rather than the old "try commands once, catch and
-  // fall to incremental JSON once, catch and fall to full JSON" cascade. Whether this adjust turn
-  // was triggered automatically right after a generate turn's draft or by a typed follow-up
-  // message, it is the exact same call.
+  // Everything else uses the adaptive adjustment runner — commands preferred, JSON Patch next,
+  // and a full-scene rewrite only as a last resort (see core/ai/sceneAgent.js). The model can
+  // complete the request in its first response; additional calls happen only while it returns a
+  // concrete, non-repeated change. The numeric setting below is solely a runaway guard.
   return runAiAgentAdjustTurn({
     userPrompt,
     envelope,

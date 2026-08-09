@@ -137,6 +137,13 @@ export async function loadEditorSettingsBundle() {
   const fileDefaults = await fetchEditorSettingsFileDefaults();
   const cached = readEditorSettingsCache();
   const merged = deepMergeEditorSettings(fileDefaults, cached || {});
+  if (Number(cached?.ai?.agentPolicyVersion || 0) < 2) {
+    const legacyLimit = Number(cached?.ai?.maxAutoRefineRounds);
+    merged.ai.maxAutoRefineRounds = Number.isFinite(legacyLimit) && legacyLimit > 0
+      ? Math.min(6, Math.round(legacyLimit))
+      : EDITOR_SETTINGS_DEFAULTS.ai.maxAutoRefineRounds;
+    merged.ai.agentPolicyVersion = 2;
+  }
   ensureBuiltinProviderSeeded(merged);
   return {
     fileDefaults,

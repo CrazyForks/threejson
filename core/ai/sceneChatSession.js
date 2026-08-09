@@ -86,7 +86,7 @@ function buildClassifyIntentSystemPrompt(animationCapabilityMode = "auto") {
     "- \"adjust\": the user wants to modify the scene produced by a specific prior turn.",
     "",
     "Output shape (strict):",
-    '{ "intent": "generate"|"adjust", "targetTurnId": string|null, "note": string, "generationStrategy": "single"|"segmented"|"compact", "estimatedSegments": integer, "selectedCapabilityIds": string[], "requiresAnimation": boolean }',
+    '{ "intent": "generate"|"adjust", "targetTurnId": string|null, "note": string, "generationStrategy": "single"|"segmented"|"compact", "estimatedSegments": integer, "executionMode": "direct"|"draft_refine", "refinementGoals": string[], "selectedCapabilityIds": string[], "requiresAnimation": boolean }',
     "",
     "Rules:",
     '- "targetTurnId" MUST be one of the provided turn ids, or null. Never invent an id.',
@@ -98,6 +98,8 @@ function buildClassifyIntentSystemPrompt(animationCapabilityMode = "auto") {
     '- Choose "generationStrategy" before generation starts. "single" means the complete JSON clearly fits one response. "segmented" means the request genuinely needs multiple responses AND you can follow the host segmented-output protocol from the first response. "compact" means a literal/full expansion is too large or segmented output is unsuitable; preserve the visual intent with instancing, bounded representative populations, and fewer explicit records so complete JSON fits one response.',
     '- Complexity features are optional safeguards, not a quality setting. Never choose "segmented" merely to improve quality, reasoning, correctness, or visual detail. Never begin a large one-shot response expecting the host to repair an arbitrary cutoff later.',
     '- For "single" or "compact", estimatedSegments MUST be 1. For "segmented", use 2-16 and only when the requested JSON is clearly too large for one provider response. If you are not confident that strict segmented output is supported, choose "compact" instead.',
+    '- executionMode is independent from generationStrategy. Choose "direct" by default: the generation model should return one complete, immediately usable scene including identity-defining textures and requested primary animation. A room, a small campus, a named planet with moons, and a conventional Solar System scene with a bounded number of bodies are all direct even when they request textures or animation. Choose "draft_refine" only when the requested scene has several substantial systems/regions or so much independent detail that one complete generation is unlikely to be usable (for example a multi-district city with separately specified infrastructure and landmarks). Never choose it merely to improve quality, perform ceremonial review, or because multiple rounds are available.',
+    '- refinementGoals is empty for "direct". For "draft_refine", list 1-4 concrete remaining goals that can be completed and verified (for example "populate the four city districts"), not generic goals such as "improve quality" or "review the scene".',
     '- selectedCapabilityIds lists only the capability ids whose detailed syntax/examples the generation model needs. Do semantic reasoning; do not select capabilities merely because a keyword appears.',
     '- If the user asks to add, show, write, label, title, caption, or otherwise render visible words in the 3D scene, select "sceneText". Plain text defaults to SDF scene text. Select "infoPanel" instead only when the requested text needs a visible board/card/screen/panel backing; explicit extruded/beveled/solid lettering may use mesh text.',
     animationCapabilityMode === "on"
@@ -153,8 +155,15 @@ async function classifyTurnIntent(input = {}, options = {}) {
     classificationFailed: true,
     generationStrategy: "single",
     estimatedSegments: 1,
-    selectedCapabilityIds: [],
+    executionMode: "direct",
+    refinementGoals: [],
+    // Undefined preserves core/ai's local intent hints when negotiation could not be parsed.
+    selectedCapabilityIds: undefined,
     requiresAnimation: options.animationCapabilityMode === "on"
+      ? true
+      : options.animationCapabilityMode === "off"
+        ? false
+        : undefined
   };
 
   try {
@@ -194,14 +203,20 @@ async function classifyTurnIntent(input = {}, options = {}) {
         : "single";
     const generationStrategy = parsedStrategy;
     const estimatedSegments = generationStrategy === "segmented" ? Math.max(2, boundedSegments) : 1;
+    const executionMode = parsed?.executionMode === "draft_refine" ? "draft_refine" : "direct";
+    const refinementGoals = executionMode === "draft_refine" && Array.isArray(parsed?.refinementGoals)
+      ? [...new Set(parsed.refinementGoals.map((goal) => String(goal || "").trim()).filter(Boolean))].slice(0, 4)
+      : [];
     const selectedCapabilityIds = Array.isArray(parsed?.selectedCapabilityIds)
       ? [...new Set(parsed.selectedCapabilityIds.map((id) => String(id || "").trim()).filter(Boolean))].slice(0, 12)
-      : [];
+      : undefined;
     const requiresAnimation = options.animationCapabilityMode === "on"
       ? true
       : options.animationCapabilityMode === "off"
         ? false
-        : parsed?.requiresAnimation === true;
+        : typeof parsed?.requiresAnimation === "boolean"
+          ? parsed.requiresAnimation
+          : undefined;
     if (intent === "adjust" && !targetTurnId) {
       return { ...fallback, note: "fallback: model chose adjust without any prior scene turn" };
     }
@@ -212,6 +227,8 @@ async function classifyTurnIntent(input = {}, options = {}) {
       classificationFailed: false,
       generationStrategy,
       estimatedSegments,
+      executionMode,
+      refinementGoals,
       selectedCapabilityIds,
       requiresAnimation
     };
@@ -392,6 +409,8 @@ async function generateSceneTitle(input = {}, options = {}) {
  *   globalPromptPrefix?: string|null,
  *   includeReferenceLinks?: boolean,
  *   generationStrategy?: "single"|"segmented"|"compact"
+ *   executionMode?: "direct"|"draft_refine",
+ *   refinementGoals?: string[],
  *   selectedCapabilityIds?: string[],
  *   requiresAnimation?: boolean
  * }} input
@@ -434,6 +453,13 @@ function buildStructuredTurnEnvelope(input = {}) {
       ? input.generationStrategy
       : "single";
     envelope.generationStrategy = strategy;
+    envelope.executionMode = input?.executionMode === "draft_refine" ? "draft_refine" : "direct";
+    if (envelope.executionMode === "draft_refine" && Array.isArray(input?.refinementGoals)) {
+      const goals = [...new Set(input.refinementGoals.map((goal) => String(goal || "").trim()).filter(Boolean))].slice(0, 4);
+      if (goals.length) {
+        envelope.refinementGoals = goals;
+      }
+    }
     if (strategy === "compact") {
       envelope.generationConstraints = {
         completeJsonInOneResponse: true,

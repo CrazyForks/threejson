@@ -29,10 +29,9 @@ test("listTexturePointersSummary on scene with material", () => {
   assert.equal(r.count, 1);
 });
 
-// Every ordinary generation runs the quality pipeline (outline -> small draft -> incremental
-// refine-to-done -> capability/layout review). generationStrategy is only a full-JSON transport
-// hint and must not enable/disable this pipeline. Fetch mocks return "# done" for refinement calls
-// they do not otherwise care about so the model-controlled loop terminates cleanly.
+// Direct generation is the default. Tests that exercise incremental construction opt into
+// executionMode:"draft_refine" explicitly; generationStrategy remains an independent transport
+// hint.
 
 test("runSceneAgent repairs an invalid draft once, then completes via done/reviews", async () => {
   const validScene = JSON.stringify(MINIMAL_SCENE);
@@ -60,6 +59,7 @@ test("runSceneAgent repairs an invalid draft once, then completes via done/revie
       {
         apiKey: "test-key",
         provider: "deepseek",
+        executionMode: "draft_refine",
         generationStrategy: "segmented"
       }
     );
@@ -72,23 +72,18 @@ test("runSceneAgent repairs an invalid draft once, then completes via done/revie
   }
 });
 
-test("runSceneAgent refines by default even without generationStrategy", async () => {
+test("runSceneAgent uses one complete generation call by default", async () => {
   const scenePayload = JSON.stringify(MINIMAL_SCENE);
-  let call = 0;
-  const fetchMock = mock.fn(async () => {
-    call += 1;
-    const content = call === 1 ? "- floor" : call === 2 ? scenePayload : "# done";
-    return {
-      ok: true,
-      async text() { return ""; },
-      async json() { return { choices: [{ message: { content } }] }; }
-    };
-  });
+  const fetchMock = mock.fn(async () => ({
+    ok: true,
+    async text() { return ""; },
+    async json() { return { choices: [{ message: { content: scenePayload } }] }; }
+  }));
   const originalFetch = globalThis.fetch;
   globalThis.fetch = fetchMock;
   try {
     const result = await runSceneAgent(
-      { mode: "generate", prompt: "a small floor" },
+      { mode: "generate", prompt: "a simple box" },
       {
         apiKey: "test-key",
         provider: "deepseek"
@@ -96,8 +91,138 @@ test("runSceneAgent refines by default even without generationStrategy", async (
     );
     assert.equal(result.agentUsed, true);
     assert.equal(result.completed, true);
+    assert.equal(result.executionMode, "direct");
+    assert.equal(result.stopReason, "direct_complete");
     assert.ok(result.sceneJsonString.includes("objectList"));
-    assert.ok(fetchMock.mock.calls.length >= 3);
+    assert.equal(fetchMock.mock.calls.length, 1, JSON.stringify(result.steps));
+    assert.equal(result.steps.some((step) => step.kind === "draft_refinement"), false);
+    assert.equal(result.steps.some((step) => step.kind === "layout_review"), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("structured envelope metadata does not create a false animation review", async () => {
+  const scenePayload = JSON.stringify(MINIMAL_SCENE);
+  const fetchMock = mock.fn(async () => ({
+    ok: true,
+    async text() { return ""; },
+    async json() { return { choices: [{ message: { content: scenePayload } }] }; }
+  }));
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = fetchMock;
+  try {
+    const result = await runSceneAgent(
+      {
+        mode: "generate",
+        prompt: JSON.stringify({
+          intent: "generate",
+          userRequest: "a simple box",
+          requiresAnimation: false,
+          executionMode: "direct"
+        })
+      },
+      { apiKey: "test-key", provider: "deepseek" }
+    );
+    assert.equal(result.executionMode, "direct");
+    assert.equal(fetchMock.mock.calls.length, 1, JSON.stringify(result.steps));
+    assert.equal(result.steps.some((step) => step.kind === "capability_review" && step.attempt), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("runSceneAgent fills bundled planet textures before the first direct preview", async () => {
+  const scenePayload = JSON.stringify({
+    threeJsonId: "earth-moon",
+    worldInfo: {
+      sphereModelList: [
+        {
+          threeJsonId: "earth",
+          name: "Earth",
+          geometry: { radius: 4 },
+          material: { color: "#000000", textureUrl: "https://unreliable.example/earth.jpg" }
+        },
+        { threeJsonId: "moon", name: "Moon", geometry: { radius: 1 }, material: { color: "#222222" } }
+      ],
+      modelList: [
+        {
+          threeJsonId: "saturn-ring",
+          name: "Saturn Ring",
+          objType: "ring",
+          geometry: { type: "ring", innerRadius: 4, outerRadius: 6 },
+          material: { color: "#111111" }
+        }
+      ]
+    }
+  });
+  const progress = [];
+  const fetchMock = mock.fn(async () => ({
+    ok: true,
+    async text() { return ""; },
+    async json() { return { choices: [{ message: { content: scenePayload } }] }; }
+  }));
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = fetchMock;
+  try {
+    const result = await runSceneAgent(
+      { mode: "generate", prompt: "Create a Solar System" },
+      {
+        apiKey: "test-key",
+        provider: "deepseek",
+        onlineTextureHints: true,
+        onProgress: (event) => progress.push(event)
+      }
+    );
+    const scene = JSON.parse(result.sceneJsonString);
+    const earth = scene.objectList.find((item) => item.threeJsonId === "earth");
+    const moon = scene.objectList.find((item) => item.threeJsonId === "moon");
+    const saturnRing = scene.objectList.find((item) => item.threeJsonId === "saturn-ring");
+    assert.equal(earth.material.textureUrl, "/assets/textures/environment/nature/planet/earth.png");
+    assert.equal(moon.material.textureUrl, "/assets/textures/environment/nature/planet/moon.png");
+    assert.equal(saturnRing.material.textureUrl, "/assets/textures/environment/nature/planet/saturn_ring.png");
+    assert.equal(earth.material.color, "#ffffff");
+    const preview = progress.find((event) => event.kind === "stage_preview");
+    assert.match(preview.sceneJsonString, /planet\/earth\.png/);
+    assert.equal(fetchMock.mock.calls.length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("runSceneAgent escalates a real direct output cutoff to incremental construction", async () => {
+  const scenePayload = JSON.stringify(MINIMAL_SCENE);
+  let call = 0;
+  const fetchMock = mock.fn(async () => {
+    call += 1;
+    const content = call === 1
+      ? '{"threeJsonId":"cut-off","objectList":['
+      : call === 2
+        ? "- establish the main structure"
+        : call === 3
+          ? scenePayload
+          : "# done";
+    return {
+      ok: true,
+      async text() { return ""; },
+      async json() {
+        return {
+          choices: [{ message: { content }, finish_reason: call === 1 ? "length" : "stop" }]
+        };
+      }
+    };
+  });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = fetchMock;
+  try {
+    const result = await runSceneAgent(
+      { mode: "generate", prompt: "a scene too large for one response" },
+      { apiKey: "test-key", provider: "deepseek", agent: { maxRefineRounds: 2 } }
+    );
+    assert.equal(result.executionMode, "draft_refine");
+    assert.ok(result.steps.some((step) => step.kind === "execution_fallback" && step.reason === "output_limit"));
+    assert.equal(result.completed, true);
+    assert.equal(fetchMock.mock.calls.length, 4);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -123,6 +248,7 @@ test('runSceneAgent keeps generationStrategy "compact" independent from automati
       {
         apiKey: "test-key",
         provider: "deepseek",
+        executionMode: "draft_refine",
         generationStrategy: "compact",
         estimatedSegments: 1
       }
@@ -136,7 +262,7 @@ test('runSceneAgent keeps generationStrategy "compact" independent from automati
   }
 });
 
-test("runSceneAgent keeps segmented transport metadata independent from the full agent pipeline", async () => {
+test("runSceneAgent keeps segmented transport metadata independent from direct execution", async () => {
   const scenePayload = JSON.stringify(MINIMAL_SCENE);
   const fetchMock = mock.fn(async () => ({
     ok: true,
@@ -153,40 +279,36 @@ test("runSceneAgent keeps segmented transport metadata independent from the full
   globalThis.fetch = fetchMock;
   try {
     const result = await runSceneAgent(
-      { mode: "generate", prompt: "a small floor" },
+      { mode: "generate", prompt: "a simple box" },
       {
         apiKey: "test-key",
         provider: "deepseek",
         generationStrategy: "segmented"
       }
     );
-    // Every call in this mock returns the same already-valid scene, so the outline is free-text,
-    // the draft is immediately valid, the draft-refinement loop sees "json" output matching the
-    // unchanged scene every round, and only stops once maxRefineRounds is exhausted — this test
-    // only cares that segmented transport metadata does not prevent the pipeline from returning a
-    // usable scene.
     assert.equal(result.agentUsed, true);
+    assert.equal(result.executionMode, "direct");
     assert.ok(result.sceneJsonString.includes("objectList"));
-    assert.ok(fetchMock.mock.calls.length >= 2);
+    assert.equal(fetchMock.mock.calls.length, 1);
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
 test("runSceneAgent respects a caller-configured maxRefineRounds cap", async () => {
-  const scenePayload = JSON.stringify(MINIMAL_SCENE);
   let call = 0;
   const fetchMock = mock.fn(async () => {
     call += 1;
-    // Never says "# done" — the loop must still terminate at the configured round cap rather
-    // than spinning forever.
+    const content = call === 1
+      ? "- floor"
+      : JSON.stringify({ ...MINIMAL_SCENE, threeJsonId: `agent-test-${call}` });
     return {
       ok: true,
       async text() {
         return "";
       },
       async json() {
-        return { choices: [{ message: { content: scenePayload } }] };
+        return { choices: [{ message: { content } }] };
       }
     };
   });
@@ -194,11 +316,12 @@ test("runSceneAgent respects a caller-configured maxRefineRounds cap", async () 
   globalThis.fetch = fetchMock;
   try {
     const result = await runSceneAgent(
-      { mode: "generate", prompt: "a small floor" },
+      { mode: "generate", prompt: "a simple box" },
       {
         agent: { maxRefineRounds: 2 },
         apiKey: "test-key",
         provider: "deepseek",
+        executionMode: "draft_refine",
         generationStrategy: "segmented"
       }
     );
@@ -206,8 +329,7 @@ test("runSceneAgent respects a caller-configured maxRefineRounds cap", async () 
     assert.equal(result.completed, false);
     assert.equal(result.stopReason, "budget_exhausted");
     assert.ok(result.sceneJsonString.includes("objectList"));
-    // outline(1) + draft(1) + at most 2 refine rounds + capability review(<=1) + layout review(1).
-    assert.ok(fetchMock.mock.calls.length <= 6, `expected <= 6 calls, got ${fetchMock.mock.calls.length}`);
+    assert.equal(fetchMock.mock.calls.length, 4);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -215,41 +337,19 @@ test("runSceneAgent respects a caller-configured maxRefineRounds cap", async () 
 
 test("runSceneAgent texture fill soft-fails and keeps scene JSON", async () => {
   const scenePayload = JSON.stringify(MINIMAL_SCENE);
-  const fetchMock = mock.fn(async () => ({
-    ok: true,
-    async text() {
-      return "";
-    },
-    async json() {
-      return {
-        choices: [{ message: { content: "# done" } }]
-      };
-    }
-  }));
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = fetchMock;
+  globalThis.fetch = mock.fn(async () => ({
+    ok: true,
+    async text() { return ""; },
+    async json() { return { choices: [{ message: { content: scenePayload } }] }; }
+  }));
   try {
-    // First real content call must produce the valid scene; every subsequent round says "# done"
-    // so refinement/review stop immediately. Swap in a one-off responder for call 2 (the draft).
-    let call = 0;
-    globalThis.fetch = mock.fn(async () => {
-      call += 1;
-      const content = call === 2 ? scenePayload : "# done";
-      return {
-        ok: true,
-        async text() {
-          return "";
-        },
-        async json() {
-          return { choices: [{ message: { content } }] };
-        }
-      };
-    });
     const result = await runSceneAgent(
       { mode: "generate", prompt: "a small floor" },
       {
         apiKey: "test-key",
         provider: "deepseek",
+        executionMode: "draft_refine",
         agent: { maxRefineRounds: 1 },
         generationStrategy: "segmented",
         texture: {
@@ -449,10 +549,7 @@ test("runSceneAgent update auto accepts JSON output in agent session", async () 
 test("runSceneAgent emits scene_ready before texture fill", async () => {
   const scenePayload = JSON.stringify(MINIMAL_SCENE);
   const progress = [];
-  let call = 0;
   const fetchMock = mock.fn(async () => {
-    call += 1;
-    const content = call === 2 ? scenePayload : "# done";
     return {
       ok: true,
       async text() {
@@ -460,7 +557,7 @@ test("runSceneAgent emits scene_ready before texture fill", async () => {
       },
       async json() {
         return {
-          choices: [{ message: { content } }]
+          choices: [{ message: { content: scenePayload } }]
         };
       }
     };
@@ -473,6 +570,7 @@ test("runSceneAgent emits scene_ready before texture fill", async () => {
       {
         apiKey: "test-key",
         provider: "deepseek",
+        executionMode: "draft_refine",
         agent: { maxRefineRounds: 1 },
         generationStrategy: "segmented",
         onProgress: (p) => progress.push(p.kind),
@@ -511,6 +609,7 @@ test("runSceneAgent emits stage_preview after repair", async () => {
       {
         apiKey: "test-key",
         provider: "deepseek",
+        executionMode: "draft_refine",
         agent: { maxRefineRounds: 1 },
         generationStrategy: "segmented",
         onProgress: (p) => progress.push(p.kind)
@@ -551,6 +650,7 @@ test("runSceneAgent refines a valid draft with mixed-output protocol until done"
         agent: { maxRefineRounds: 5 },
         apiKey: "test-key",
         provider: "deepseek",
+        executionMode: "draft_refine",
         generationStrategy: "segmented",
         onProgress: (event) => progress.push(event)
       }
@@ -637,9 +737,7 @@ test("runSceneAgent iterative apply execs commands and skips final exec batch", 
 test("runSceneAgent applies commands before honoring a same-response # done and returns every applied round", async () => {
   const currentScene = JSON.stringify(MINIMAL_SCENE);
   const replies = [
-    "- refine colors and camera",
-    'object.patch id=floor partial={"material":{"color":"#112233"}}',
-    'camera.fit mode=scene\n# done'
+    'object.patch id=floor partial={"material":{"color":"#112233"}}\ncamera.fit mode=scene\n# done'
   ];
   const applied = [];
   const fetchMock = mock.fn(async () => ({
@@ -674,6 +772,7 @@ test("runSceneAgent applies commands before honoring a same-response # done and 
     assert.equal(applied.length, 2);
     assert.equal(result.commands.length, 2);
     assert.equal(result.commands[1].op, "camera.fit");
+    assert.equal(fetchMock.mock.calls.length, 1);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -714,7 +813,56 @@ test("runSceneAgent update commands iterates by default when the host supplies a
     assert.equal(result.iterativeApplied, true);
     assert.equal(result.completed, true);
     assert.ok(Array.isArray(result.commands) && result.commands.length > 0);
-    assert.equal(fetchMock.mock.calls.length, 3);
+    assert.equal(result.stopReason, "no_change");
+    assert.equal(fetchMock.mock.calls.length, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("runSceneAgent stops a repeated command batch before applying it twice", async () => {
+  const currentScene = JSON.stringify(MINIMAL_SCENE);
+  const changedScene = JSON.stringify({
+    ...MINIMAL_SCENE,
+    worldInfo: {
+      boxModelList: [{
+        ...MINIMAL_SCENE.worldInfo.boxModelList[0],
+        material: { type: "standard", color: "#336699" }
+      }]
+    }
+  });
+  const command = 'object.patch id=floor partial={"material":{"color":"#336699"}}';
+  const fetchMock = mock.fn(async () => ({
+    ok: true,
+    async text() { return ""; },
+    async json() { return { choices: [{ message: { content: command } }] }; }
+  }));
+  let applyCount = 0;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = fetchMock;
+  try {
+    const result = await runSceneAgent(
+      {
+        mode: "update",
+        prompt: "change the floor color",
+        currentSceneJsonString: currentScene,
+        outputMode: "commands",
+        updateContext: { objectList: [{ threeJsonId: "floor", objType: "box" }] }
+      },
+      {
+        apiKey: "test-key",
+        provider: "deepseek",
+        agent: { maxRefineRounds: 4 },
+        applyCommands: async () => {
+          applyCount += 1;
+          return { ok: true, sceneMutated: true };
+        },
+        refreshContext: async () => ({ currentSceneJsonString: changedScene, objectList: [] })
+      }
+    );
+    assert.equal(result.stopReason, "repeated_output");
+    assert.equal(applyCount, 1);
+    assert.equal(fetchMock.mock.calls.length, 2);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -726,17 +874,14 @@ test("runSceneAgent update commands falls back to the non-iterative runner witho
   // collect-one-batch-and-return runner instead.
   const currentScene = JSON.stringify(MINIMAL_SCENE);
   const validCommands = 'object.patch id=floor partial={"material":{"color":"#336699"}}';
-  let call = 0;
   const fetchMock = mock.fn(async () => {
-    call += 1;
-    const content = call === 1 ? "- outline text" : validCommands;
     return {
       ok: true,
       async text() {
         return "";
       },
       async json() {
-        return { choices: [{ message: { content } }] };
+        return { choices: [{ message: { content: validCommands } }] };
       }
     };
   });
@@ -758,6 +903,7 @@ test("runSceneAgent update commands falls back to the non-iterative runner witho
     assert.equal(result.outputMode, "commands");
     assert.equal(result.iterativeApplied, undefined);
     assert.ok(Array.isArray(result.commands) && result.commands.length > 0);
+    assert.equal(fetchMock.mock.calls.length, 1);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -785,8 +931,13 @@ test("runSceneAgent tolerates an outline failure and still produces a scene", as
   globalThis.fetch = fetchMock;
   try {
     const result = await runSceneAgent(
-      { mode: "generate", prompt: "a small floor" },
-      { apiKey: "test-key", provider: "deepseek", generationStrategy: "segmented" }
+      { mode: "generate", prompt: "a simple box" },
+      {
+        apiKey: "test-key",
+        provider: "deepseek",
+        executionMode: "draft_refine",
+        generationStrategy: "segmented"
+      }
     );
     assert.ok(result.sceneJsonString.includes("objectList"));
     assert.ok(result.steps.some((s) => s.kind === "outline" && s.ok === false));
@@ -828,7 +979,13 @@ test("runSceneAgent keeps a valid draft when both capability and layout review r
   try {
     const result = await runSceneAgent(
       { mode: "generate", prompt },
-      { apiKey: "test-key", provider: "deepseek", generationStrategy: "segmented" }
+      {
+        apiKey: "test-key",
+        provider: "deepseek",
+        executionMode: "draft_refine",
+        generationStrategy: "segmented",
+        agent: { layoutReview: true }
+      }
     );
     assert.equal(JSON.parse(result.sceneJsonString).threeJsonId, "cabin-scene");
     assert.ok(result.steps.some((s) => s.kind === "capability_review"));

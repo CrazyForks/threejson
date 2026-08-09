@@ -206,12 +206,7 @@ export function getCredentials(host) {
   return creds;
 }
 
-/**
- * There is no more "enable Agent" toggle or depth preset — generation and adjustment are always
- * draft-then-incrementally-refine now (see core/ai/sceneAgent.js's module docblock). The only
- * thing left to resolve from settings is how many automatic refine rounds are allowed before the
- * round budget kicks in (the model can always finish earlier via `# done`).
- */
+/** Resolve the runaway guard used only when an operation genuinely continues incrementally. */
 export function getAgentOptions(host) {
   const ai = host.getEditorSettings()?.ai || {};
   return {

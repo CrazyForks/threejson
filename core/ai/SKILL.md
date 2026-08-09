@@ -1,6 +1,6 @@
 ---
 name: threejson-ai-scene
-description: Generate or modify ThreeJSON scene JSON, core command scripts, and optional multi-step agents via core/ai; plan/fill textureUrl. Use for prompts, image-to-scene, command-mode edits, or texture pipelines.
+description: Generate or modify ThreeJSON scene JSON, core command scripts, and adaptive direct/incremental scene execution via core/ai; plan/fill textureUrl. Use for prompts, image-to-scene, command-mode edits, or texture pipelines.
 ---
 
 # ThreeJSON AI Scene Skill
@@ -23,11 +23,11 @@ Use this skill when the request includes one of these intents:
 - Switch between ChatGPT and DeepSeek providers for scene tasks.
 - Plan or generate material textures: chat proposes per-slot prompts, image API produces pixels, sinks persist URLs or paths into `textureUrl`.
 - Apply **command-mode** edits (`requestUpdatedSceneEditCommands`) producing `scene.*` / `object.*` / `material.*` / `camera.*` scripts (not `editor.*`).
-- Run optional **multi-step agent** (`runSceneAgent` with `agent.enabled: true`).
+- Run adaptive scene execution (`runSceneAgent`): direct by default, incremental only for genuinely complex/output-limited work.
 
 ## Capability catalog (runtime prompts)
 
-Generation/update prompts (`threeJsonCoreSkill.js`) include a compact runtime index from `sceneCapabilityIndex.js`. Before formal generation, the supplier model returns a fixed JSON negotiation result containing `intent`, `generationStrategy`, `estimatedSegments`, `selectedCapabilityIds`, and `requiresAnimation`. Core parses that response and injects the selected references and optional detailed animation block. Core must not infer animation through local keyword rules; the supplier model evaluates the complete user intent. Host-only wiring (PluginHost, extension bootstrap) is **not** auto-generated — see [`docs/zh/extensions.md`](../../docs/zh/extensions.md). Business objects use [`docs/zh/domains.md`](../../docs/zh/domains.md) — see [`docs/zh/glossary.md`](../../docs/zh/glossary.md).
+Generation/update prompts (`threeJsonCoreSkill.js`) include a compact runtime index from `sceneCapabilityIndex.js`. Before formal generation, the supplier model returns a fixed JSON negotiation result containing `intent`, `generationStrategy`, `estimatedSegments`, `executionMode`, `refinementGoals`, `selectedCapabilityIds`, and `requiresAnimation`. Core parses that response and injects the selected references and optional detailed animation block. Local intent matching is only the graceful fallback when negotiation omits those fields or cannot be parsed. Host-only wiring (PluginHost, extension bootstrap) is **not** auto-generated — see [`docs/zh/extensions.md`](../../docs/zh/extensions.md). Business objects use [`docs/zh/domains.md`](../../docs/zh/domains.md) — see [`docs/zh/glossary.md`](../../docs/zh/glossary.md).
 
 Use `THREE_JSON_AGENT_CAPABILITY_INDEX` as the token-cheap multi-turn lookup surface. Do not paste all docs into every turn; use the index first, then retrieve docs/examples only for a specific capability.
 
@@ -51,10 +51,10 @@ From **`threejson`** / **`threejson/core`** / **`core/index.js`** (ESM named exp
 10. `listTextureUrlPointers(sceneObj)` — list valid `/objectList/.../textureUrl` targets, with friendly `/worldInfo/boxModelList/...` compatibility (includes `material`, `materials[]`, nested `joins` / `inters` / `holes`).
 11. `parseSceneJsonString(str)` / `extractJsonText(str)` / `resolveVisionImageUrl(image)` — parsing and image URL normalization for vision chat.
 12. `createSceneAiClient(defaultOptions?)` — merges defaults into generate/update/plan/fill/agent methods (no file I/O).
-13. `runSceneAgent(input, options?)` — optional multi-step agent; **requires `options.agent.enabled === true`**; default is single-shot. Depth: `simple` | `medium` | `deep` | `auto`. Browser agent does not persist textures to disk.
+13. `runSceneAgent(input, options?)` — adaptive scene executor. `executionMode: "direct"` is the default; `"draft_refine"` is reserved for genuinely complex scenes or a detected direct output-limit fallback. `agent.maxRefineRounds` is a runaway guard (default 6, hard maximum 20), not a target. All calls share a total deadline (default 180 seconds; `turnTimeoutMs`/`turnDeadlineAt`). Browser agent does not persist generated textures to disk.
 14. The supplier-model negotiation chooses relevant capability IDs before formal generation; `sceneCapability.js` performs optional post-generation capability-fit review.
 15. `generateSceneJsonString` options: `planFirst`, `capabilityReview` (default on), `maxCapabilityReviewAttempts`, `maxTokens` (**default 6000** for generation), and optional segmented output. The supplier-model negotiation chooses `single`, `segmented`, or `compact`; planned `segmented` output starts its continuation/stitching protocol in the first response and uses the caller's `maxSceneSegments` limit (default 16, hard maximum 64). `single` and `compact` do not silently upgrade into arbitrary-cutoff continuation. If an unsegmented response genuinely hits the provider limit, generation makes at most one full compact retry from the beginning; set `compactRetryOnTruncation: false` to disable it.
-16. Agent depth presets (`agentDepth.js`): `simple` runs structural repair + capability review; `medium`/`deep`/`auto` add outline/layout review. This is **business Agent depth**, not a provider/model reasoning-depth parameter.
+16. `agentDepth.js` is retained for legacy callers only; current execution policy does not use `simple`/`medium`/`deep` quality presets. Layout/material LLM review is opt-in (`agent.layoutReview: true`), not an unconditional phase.
 17. Animation capability prompting accepts `animationCapabilityMode: "auto" | "on" | "off"`. `auto` follows the supplier negotiation, `on` always injects animation guidance, and `off` never injects it.
 
 Browser global `window.ThreeJsonAI` exposes `createSceneAiClient`, `generateSceneJsonString`, `generateSceneJsonFromImage`, `updateSceneJsonString`, `resolveVisionImageUrl`, `planTextures`, `fillTextureUrls`, `createOpenAiImageProvider`, `normalizeImageRawToBlob`, `listTextureUrlPointers`, and **`runSceneAgent`** (no `updateSceneJsonFile`; avoid shipping secrets in public bundles).

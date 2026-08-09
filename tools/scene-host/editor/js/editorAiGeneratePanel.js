@@ -1,4 +1,8 @@
-import { runAiGenerateTurn, runAiImageGenerateTurn } from "../../shared/js/aiTurnOrchestrator.js";
+import {
+  classifyAiTurnIntent,
+  runAiGenerateTurn,
+  runAiImageGenerateTurn
+} from "../../shared/js/aiTurnOrchestrator.js";
 import { parseUploadedSceneJsonFile, parseUploadedTjzFile } from "../../shared/js/sceneFileUpload.js";
 import {
   applyScenePayload,
@@ -337,16 +341,9 @@ export function createEditorAiGeneratePanel(host) {
     }
   }
 
-  /** Generation is now always draft-then-incrementally-refine (outline -> small draft -> N auto
-   * refine rounds -> capability/layout review — see core/ai/sceneAgent.js's module docblock), so a
-   * single raw-text stream from one LLM call no longer makes sense (there isn't just one call
-   * anymore) — runAiGenerateTurn doesn't offer onDelta for that reason. This renders a short,
-   * readable running log of what stage is in progress instead, the same status-line approach
-   * ThreeBox's chat panel uses (see threeBoxApp.js's createAgentProgressUpdater). Reloading the
-   * live canvas on every intermediate round (the way ThreeBox's disposable scene card does) isn't
-   * viable here — editorApp.js's ingestScenePayload tears down and re-initializes the whole
-   * runtime per call — so preview loads are serialized and deduplicated while the status text
-   * continues to use the existing compact activity indicator. */
+  /** Direct generation normally emits one usable preview. Genuinely large scenes (or a direct
+   * output-limit fallback) can emit several incremental previews. Preview loads are serialized and
+   * deduplicated because editorApp.js ingest tears down and re-initializes the live runtime. */
   function createGenerateStatusUpdater(assistantBody, onScenePreview) {
     // Writes textContent directly rather than through historyCtl.updateMessage, which clears the
     // "still busy" styling/aria state appendActivityMessage set up — that must stay in effect
@@ -360,7 +357,7 @@ export function createEditorAiGeneratePanel(host) {
         typeof phaseOrProgress.sceneJsonString === "string" &&
         (phaseOrProgress.kind === "stage_preview" || phaseOrProgress.kind === "scene_ready")
       ) {
-        onScenePreview(phaseOrProgress.sceneJsonString);
+        onScenePreview(phaseOrProgress.sceneJsonString, phaseOrProgress);
       }
       // Two different shapes land here: SceneAgentProgress events (`.kind`, from onAgentProgress)
       // — run through the shared localized-label mapping, same as ThreeBox's chat panel — and the
@@ -432,28 +429,70 @@ export function createEditorAiGeneratePanel(host) {
       }
 
       const agentOptions = getAgentOptions(host);
+      const turnDeadlineAt = Date.now() + 180000;
       const providerOptions = {
         provider: creds.provider,
         apiKey: creds.apiKey,
         model: creds.model,
         baseUrl: creds.baseUrl,
         userId: creds.userId,
-        threeBoxTurnContext: createEditorAiTurnContext(userText)
+        threeBoxTurnContext: createEditorAiTurnContext(userText),
+        turnDeadlineAt
       };
+      // The tab already fixes the intent to "generate". Clearly bounded prompts resolve locally;
+      // explicitly large/ambiguous prompts still use model negotiation for execution policy.
+      // Local capability matching supplies animation syntax even when no classifier call is made.
+      const negotiation = await classifyAiTurnIntent(
+        {
+          userPrompt:
+            prompt ||
+            (attachment?.kind === "image"
+              ? "Reconstruct the attached image as one complete scene."
+              : userText),
+          history: []
+        },
+        {
+          ...providerOptions,
+          signal: abortController.signal,
+          animationCapabilityMode: "auto"
+        }
+      );
       let resultText;
-      let lastPreviewSceneJsonString = "";
+      let lastQueuedPreviewSceneJsonString = "";
+      let lastAppliedPreviewSceneJsonString = "";
       let previewQueue = Promise.resolve();
-      const queueScenePreview = (sceneJsonString) => {
+      const queueScenePreview = (sceneJsonString, progress = {}) => {
         const next = String(sceneJsonString || "").trim();
-        if (!next || next === lastPreviewSceneJsonString) {
+        if (!next || next === lastQueuedPreviewSceneJsonString) {
           return previewQueue;
         }
-        lastPreviewSceneJsonString = next;
+        lastQueuedPreviewSceneJsonString = next;
         previewQueue = previewQueue
-          .then(() => applyScenePayload(host, next, "AI 自动细化预览", {
-            skipDirtyConfirm: true,
-            keepDirtyAfterLoad: true
-          }))
+          .then(async () => {
+            let applied = false;
+            if (
+              progress.outputMode === "commands" &&
+              Array.isArray(progress.commands) &&
+              progress.commands.length > 0 &&
+              host.getScene()
+            ) {
+              host.getCommandLayer().ensure();
+              const batch = await host.getCommandLayer().runBatch(progress.commands, {
+                label: `AI 自动细化第 ${progress.round || 1} 步`
+              });
+              applied = batch?.ok !== false;
+            }
+            if (!applied) {
+              applied = await applyScenePayload(host, next, "AI 自动细化预览", {
+                skipDirtyConfirm: true,
+                keepDirtyAfterLoad: true
+              });
+            }
+            if (applied) {
+              lastAppliedPreviewSceneJsonString = next;
+            }
+            return applied;
+          })
           .catch((error) => {
             console.warn("[editor] failed to render AI scene preview:", error);
           });
@@ -475,13 +514,20 @@ export function createEditorAiGeneratePanel(host) {
           image: attachment.dataUrl,
           providerOptions,
           agentOptions,
+          executionMode: negotiation.executionMode,
+          refinementGoals: negotiation.refinementGoals,
+          selectedCapabilityIds: negotiation.selectedCapabilityIds,
+          requiresAnimation: negotiation.requiresAnimation,
+          onlineTextureHints: true,
           onGenerationPhase: updateGenerateStatus,
           onAgentProgress: updateGenerateStatus,
           onSceneDraft: queueScenePreview,
           signal: abortController.signal
         });
         await previewQueue;
-        const loaded = await applyScenePayload(host, result.sceneJsonString, "AI 看图生成", { skipDirtyConfirm: true });
+        const loaded = lastAppliedPreviewSceneJsonString === result.sceneJsonString.trim()
+          ? true
+          : await applyScenePayload(host, result.sceneJsonString, "AI 看图生成", { skipDirtyConfirm: true });
         resultText = loaded
           ? t("editor.ai.edit.imageDone", "看图生成场景已载入。")
           : t("editor.ai.message.cancelled", "已取消载入。");
@@ -511,13 +557,22 @@ export function createEditorAiGeneratePanel(host) {
           userPrompt: effectivePrompt,
           providerOptions,
           agentOptions,
+          generationStrategy: negotiation.generationStrategy,
+          executionMode: negotiation.executionMode,
+          refinementGoals: negotiation.refinementGoals,
+          estimatedSegments: negotiation.estimatedSegments,
+          selectedCapabilityIds: negotiation.selectedCapabilityIds,
+          requiresAnimation: negotiation.requiresAnimation,
+          onlineTextureHints: true,
           onGenerationPhase: updateGenerateStatus,
           onAgentProgress: updateGenerateStatus,
           onSceneDraft: queueScenePreview,
           signal: abortController.signal
         });
         await previewQueue;
-        const loaded = await applyScenePayload(host, result.sceneJsonString, "AI 生成", { skipDirtyConfirm: true });
+        const loaded = lastAppliedPreviewSceneJsonString === result.sceneJsonString.trim()
+          ? true
+          : await applyScenePayload(host, result.sceneJsonString, "AI 生成", { skipDirtyConfirm: true });
         resultText = loaded ? t("editor.ai.edit.generateDone", "AI 场景已载入。") : t("editor.ai.message.cancelled", "已取消载入。");
         if (loaded) {
           if (result.agentResult?.completed === false) {

@@ -115,12 +115,16 @@ export function loadThreeBoxSettingsBundle() {
   if (cached?.io?.sceneJsonFormat !== "standard" && cached?.io?.sceneJsonFormat !== "friendly") {
     merged.io.sceneJsonFormat = cached?.io?.copyFriendlyJson === true ? "friendly" : "standard";
   }
-  // A previously persisted `agent.*`/`ai.agentDepth` (the retired on/off + depth-preset toggle —
-  // see core/ai/sceneAgent.js's module docblock) has nothing left to migrate into: generation is
-  // always draft-then-incrementally-refine now, with only `ai.maxAutoRefineRounds` left to
-  // configure, and THREEBOX_SETTINGS_DEFAULTS already supplies that. A stale `agent` object may
-  // still ride along in an old cached bundle (deepMergeThreeBoxSettings copies overlay keys the
-  // defaults no longer declare too) — harmless, since nothing reads `settings.agent` anymore.
+  // Policy v1 used 20 as the default and ran the incremental loop for every scene. Migrate old
+  // cached bundles so existing users do not retain that accidental default forever. Explicitly
+  // smaller user values are preserved; direct turns no longer use this guard at all.
+  if (Number(cached?.ai?.agentPolicyVersion || 0) < 2) {
+    const legacyLimit = Number(cached?.ai?.maxAutoRefineRounds);
+    merged.ai.maxAutoRefineRounds = Number.isFinite(legacyLimit) && legacyLimit > 0
+      ? Math.min(6, Math.round(legacyLimit))
+      : THREEBOX_SETTINGS_DEFAULTS.ai.maxAutoRefineRounds;
+    merged.ai.agentPolicyVersion = 2;
+  }
   ensureBuiltinProviderSeeded(merged);
   return merged;
 }

@@ -284,6 +284,55 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
     return runtime;
   }
 
+  /** Applies an AI command refinement to the already-visible runtime. This preserves the camera,
+   * WebGL context and in-flight/loaded textures instead of destroying and rebuilding the whole
+   * card for every incremental step. The caller supplies the authoritative post-command JSON so
+   * downloads/history stay aligned with the runtime without another export pass. */
+  async function applyCommands(commands, options = {}) {
+    if (!runtime || !Array.isArray(commands) || commands.length === 0) {
+      return null;
+    }
+    const { createCommandContext, executeCommands } = await import("threejson");
+    const ctx = createCommandContext({
+      scene: runtime.scene,
+      camera: runtime.camera,
+      renderer: runtime.renderer,
+      controls: runtime.controls
+    });
+    const execResult = await executeCommands(ctx, commands);
+    const results = Array.isArray(execResult?.results) ? execResult.results : [];
+    const failed = results.find((entry) => entry?.ok === false);
+    if (failed || execResult?.ok === false) {
+      throw new Error(failed?.error || "Scene preview command application failed.");
+    }
+    if (options.sceneJson && typeof options.sceneJson === "object") {
+      currentSceneJson = options.sceneJson;
+    }
+    setLabel(options.label);
+    setDraftState(options.draft === true);
+    syncThreeBoxPreviewAuxiliaryLights(
+      runtime.scene,
+      typeof cardOptions.shouldUsePreviewAuxiliaryLights === "function"
+        ? cardOptions.shouldUsePreviewAuxiliaryLights() !== false
+        : cardOptions.previewAuxiliaryLights !== false
+    );
+    return runtime;
+  }
+
+  /** Clears draft chrome without reloading an identical scene. */
+  async function finalize(sceneJsonPayload, options = {}) {
+    const sameScene = runtime && currentSceneJson &&
+      JSON.stringify(currentSceneJson) === JSON.stringify(sceneJsonPayload);
+    if (!sameScene) {
+      return render(sceneJsonPayload, { ...options, draft: false });
+    }
+    currentSceneJson = sceneJsonPayload;
+    setLabel(options.label);
+    setDraftState(false);
+    loadingMask.hidden = true;
+    return runtime;
+  }
+
   function dispose() {
     renderSeq += 1;
     liveResizeObserver?.disconnect();
@@ -480,6 +529,8 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
     el,
     canvas,
     render,
+    applyCommands,
+    finalize,
     dispose,
     setLabel,
     setPreviewAuxiliaryLightsEnabled: (enabled) =>

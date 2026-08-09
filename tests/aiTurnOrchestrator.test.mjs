@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { mock, test } from "node:test";
-import { runAiAdjustTurn } from "../tools/scene-host/shared/js/aiTurnOrchestrator.js";
+import {
+  resolveImmediateDirectGeneration,
+  runAiAdjustTurn
+} from "../tools/scene-host/shared/js/aiTurnOrchestrator.js";
 
 const SCENE = JSON.stringify({
   threeJsonId: "live-adjust-test",
@@ -23,6 +26,25 @@ test("image generation wires the same incremental draft command executor as text
     source.indexOf("export async function classifyAiTurnIntent")
   );
   assert.match(imageRunner, /applyDraftCommands:\s*applyAiDraftCommands/);
+});
+
+test("bounded first generations skip a redundant classifier call while large requests still negotiate", () => {
+  const direct = resolveImmediateDirectGeneration({
+    userPrompt: "生成一个地月系统，地球自转，月球绕地球公转",
+    history: []
+  });
+  assert.equal(direct?.executionMode, "direct");
+  assert.equal(direct?.generationStrategy, "single");
+  assert.equal(direct?.selectedCapabilityIds, undefined);
+
+  assert.equal(resolveImmediateDirectGeneration({
+    userPrompt: "生成一座包含四个分区、交通基础设施和数百栋建筑的城市",
+    history: []
+  }), null);
+  assert.equal(resolveImmediateDirectGeneration({
+    userPrompt: "把月球改成红色",
+    history: [{ turnId: "earth", summary: "地月系统" }]
+  }), null);
 });
 
 test("runAiAdjustTurn applies automatic rounds through host live-runtime callbacks", async () => {
@@ -61,9 +83,10 @@ test("runAiAdjustTurn applies automatic rounds through host live-runtime callbac
 
     assert.equal(result.liveApplied, true);
     assert.equal(result.agentResult.completed, true);
+    assert.equal(result.agentResult.stopReason, "no_change");
     assert.equal(applied.length, 1);
     assert.equal(result.commands.length, 1);
-    assert.equal(fetchMock.mock.calls.length, 3);
+    assert.equal(fetchMock.mock.calls.length, 2);
   } finally {
     globalThis.fetch = originalFetch;
   }

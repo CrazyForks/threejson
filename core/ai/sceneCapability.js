@@ -227,9 +227,9 @@ const INTENT_SIGNALS = [
   },
   {
     id: "declarativeAnimation",
-    patterns: [/rotate|rotation|spin|spinning|animated|animation|转动|旋转|自转|动画/i],
+    patterns: [/rotate|rotation|spin|spinning|revolve|orbit|orbital|animated|animation|转动|旋转|自转|公转|环绕|绕.+转|动画/i],
     objTypes: ["animation"],
-    note: "Use animations:[{type:'rotate',axis,speed}] with sceneConfig.renderLoop.updateAnimations true; make solid-object rotation visually apparent."
+    note: "Use animations:[{type:'rotate',axis,speed}] with sceneConfig.renderLoop.updateAnimations true; for an orbit, rotate a parent group around the orbit center and place the orbiting child at a local offset. Make the requested motion visually apparent."
   },
   {
     id: "statDomain",
