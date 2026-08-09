@@ -16,6 +16,7 @@ import {
   scenePayloadHasLifecycleEventBindings,
   runRecordDeployWithLifecycle
 } from "../runtime/objectLifecycle/index.js";
+import { runWithRuntimeContextScope } from "../runtime/runtimeContext.js";
 
 function resolveDeployTarget(target) {
   if (target?.isObject3D === true && target?.isScene !== true) {
@@ -89,16 +90,18 @@ function deployJsonObject(target, record, options = {}) {
   const normalized = resolveDeployRecord(record, options);
   const targetInfo = resolveDeployTarget(target);
   const ctx = buildDeployContext({ ...options, dynamicLifecycleDispatch: true }, targetInfo, normalized);
-  let created = null;
-  runRecordDeployWithLifecycle(normalized, ctx.objectLifecycle, () => {
-    created = createObjectFromRecord(normalized, ctx);
-    if (created) {
-      targetInfo.root.add(created);
-      return deploySubSceneAfterCreate(targetInfo.root, normalized, ctx, created);
-    }
-    return deployObjectRecord(targetInfo.root, normalized, ctx);
-  }, { dynamicReadyElm: true });
-  return created;
+  return runWithRuntimeContextScope(targetInfo.root, () => {
+    let created = null;
+    runRecordDeployWithLifecycle(normalized, ctx.objectLifecycle, () => {
+      created = createObjectFromRecord(normalized, ctx);
+      if (created) {
+        targetInfo.root.add(created);
+        return deploySubSceneAfterCreate(targetInfo.root, normalized, ctx, created);
+      }
+      return deployObjectRecord(targetInfo.root, normalized, ctx);
+    }, { dynamicReadyElm: true });
+    return created;
+  });
 }
 
 async function deployJsonObjectAsync(target, record, options = {}) {
@@ -109,13 +112,19 @@ async function deployJsonObjectAsync(target, record, options = {}) {
   const ctx = buildDeployContext({ ...options, dynamicLifecycleDispatch: true }, targetInfo, normalized);
   let created = null;
   await runRecordDeployWithLifecycle(normalized, ctx.objectLifecycle, async () => {
-    created = createObjectFromRecord(normalized, ctx);
+    // Lifecycle hooks may await before invoking this callback, so scope the actual synchronous
+    // builder entry rather than the Promise returned by the entire lifecycle operation.
+    created = runWithRuntimeContextScope(targetInfo.root, () => createObjectFromRecord(normalized, ctx));
     if (created) {
       targetInfo.root.add(created);
       await deploySubSceneAfterCreateAsync(targetInfo.root, normalized, ctx, created);
       return;
     }
-    await deployObjectRecordAsync(targetInfo.root, normalized, ctx);
+    const pendingDeploy = runWithRuntimeContextScope(
+      targetInfo.root,
+      () => deployObjectRecordAsync(targetInfo.root, normalized, ctx)
+    );
+    await pendingDeploy;
   }, { awaitSideEffects: true, dynamicReadyElm: true });
   return created;
 }

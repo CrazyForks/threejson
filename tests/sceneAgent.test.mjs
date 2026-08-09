@@ -18,6 +18,19 @@ const MINIMAL_SCENE = {
   }
 };
 
+function sceneWithFloorColor(color) {
+  return JSON.stringify({
+    ...MINIMAL_SCENE,
+    worldInfo: {
+      ...MINIMAL_SCENE.worldInfo,
+      boxModelList: MINIMAL_SCENE.worldInfo.boxModelList.map((item) => ({
+        ...item,
+        material: { ...item.material, color }
+      }))
+    }
+  });
+}
+
 test("validateSceneJson accepts minimal scene", () => {
   const r = validateSceneJson(JSON.stringify(MINIMAL_SCENE));
   assert.equal(r.ok, true);
@@ -669,6 +682,7 @@ test("runSceneAgent refines a valid draft with mixed-output protocol until done"
 
 test("runSceneAgent iterative apply execs commands and skips final exec batch", async () => {
   const currentScene = JSON.stringify(MINIMAL_SCENE);
+  const changedScene = sceneWithFloorColor("#112233");
   let fetchCall = 0;
   let applyCount = 0;
   let refreshCount = 0;
@@ -717,7 +731,7 @@ test("runSceneAgent iterative apply execs commands and skips final exec batch", 
         },
         refreshContext: async () => {
           refreshCount += 1;
-          return { currentSceneJsonString: currentScene, objectList: [] };
+          return { currentSceneJsonString: changedScene, objectList: [] };
         },
         onProgress: (p) => progress.push(p.kind)
       }
@@ -727,6 +741,8 @@ test("runSceneAgent iterative apply execs commands and skips final exec batch", 
     assert.equal(result.execOk, true);
     assert.equal(applyCount, 1);
     assert.equal(refreshCount, 1);
+    assert.equal(result.stopReason, "implicit_complete");
+    assert.equal(fetchCall, 2);
     assert.ok(progress.includes("commands_applied"));
     assert.ok(progress.includes("refine"));
   } finally {
@@ -736,6 +752,7 @@ test("runSceneAgent iterative apply execs commands and skips final exec batch", 
 
 test("runSceneAgent applies commands before honoring a same-response # done and returns every applied round", async () => {
   const currentScene = JSON.stringify(MINIMAL_SCENE);
+  const changedScene = sceneWithFloorColor("#112233");
   const replies = [
     'object.patch id=floor partial={"material":{"color":"#112233"}}\ncamera.fit mode=scene\n# done'
   ];
@@ -764,7 +781,7 @@ test("runSceneAgent applies commands before honoring a same-response # done and 
           applied.push(...commands);
           return { ok: true, sceneMutated: true };
         },
-        refreshContext: async () => ({ currentSceneJsonString: currentScene, objectList: [] })
+        refreshContext: async () => ({ currentSceneJsonString: changedScene, objectList: [] })
       }
     );
     assert.equal(result.completed, true);
@@ -780,6 +797,7 @@ test("runSceneAgent applies commands before honoring a same-response # done and 
 
 test("runSceneAgent update commands iterates by default when the host supplies apply/refresh callbacks", async () => {
   const currentScene = JSON.stringify(MINIMAL_SCENE);
+  const changedScene = sceneWithFloorColor("#336699");
   const validCommands = 'object.patch id=floor partial={"material":{"color":"#336699"}}';
   let call = 0;
   const fetchMock = mock.fn(async () => {
@@ -806,14 +824,14 @@ test("runSceneAgent update commands iterates by default when the host supplies a
         apiKey: "test-key",
         provider: "deepseek",
         applyCommands: async () => ({ ok: true, sceneMutated: true }),
-        refreshContext: async () => ({ currentSceneJsonString: currentScene, objectList: [] })
+        refreshContext: async () => ({ currentSceneJsonString: changedScene, objectList: [] })
       }
     );
     assert.equal(result.outputMode, "commands");
     assert.equal(result.iterativeApplied, true);
     assert.equal(result.completed, true);
     assert.ok(Array.isArray(result.commands) && result.commands.length > 0);
-    assert.equal(result.stopReason, "no_change");
+    assert.equal(result.stopReason, "implicit_complete");
     assert.equal(fetchMock.mock.calls.length, 2);
   } finally {
     globalThis.fetch = originalFetch;
@@ -831,7 +849,10 @@ test("runSceneAgent stops a repeated command batch before applying it twice", as
       }]
     }
   });
-  const command = 'object.patch id=floor partial={"material":{"color":"#336699"}}';
+  const command = [
+    'object.patch id=floor partial={"material":{"color":"#336699"}}',
+    "# continue: verify the applied color"
+  ].join("\n");
   const fetchMock = mock.fn(async () => ({
     ok: true,
     async text() { return ""; },

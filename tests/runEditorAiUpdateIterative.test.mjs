@@ -20,11 +20,21 @@ const MINIMAL_SCENE = {
 
 test("runEditorAiUpdate iterative agent skips duplicate final exec", async () => {
   const currentJson = JSON.stringify(MINIMAL_SCENE);
+  const changedJson = JSON.stringify({
+    ...MINIMAL_SCENE,
+    worldInfo: {
+      ...MINIMAL_SCENE.worldInfo,
+      boxModelList: MINIMAL_SCENE.worldInfo.boxModelList.map((item) => ({
+        ...item,
+        material: { ...item.material, color: "#445566" }
+      }))
+    }
+  });
   let fetchCall = 0;
   let execCount = 0;
   const fetchMock = mock.fn(async () => {
     fetchCall += 1;
-    // 1: outline (always requested now, regardless of depth), 2: round-1 commands, 3+: done.
+    // 1: outline, 2: one complete command batch. A verified mutation completes immediately.
     const content =
       fetchCall === 1
         ? "- outline text"
@@ -66,7 +76,7 @@ test("runEditorAiUpdate iterative agent skips duplicate final exec", async () =>
       fullSceneJson: currentJson,
       getCurrentSceneJson: async () => {
         refreshCount += 1;
-        return currentJson;
+        return changedJson;
       },
       outputMode: "commands",
       agentEnabled: true,
@@ -78,6 +88,7 @@ test("runEditorAiUpdate iterative agent skips duplicate final exec", async () =>
     assert.equal(result.execOk, true);
     assert.equal(execCount, 1);
     assert.ok(refreshCount >= 1);
+    assert.equal(fetchCall, 2);
   } finally {
     globalThis.fetch = originalFetch;
   }

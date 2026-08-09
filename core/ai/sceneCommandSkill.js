@@ -123,6 +123,16 @@ export function commandScriptIndicatesDone(script) {
 }
 
 /**
+ * A successfully applied mutating batch completes an adjustment by default. The model must use
+ * this marker only when it genuinely needs a separate inspection or implementation stage.
+ * @param {string} script
+ * @returns {boolean}
+ */
+export function commandScriptRequestsContinuation(script) {
+  return /(?:^|\n)\s*#\s*continue\b/i.test(String(script || ""));
+}
+
+/**
  * @returns {string}
  */
 function buildUserIntentPriorityFragment() {
@@ -403,11 +413,11 @@ export function buildSceneCommandAutoUpdateSystemPrompt(options = {}) {
   const workflow = iterativeApply
     ? [
         "Agent iterative apply workflow:",
-        "1. Finish bounded requests in ONE response whenever possible: output the complete minimal mutating command batch, then append a final `# done` line in the SAME response.",
-        "2. Use another round only when the change genuinely needs inspection or several independently verifiable stages. Never split work merely because iterative mode is available.",
+        "1. Finish bounded requests in ONE response whenever possible: output the complete minimal mutating command batch. You may append a final `# done` line in the SAME response.",
+        "2. A successful mutating batch is treated as complete unless you append `# continue: <concrete remaining goal>`. Use that marker only when the change genuinely needs inspection or a separate independently verifiable stage. Never split work merely because iterative mode is available.",
         "3. Intermediate rounds MAY use object.get to inspect descriptors (results are fed back), but do not inspect data already present in the supplied scene context.",
         "4. If the scene already matches the request, output `# done` only. If your current commands finish the request, append `# done` after those commands.",
-        "5. Every non-final round must make a meaningful new change; never repeat an earlier command batch or manufacture cosmetic work to consume rounds."
+        "5. Every `# continue` round must name and make progress toward a concrete remaining goal; never repeat an earlier command batch or manufacture cosmetic work to consume rounds."
       ]
     : agentRound
     ? [
@@ -564,7 +574,7 @@ export function buildSceneCommandUpdateUserMessage({
     );
   } else if (agentRound) {
     parts.push(
-      "Agent round: finish the request now when possible. If the scene already satisfies it, output # done only. If this round's mutating commands finish it, append # done after the commands in the same response. Use another round only when inspection or a genuinely separate stage is still required; never repeat work or create changes just to continue."
+      "Agent round: finish the request now when possible. If the scene already satisfies it, output # done only. A successfully applied mutating batch is final by default; append `# continue: <concrete remaining goal>` only when inspection or a genuinely separate stage is still required. Never repeat work or create changes just to continue."
     );
   } else {
     parts.push("Output ONLY the command script (micro DSL or JSONL).");

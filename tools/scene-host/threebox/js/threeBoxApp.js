@@ -419,15 +419,15 @@ async function main() {
     if (!agentResult?.agentUsed || !Array.isArray(agentResult.steps)) {
       return "";
     }
-    if (
-      agentResult.executionMode === "direct" &&
-      !agentResult.steps.some((step) =>
+    const noteworthy =
+      agentResult.completed === false ||
+      agentResult.steps.some((step) =>
         step.ok === false ||
-        step.kind === "execution_fallback" ||
-        step.kind === "repair" ||
+        /(?:repair|fallback|budget)/i.test(String(step.kind || "")) ||
         (step.kind === "capability_review" && step.attempt)
-      )
-    ) {
+      );
+    // Routine successful execution is product behavior, not a user-facing debug transcript.
+    if (!noteworthy) {
       return "";
     }
     const lines = agentResult.steps.slice(0, 10).map((step, index) => {
@@ -891,40 +891,11 @@ async function main() {
       }
       api.insertBeforeBody(textEl, api.buildJsonCollapse(outputSceneJsonString), sceneCard.el);
 
-      // Match handleGenerateTurn: title + recap start together, while the scene card is inserted
-      // and rendered immediately. A later title response only updates the card label/file name.
-      const digest = buildResultDigest(sceneJson);
-      const titlePromise =
-        settings.ai?.autoGenerateSceneTitle !== false
-          ? runThreeBoxGenerateSceneTitle({
-              userPrompt: text,
-              resultDigest: digest,
-              providerOptions,
-              responseLanguage: resolveSceneTitleLanguage(settings),
-              // Keeps adjustment titles consistent with the scene being adjusted (e.g.
-              // "SolarSystem" -> "SolarSystem_Rev1_ImprovedTextures") instead of generating an
-              // unrelated name each round — see generateSceneTitle's previousTitle doc.
-              previousTitle: targetTurn.sceneTitle || targetTurn.userPrompt
-            }).catch(() => "")
-          : Promise.resolve("");
-      const recapPromise =
-        settings.ai?.includeTurnSummary !== false
-          ? runThreeBoxSummary({
-              userPrompt: text,
-              mode: "adjust",
-              targetTurnId,
-              turnId,
-              resultDigest: digest,
-              providerOptions,
-              responseLanguage: resolveSummaryResponseLanguage(),
-              selfName: settings.ai?.selfName || "ThreeBox"
-            }).catch(() => "")
-          : Promise.resolve("");
-
-      const resolvedTitlePromise = titlePromise.then((title) => {
-        sceneCard.setLabel(title || text);
-        return title;
-      });
+      // Preserve the target title. An adjustment must not spend two extra model calls inventing a
+      // title and a prose recap from an object-count digest; that recap could claim a property
+      // changed even when the runtime exported an unchanged scene.
+      const sceneTitle = targetTurn.sceneTitle || targetTurn.userPrompt || text;
+      sceneCard.setLabel(sceneTitle);
       previewQueueOpen = false;
       void previewRenderQueue.catch((error) => {
         console.warn("[threebox] superseded adjustment preview render failed:", error);
@@ -932,18 +903,14 @@ async function main() {
       await sceneCard.finalize(outputSceneJson, { label: text });
       sceneCardsByTurnId.set(turnId, sceneCard);
 
-      const sceneTitle = await resolvedTitlePromise;
-
       let recap = "";
       if (settings.ai?.includeTurnSummary !== false) {
-        recap =
-          (await recapPromise) ||
-          t("threebox.app.defaultAdjustRecap", "已通过{stage}调整了场景。", { stage: stageResultLabel(result.stage) });
+        recap = t("threebox.app.defaultAdjustRecap", "已通过{stage}调整了场景。", {
+          stage: stageResultLabel(result.stage)
+        });
         api.appendToBody(
           textEl,
-          api.buildSummaryBlock(
-            t("threebox.app.adjustRecapWithMethod", "{recap}（方式：{stage}）", { recap, stage: stageResultLabel(result.stage) })
-          )
+          api.buildSummaryBlock(recap)
         );
       }
 

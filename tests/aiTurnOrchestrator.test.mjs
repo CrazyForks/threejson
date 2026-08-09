@@ -16,6 +16,16 @@ const SCENE = JSON.stringify({
   }]
 });
 
+const CHANGED_SCENE = JSON.stringify({
+  threeJsonId: "live-adjust-test",
+  objectList: [{
+    threeJsonId: "floor",
+    objType: "box",
+    geometry: { width: 10, height: 0.2, depth: 10 },
+    material: { color: "#336699" }
+  }]
+});
+
 test("image generation wires the same incremental draft command executor as text generation", async () => {
   const source = await readFile(
     new URL("../tools/scene-host/shared/js/aiTurnOrchestrator.js", import.meta.url),
@@ -41,9 +51,22 @@ test("bounded first generations skip a redundant classifier call while large req
     userPrompt: "生成一座包含四个分区、交通基础设施和数百栋建筑的城市",
     history: []
   }), null);
-  assert.equal(resolveImmediateDirectGeneration({
+  const adjust = resolveImmediateDirectGeneration({
     userPrompt: "把月球改成红色",
     history: [{ turnId: "earth", summary: "地月系统" }]
+  });
+  assert.equal(adjust?.intent, "adjust");
+  assert.equal(adjust?.targetTurnId, "earth");
+  const terseAdjust = resolveImmediateDirectGeneration({
+    userPrompt: "变成红色",
+    history: [{ turnId: "cube", summary: "蓝色立方体" }]
+  });
+  assert.equal(terseAdjust?.intent, "adjust");
+  assert.equal(terseAdjust?.targetTurnId, "cube");
+
+  assert.equal(resolveImmediateDirectGeneration({
+    userPrompt: "Create a new red sphere",
+    history: [{ turnId: "earth", summary: "Earth system" }]
   }), null);
 });
 
@@ -75,17 +98,57 @@ test("runAiAdjustTurn applies automatic rounds through host live-runtime callbac
         return { ok: true, sceneMutated: true };
       },
       refreshContext: async () => ({
-        currentSceneJsonString: SCENE,
-        fullSceneJson: SCENE,
+        currentSceneJsonString: CHANGED_SCENE,
+        fullSceneJson: CHANGED_SCENE,
         objectList: [{ threeJsonId: "floor", objType: "box" }]
       })
     });
 
     assert.equal(result.liveApplied, true);
     assert.equal(result.agentResult.completed, true);
-    assert.equal(result.agentResult.stopReason, "no_change");
+    assert.equal(result.agentResult.stopReason, "implicit_complete");
     assert.equal(applied.length, 1);
     assert.equal(result.commands.length, 1);
+    assert.equal(fetchMock.mock.calls.length, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("runAiAdjustTurn rejects a false command success and falls back to a verified JSON Patch", async () => {
+  const replies = [
+    'object.patch id=floor partial={"material":{"color":"#ff0000"}}',
+    JSON.stringify([{ op: "replace", path: "/objectList/0/material/color", value: "#ff0000" }])
+  ];
+  const fetchMock = mock.fn(async () => ({
+    ok: true,
+    async text() { return ""; },
+    async json() { return { choices: [{ message: { content: replies.shift() || "# done" } }] }; }
+  }));
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = fetchMock;
+  try {
+    const result = await runAiAdjustTurn({
+      userPrompt: "turn it red",
+      envelope: "turn it red",
+      targetSceneJsonString: SCENE,
+      providerOptions: { apiKey: "test-key", provider: "deepseek" },
+      agentOptions: { maxRefineRounds: 1 },
+      updateOutputMode: "commands",
+      resolveContextPayload: () => ({ objectList: [{ threeJsonId: "floor", objType: "box" }] }),
+      applyCommands: async () => ({ ok: true, sceneMutated: true }),
+      // Reproduce the original bug: command execution says ok, but the authoritative export did
+      // not change because a different canvas was mutated.
+      refreshContext: async () => ({
+        currentSceneJsonString: SCENE,
+        fullSceneJson: SCENE,
+        objectList: [{ threeJsonId: "floor", objType: "box" }]
+      })
+    });
+
+    assert.equal(result.stage, "json-incremental");
+    assert.equal(result.sceneJson.objectList[0].material.color, "#ff0000");
+    assert.equal(result.agentResult.stopReason, "json_patch_fallback");
     assert.equal(fetchMock.mock.calls.length, 2);
   } finally {
     globalThis.fetch = originalFetch;

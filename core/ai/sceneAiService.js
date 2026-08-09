@@ -1307,9 +1307,15 @@ async function requestUpdatedSceneEditCommands(prompt, context = {}, options = {
         selectedCapabilityIds: options.selectedCapabilityIds
       });
 
+  let finishReason = null;
+  const externalCompletionMetadata = options.onCompletionMetadata;
   const content = await requestChatCompletion({
     ...options,
     ...stripChatTransportOptions(options),
+    onCompletionMetadata: (metadata) => {
+      finishReason = metadata?.finishReason || null;
+      externalCompletionMetadata?.(metadata);
+    },
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userContent }
@@ -1329,7 +1335,8 @@ async function requestUpdatedSceneEditCommands(prompt, context = {}, options = {
         outputMode: "commands",
         commandScript: doneScript,
         commands: [],
-        rawContent: String(content || "")
+        rawContent: String(content || ""),
+        finishReason
       };
     }
   }
@@ -1400,7 +1407,8 @@ async function requestUpdatedSceneEditCommands(prompt, context = {}, options = {
       commandScript,
       commands,
       ok: true,
-      rawContent: content
+      rawContent: content,
+      finishReason
     };
   } catch (err) {
     return tryJsonFallback(String(err?.message || err));

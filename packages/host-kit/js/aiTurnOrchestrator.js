@@ -259,11 +259,30 @@ export async function classifyAiTurnIntent({ userPrompt, history }, providerOpti
  * inside core/ai without being regenerated wholesale.
  */
 export function resolveImmediateDirectGeneration({ userPrompt, history }, providerOptions = {}) {
-  if (Array.isArray(history) && history.length > 0) {
-    return null;
-  }
   const text = String(userPrompt || "").trim();
   if (!text || text.length > 280) {
+    return null;
+  }
+  const priorTurns = Array.isArray(history) ? history.filter((turn) => turn?.turnId) : [];
+  if (priorTurns.length > 0) {
+    const explicitlyNewScene = /(?:创建|生成|新建|重做|重新生成|另一个|全新)(?:一个|一座|一幅|新的)?|\b(?:create|generate|start|build)\b.{0,16}\b(?:new|another)\b|\bnew\s+scene\b/i.test(text);
+    const obviousAdjustment = /(?:^|[，。,.!！?？\s])(?:把|将|让|给|再|继续|改|变|换|设|调整|修改|添加|增加|删除|移除|替换|移动|旋转|缩放|放大|缩小|隐藏|显示)|(?:颜色|材质|位置|大小|尺寸|纹理|灯光|相机).{0,12}(?:改|变|换|设|调整)|\b(?:change|make|turn|set|recolor|adjust|modify|add|remove|delete|replace|move|rotate|resize|scale|hide|show|continue)\b/i.test(text);
+    if (!explicitlyNewScene && obviousAdjustment) {
+      const targetTurnId = priorTurns[priorTurns.length - 1].turnId;
+      const animationMode = providerOptions?.animationCapabilityMode;
+      return {
+        intent: "adjust",
+        targetTurnId,
+        note: "local fast path: obvious adjustment of latest scene",
+        classificationFailed: false,
+        generationStrategy: "single",
+        estimatedSegments: 1,
+        executionMode: "direct",
+        refinementGoals: [],
+        selectedCapabilityIds: undefined,
+        requiresAnimation: animationMode === "on" ? true : animationMode === "off" ? false : undefined
+      };
+    }
     return null;
   }
   const explicitlyLarge = /(?:very\s+large|massive|large[- ]scale|\bcomplex\b|\bmany\b|multi[- ]district|\bdistricts?\b|\bmetropolis\b|\bcity(?:scape)?\b|\binfrastructure\b|\bhundreds?\b|\bthousands?\b|\bevery\s+building\b|复杂|超大|巨型|大规模|大量|许多|众多|多区域|多个区域|分区|城市|基础设施|数百|上千|每栋建筑)/i.test(text);
@@ -380,6 +399,22 @@ function createCommandContextForRuntime(runtime) {
   });
 }
 
+function normalizedSceneJsonSignature(sceneJsonString) {
+  return JSON.stringify(parseSceneJsonString(String(sceneJsonString || "")));
+}
+
+function assertAdjustedSceneChanged(sceneJsonString, targetSceneJsonString, message) {
+  if (normalizedSceneJsonSignature(sceneJsonString) === normalizedSceneJsonSignature(targetSceneJsonString)) {
+    const error = new Error(message || "AI adjustment completed without changing the scene.");
+    error.code = "AI_ADJUST_NO_CHANGE";
+    throw error;
+  }
+}
+
+function isAbortOrTurnTimeout(error, signal) {
+  return signal?.aborted || error?.name === "AbortError" || error?.code === "AI_TURN_TIMEOUT";
+}
+
 async function runAiAgentAdjustTurn({
   userPrompt,
   envelope,
@@ -433,6 +468,11 @@ async function runAiAgentAdjustTurn({
         signal,
         onProgress: onAgentProgress
       }
+    );
+    assertAdjustedSceneChanged(
+      result.sceneJsonString,
+      targetSceneJsonString,
+      "AI JSON adjustment returned the original scene unchanged."
     );
     return {
       stage: mode.stage,
@@ -496,12 +536,22 @@ async function runAiAgentAdjustTurn({
       }
     );
     if (result.outputMode === "json") {
+      assertAdjustedSceneChanged(
+        result.sceneJsonString,
+        targetSceneJsonString,
+        "Agent JSON adjustment returned the original scene unchanged."
+      );
       return {
         stage: "json-full",
         sceneJson: parseSceneJsonString(result.sceneJsonString),
         sceneJsonString: result.sceneJsonString,
         agentResult: result
       };
+    }
+    if (result.execOk === false) {
+      const error = new Error("Agent commands did not produce a verified scene mutation.");
+      error.code = "AI_ADJUST_NO_CHANGE";
+      throw error;
     }
     if (!result.skipFinalExec && Array.isArray(result.commands) && result.commands.length) {
       const applied = await applyCommands(result.commands);
@@ -514,6 +564,11 @@ async function runAiAgentAdjustTurn({
       finalContext?.currentSceneJsonString ||
       finalContext?.fullSceneJson ||
       latestSceneJsonString
+    );
+    assertAdjustedSceneChanged(
+      sceneJsonString,
+      targetSceneJsonString,
+      "Agent commands reported success, but the resulting scene JSON is unchanged."
     );
     return {
       stage: "commands",
@@ -679,24 +734,93 @@ export async function runAiAdjustTurn({
   // and a full-scene rewrite only as a last resort (see core/ai/sceneAgent.js). The model can
   // complete the request in its first response; additional calls happen only while it returns a
   // concrete, non-repeated change. The numeric setting below is solely a runaway guard.
-  return runAiAgentAdjustTurn({
-    userPrompt,
-    envelope,
-    targetSceneJsonString,
-    providerOptions,
-    agentOptions,
-    updateOutputMode,
-    resolveContextPayload,
-    onAgentProgress,
-    locale,
-    capabilityLookup,
-    onlineTextureHints,
-    selectedCapabilityIds,
-    animationCapabilities,
-    generationStrategy,
-    estimatedSegments,
-    applyCommands,
-    refreshContext,
-    signal
-  });
+  try {
+    return await runAiAgentAdjustTurn({
+      userPrompt,
+      envelope,
+      targetSceneJsonString,
+      providerOptions,
+      agentOptions,
+      updateOutputMode,
+      resolveContextPayload,
+      onAgentProgress,
+      locale,
+      capabilityLookup,
+      onlineTextureHints,
+      selectedCapabilityIds,
+      animationCapabilities,
+      generationStrategy,
+      estimatedSegments,
+      applyCommands,
+      refreshContext,
+      signal
+    });
+  } catch (commandError) {
+    if (isAbortOrTurnTimeout(commandError, signal)) {
+      throw commandError;
+    }
+    const commonFallbackOptions = {
+      ...providerOptions,
+      stream: true,
+      onDelta,
+      signal,
+      resolveReferenceUrl: resolveSceneAiReferenceUrl,
+      capabilityLookup,
+      onlineTextureHints,
+      selectedCapabilityIds,
+      animationCapabilities,
+      locale
+    };
+    try {
+      const { sceneJsonString, patch } = await requestUpdatedSceneJsonString(
+        userPrompt,
+        targetSceneJsonString,
+        { ...commonFallbackOptions, updateMode: "incremental", includePatch: true }
+      );
+      if (normalizedSceneJsonSignature(sceneJsonString) !== normalizedSceneJsonSignature(targetSceneJsonString)) {
+        return {
+          stage: "json-incremental",
+          patch,
+          sceneJson: parseSceneJsonString(sceneJsonString),
+          sceneJsonString,
+          agentResult: {
+            agentUsed: true,
+            completed: true,
+            stopReason: "json_patch_fallback",
+            steps: [
+              { kind: "commands", ok: false, error: String(commandError?.message || commandError) },
+              { kind: "json_patch_fallback", ok: true }
+            ]
+          }
+        };
+      }
+    } catch (patchError) {
+      if (isAbortOrTurnTimeout(patchError, signal)) throw patchError;
+    }
+
+    const sceneJsonString = await requestUpdatedSceneJsonString(
+      userPrompt,
+      targetSceneJsonString,
+      { ...commonFallbackOptions, updateMode: "full" }
+    );
+    if (normalizedSceneJsonSignature(sceneJsonString) === normalizedSceneJsonSignature(targetSceneJsonString)) {
+      const error = new Error("AI adjustment completed without changing the scene.");
+      error.code = "AI_ADJUST_NO_CHANGE";
+      throw error;
+    }
+    return {
+      stage: "json-full",
+      sceneJson: parseSceneJsonString(sceneJsonString),
+      sceneJsonString,
+      agentResult: {
+        agentUsed: true,
+        completed: true,
+        stopReason: "json_full_fallback",
+        steps: [
+          { kind: "commands", ok: false, error: String(commandError?.message || commandError) },
+          { kind: "json_full_fallback", ok: true }
+        ]
+      }
+    };
+  }
 }

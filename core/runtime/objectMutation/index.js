@@ -25,12 +25,16 @@ function ensureDescriptor(object3D) {
   return descriptor;
 }
 
-function resolveById(threeJsonId) {
+function resolveById(threeJsonId, runtimeScope = null) {
   const id = String(threeJsonId ?? "").trim();
   if (!id) {
     return { ok: false, error: "threeJsonId is required." };
   }
-  const object3D = getObjectByThreeJsonId(id);
+  // Multi-canvas hosts (ThreeBox keeps one live RuntimeContext per turn card, plus temporary
+  // offscreen runtimes) routinely contain the same stable threeJsonId in several scenes. Always
+  // honor the command/event caller's scene scope; falling back to the most recently attached
+  // RuntimeContext can report success while mutating a different card.
+  const object3D = getObjectByThreeJsonId(id, runtimeScope);
   if (!object3D) {
     return { ok: false, error: `Object not found for threeJsonId "${id}".` };
   }
@@ -279,7 +283,7 @@ function mergeDescriptorPartial(target, partial) {
 }
 
 function applyObjectPartial(threeJsonId, partial, options = {}) {
-  const base = resolveById(threeJsonId);
+  const base = resolveById(threeJsonId, options.runtimeScope || options.scene);
   if (!base.ok) {
     return mutationResult(base);
   }
@@ -302,7 +306,7 @@ function applyObjectPartial(threeJsonId, partial, options = {}) {
 }
 
 async function applyObjectPartialAsync(threeJsonId, partial, options = {}) {
-  const base = resolveById(threeJsonId);
+  const base = resolveById(threeJsonId, options.runtimeScope || options.scene);
   if (!base.ok) {
     return mutationResult(base);
   }
@@ -325,7 +329,7 @@ async function applyObjectPartialAsync(threeJsonId, partial, options = {}) {
 }
 
 function applyObjectChange(threeJsonId, path, value, options = {}) {
-  const base = resolveById(threeJsonId);
+  const base = resolveById(threeJsonId, options.runtimeScope || options.scene);
   if (!base.ok) {
     return mutationResult(base);
   }
@@ -360,7 +364,7 @@ function applyObjectChange(threeJsonId, path, value, options = {}) {
 }
 
 async function applyObjectChangeAsync(threeJsonId, path, value, options = {}) {
-  const base = resolveById(threeJsonId);
+  const base = resolveById(threeJsonId, options.runtimeScope || options.scene);
   if (!base.ok) {
     return mutationResult(base);
   }
@@ -394,8 +398,8 @@ async function applyObjectChangeAsync(threeJsonId, path, value, options = {}) {
   });
 }
 
-function captureObjectSnapshot(threeJsonId) {
-  const base = resolveById(threeJsonId);
+function captureObjectSnapshot(threeJsonId, options = {}) {
+  const base = resolveById(threeJsonId, options.runtimeScope || options.scene);
   if (!base.ok) {
     return null;
   }
@@ -403,7 +407,7 @@ function captureObjectSnapshot(threeJsonId) {
 }
 
 function applyObjectSnapshot(threeJsonId, snapshot, options = {}) {
-  const base = resolveById(threeJsonId);
+  const base = resolveById(threeJsonId, options.runtimeScope || options.scene);
   if (!base.ok) {
     return mutationResult(base);
   }
@@ -427,7 +431,7 @@ function applyObjectSnapshot(threeJsonId, snapshot, options = {}) {
 }
 
 async function applyObjectSnapshotAsync(threeJsonId, snapshot, options = {}) {
-  const base = resolveById(threeJsonId);
+  const base = resolveById(threeJsonId, options.runtimeScope || options.scene);
   if (!base.ok) {
     return mutationResult(base);
   }
@@ -450,8 +454,8 @@ async function applyObjectSnapshotAsync(threeJsonId, snapshot, options = {}) {
   return mutationResult(base, { needsRedeploy, object3D: redeployed || base.object3D });
 }
 
-function getObjectField(threeJsonId, path) {
-  const base = resolveById(threeJsonId);
+function getObjectField(threeJsonId, path, options = {}) {
+  const base = resolveById(threeJsonId, options.runtimeScope || options.scene);
   if (!base.ok) {
     return undefined;
   }

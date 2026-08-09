@@ -107,15 +107,14 @@ function buildAgentProcessSummary(agentResult, heading, budgetMessage) {
   if (!agentResult?.agentUsed || !Array.isArray(agentResult.steps)) {
     return "";
   }
-  if (
-    agentResult.executionMode === "direct" &&
-    !agentResult.steps.some((step) =>
+  const noteworthy =
+    agentResult.completed === false ||
+    agentResult.steps.some((step) =>
       step.ok === false ||
-      step.kind === "execution_fallback" ||
-      step.kind === "repair" ||
+      /(?:repair|fallback|budget)/i.test(String(step.kind || "")) ||
       (step.kind === "capability_review" && step.attempt)
-    )
-  ) {
+    );
+  if (!noteworthy) {
     return "";
   }
   const lines = agentResult.steps.slice(0, 10).map((step, index) => {
@@ -848,13 +847,17 @@ export function App() {
 
         setStream("");
         const snapshot = sceneJsonString ?? JSON.stringify(sceneJson);
+        const verifiedAdjustSummary = adjusting && settings.ai.includeTurnSummary
+          ? L(`已通过 ${stage} 调整了场景。`, `Adjusted the scene via ${stage}.`)
+          : "";
         const turnRecord = await history.appendTurn(conversationId, {
           userPrompt,
           mode: adjusting ? "adjust" : "generate",
           targetTurnId: adjusting ? shownTurnId : undefined,
           stage,
           sceneJson: snapshot,
-          sceneTitle: ""
+          sceneTitle: "",
+          recapSummary: verifiedAdjustSummary
         });
         const baseText = adjusting ? L(`场景已调整（${stage}）。`, `Scene adjusted (${stage}).`) : L("场景已生成。", "Scene generated.");
         // Only show a recap when adaptive execution actually performed meaningful extra work.
@@ -875,7 +878,8 @@ export function App() {
           diff,
           label: userPrompt,
           turnId: turnRecord?.id ?? null,
-          mode: adjusting ? "adjust" : "generate"
+          mode: adjusting ? "adjust" : "generate",
+          summary: verifiedAdjustSummary || undefined
         };
         // The card was appended early and streamed drafts (see above) — finalize it in place so
         // the last draft is superseded by the real result.
@@ -885,10 +889,9 @@ export function App() {
         // Debounced push to the user's self-hosted sync server (no-op unless configured).
         selfHostedSync.scheduleSync();
 
-        // Scene title + recap are independent, best-effort AI calls that both only need the result
-        // digest. They must never block the visible scene card (the original shows the canvas first
-        // and fills these in when they arrive), so fire them detached and patch the message/turn.
-        if (settings.ai.autoGenerateSceneTitle || settings.ai.includeTurnSummary) {
+        // Generation title/recap remain best-effort background calls. Adjustments use the verified
+        // stage above instead of asking another model call to guess what changed from a thin digest.
+        if (!adjusting && (settings.ai.autoGenerateSceneTitle || settings.ai.includeTurnSummary)) {
           const digest = buildResultDigest(sceneJson);
           const providerOptions = resolved.options;
           const turnMode = adjusting ? "adjust" : "generate";

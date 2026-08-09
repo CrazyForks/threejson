@@ -14,7 +14,12 @@ import {
   getCommandSpec,
   getCommandHelp
 } from "../core/command/index.js";
-import { clearObjectRegistry } from "../core/handler/objectRegistry.js";
+import {
+  clearObjectRegistry,
+  getObjectByThreeJsonId,
+  registerObject
+} from "../core/handler/objectRegistry.js";
+import { attachRuntimeContext, createRuntimeContext } from "../core/runtime/runtimeContext.js";
 
 function buildBoxDescriptor(overrides = {}) {
   return {
@@ -256,6 +261,91 @@ test("material.patch updates descriptor material color", async () => {
   });
   assert.equal(got.data.value, "#112233");
   clearObjectRegistry();
+});
+
+test("material.patch stays inside ctx.scene when concurrent scenes reuse one threeJsonId", async () => {
+  const sceneA = new THREE.Scene();
+  const sceneB = new THREE.Scene();
+  const runtimeA = createRuntimeContext();
+  const runtimeB = createRuntimeContext();
+  attachRuntimeContext(sceneA, runtimeA);
+  attachRuntimeContext(sceneB, runtimeB);
+  const ctxA = createCommandContext({ scene: sceneA });
+  const descriptor = (color) => buildBoxDescriptor({
+    threeJsonId: "shared-cube",
+    name: "shared-cube",
+    material: { type: "standard", color }
+  });
+  const mount = (scene, color) => {
+    const record = descriptor(color);
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshStandardMaterial({ color })
+    );
+    mesh.name = record.name;
+    scene.add(mesh);
+    registerObject(mesh, record, { recursive: false }, scene);
+    return mesh;
+  };
+  try {
+    const meshA = mount(sceneA, "#0000ff");
+    const meshB = mount(sceneB, "#00ff00");
+
+    const patched = await executeCommand(ctxA, {
+      op: "material.patch",
+      args: { id: "shared-cube", partial: { color: "#ff0000" } }
+    });
+    assert.equal(patched.ok, true);
+    assert.equal(meshA.userData.objJson.material.color, "#ff0000");
+    assert.equal(meshA.material.color.getHexString(), "ff0000");
+    assert.equal(meshB.userData.objJson.material.color, "#00ff00");
+    assert.equal(meshB.material.color.getHexString(), "00ff00");
+  } finally {
+    runtimeA.dispose();
+    runtimeB.dispose();
+  }
+});
+
+test("object.add registers in ctx.scene even when a newer scene already owns the same id", async () => {
+  const sceneA = new THREE.Scene();
+  const sceneB = new THREE.Scene();
+  const runtimeA = createRuntimeContext();
+  const runtimeB = createRuntimeContext();
+  attachRuntimeContext(sceneA, runtimeA);
+  attachRuntimeContext(sceneB, runtimeB); // Deliberately make B the global fallback.
+  const existingRecord = buildBoxDescriptor({
+    threeJsonId: "same-new-id",
+    name: "existing-in-b",
+    material: { type: "standard", color: "#00ff00" }
+  });
+  const existingInB = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshStandardMaterial({ color: "#00ff00" })
+  );
+  sceneB.add(existingInB);
+  registerObject(existingInB, existingRecord, { recursive: false }, sceneB);
+
+  try {
+    const added = await executeCommand(createCommandContext({ scene: sceneA }), {
+      op: "object.add",
+      args: {
+        descriptor: buildBoxDescriptor({
+          threeJsonId: "same-new-id",
+          name: "new-in-a",
+          material: { type: "standard", color: "#ff0000" }
+        })
+      }
+    });
+    assert.equal(added.ok, true);
+    const addedInA = getObjectByThreeJsonId("same-new-id", sceneA);
+    assert.ok(addedInA);
+    assert.notEqual(addedInA, existingInB);
+    assert.equal(addedInA.userData.objJson.name, "new-in-a");
+    assert.equal(getObjectByThreeJsonId("same-new-id", sceneB), existingInB);
+  } finally {
+    runtimeA.dispose();
+    runtimeB.dispose();
+  }
 });
 
 test("object.reconcile writes transform back to descriptor", async () => {

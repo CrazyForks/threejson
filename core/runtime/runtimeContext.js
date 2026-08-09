@@ -78,6 +78,11 @@ let defaultContext = null;
  */
 let lastAttachedContext = null;
 
+// Explicit fallback used only while a builder synchronously creates/registers an Object3D before
+// attaching it to its target scene. This avoids resolving that unattached object through an
+// unrelated lastAttachedContext on multi-canvas pages.
+const synchronousContextStack = [];
+
 /**
  * Fixed dispose order: event mechanism -> animation registries -> deploy scheduler
  * -> asset/texture caches -> tracked resources -> remaining indices. Each phase of
@@ -248,7 +253,9 @@ function isRuntimeContext(value) {
  */
 function resolveRuntimeContext(sceneOrObjectOrCtx) {
   if (!sceneOrObjectOrCtx) {
-    return lastAttachedContext ?? getOrCreateDefaultRuntimeContext();
+    return synchronousContextStack[synchronousContextStack.length - 1] ??
+      lastAttachedContext ??
+      getOrCreateDefaultRuntimeContext();
   }
   if (isRuntimeContext(sceneOrObjectOrCtx)) {
     return sceneOrObjectOrCtx;
@@ -268,12 +275,33 @@ function resolveRuntimeContext(sceneOrObjectOrCtx) {
     }
     node = node.parent ?? null;
   }
-  return lastAttachedContext ?? getOrCreateDefaultRuntimeContext();
+  return synchronousContextStack[synchronousContextStack.length - 1] ??
+    lastAttachedContext ??
+    getOrCreateDefaultRuntimeContext();
+}
+
+/**
+ * Run the synchronous portion of object creation with an explicit fallback RuntimeContext.
+ * The scope ends as soon as callback returns, including when it returns a Promise, so unrelated
+ * asynchronous asset loads never share mutable ambient state.
+ */
+function runWithRuntimeContextScope(runtimeScope, callback) {
+  if (typeof callback !== "function") {
+    throw new TypeError("runWithRuntimeContextScope requires a callback.");
+  }
+  const ctx = resolveRuntimeContext(runtimeScope);
+  synchronousContextStack.push(ctx);
+  try {
+    return callback(ctx);
+  } finally {
+    synchronousContextStack.pop();
+  }
 }
 
 /** @internal test-only: force-reset the default context */
 function _resetDefaultRuntimeContextForTests() {
   defaultContext = null;
+  synchronousContextStack.length = 0;
 }
 
 export {
@@ -282,6 +310,7 @@ export {
   attachRuntimeContext,
   detachRuntimeContext,
   resolveRuntimeContext,
+  runWithRuntimeContextScope,
   isRuntimeContext,
   _resetDefaultRuntimeContextForTests
 };

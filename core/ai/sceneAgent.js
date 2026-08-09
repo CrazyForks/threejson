@@ -29,7 +29,8 @@ import {
   buildSceneCommandUpdateUserMessage,
   commandListHasMutatingOp,
   commandListIsEmptyOrCommentsOnly,
-  commandScriptIndicatesDone
+  commandScriptIndicatesDone,
+  commandScriptRequestsContinuation
 } from "./sceneCommandSkill.js";
 import {
   validateSceneJsonWithNormalizer,
@@ -125,6 +126,10 @@ function isSceneOutputLimitError(error) {
   return /output limit|not completed after .*segments|maximum output|token limit/i.test(
     String(error?.message || error || "")
   );
+}
+
+function completionReasonIndicatesCutoff(reason) {
+  return /length|max[_ -]?tokens?|token[_ -]?limit|incomplete|truncat/i.test(String(reason || ""));
 }
 
 const KNOWN_PLANET_TEXTURES = Object.freeze([
@@ -651,6 +656,7 @@ async function runSceneAgentCommandsUpdateIterative(params) {
       continue;
     }
 
+    const priorRoundError = lastError;
     lastRawContent = String(commandResult.rawContent || commandResult.commandScript || "");
     lastError = "";
 
@@ -682,7 +688,17 @@ async function runSceneAgentCommandsUpdateIterative(params) {
 
     const commands = commandResult.commands;
     const modelSaysDone = commandScriptIndicatesDone(lastRawContent);
+    const modelRequestsContinuation = commandScriptRequestsContinuation(lastRawContent);
+    const responseWasCutOff = completionReasonIndicatesCutoff(commandResult.finishReason);
     if (commandListIsEmptyOrCommentsOnly(commands) && modelSaysDone) {
+      // Do not let a follow-up `# done` erase evidence that the preceding command batch reported
+      // success but left the exported scene unchanged. Give the model another repair opportunity;
+      // if the guard is exhausted the caller will enter its verified JSON-Patch/full-JSON fallback.
+      if (priorRoundError && appliedRounds === 0) {
+        lastError = priorRoundError;
+        steps.push({ kind: "refine_done", round: refineRound, ok: false, error: priorRoundError });
+        continue;
+      }
       steps.push({ kind: "refine_done", round: refineRound, ok: true, appliedRounds });
       return {
         outputMode: "commands",
@@ -747,38 +763,51 @@ async function runSceneAgentCommandsUpdateIterative(params) {
       continue;
     }
 
-    appliedCommands.push(...commands);
     if (applied.objectGetFeedback) {
       baseContext.objectGetFeedback = [baseContext.objectGetFeedback, applied.objectGetFeedback]
         .filter(Boolean)
         .join("\n\n");
     }
 
-    if (!readOnly) {
-      previousMutatingSignature = mutatingSignature;
-      appliedRounds += 1;
-      anySceneMutated = anySceneMutated || applied.sceneMutated === true;
-      emitProgress(
-        {
-          step: getStepIndex(),
-          kind: "commands_applied",
-          round: refineRound,
-          message: `Applied round ${refineRound} to scene.`,
-          sceneMutated: applied.sceneMutated === true
-        },
-        onProgress
-      );
-    }
-
     const fresh = await refreshContext();
     if (fresh && typeof fresh === "object") {
       Object.assign(baseContext, fresh);
     }
-    const sceneUnchanged =
-      !readOnly &&
-      typeof baseContext.currentSceneJsonString === "string" &&
+    const hasFreshSceneJson = typeof baseContext.currentSceneJsonString === "string";
+    const sceneUnchanged = !readOnly && hasFreshSceneJson &&
       normalizedSceneSignature(baseContext.currentSceneJsonString) === sceneSignatureBeforeApply;
-    if (!readOnly && typeof baseContext.currentSceneJsonString === "string") {
+    const verifiedSceneMutation = !readOnly && (
+      hasFreshSceneJson ? !sceneUnchanged : applied.sceneMutated === true
+    );
+
+    if (readOnly) {
+      steps.push({ kind: "explore", round: refineRound, ok: true, count: commands.length });
+      continue;
+    }
+
+    if (!verifiedSceneMutation) {
+      previousMutatingSignature = mutatingSignature;
+      lastError = "The command batch reported success, but the refreshed scene JSON did not change.";
+      steps.push({ kind: "refine_apply", round: refineRound, ok: false, count: commands.length, error: lastError });
+      continue;
+    }
+
+    previousMutatingSignature = mutatingSignature;
+    appliedRounds += 1;
+    anySceneMutated = true;
+    appliedCommands.push(...commands);
+    emitProgress(
+      {
+        step: getStepIndex(),
+        kind: "commands_applied",
+        round: refineRound,
+        message: `Applied round ${refineRound} to scene.`,
+        sceneMutated: true
+      },
+      onProgress
+    );
+
+    if (hasFreshSceneJson) {
       emitStagePreview({
         sceneJsonString: baseContext.currentSceneJsonString,
         onProgress,
@@ -787,37 +816,18 @@ async function runSceneAgentCommandsUpdateIterative(params) {
         stage: "adjustment_refinement",
         round: refineRound,
         maxRounds: maxRefineRounds,
-        commands: readOnly ? undefined : commands,
+        commands,
         outputMode: commandResult.outputMode,
         message: `Adjustment refinement preview ${refineRound}.`
       });
     }
 
     steps.push({
-      kind: readOnly ? "explore" : "refine_apply",
+      kind: "refine_apply",
       round: refineRound,
       ok: true,
       count: commands.length
     });
-
-    if (sceneUnchanged && !modelSaysDone) {
-      steps.push({ kind: "refine_done", round: refineRound, ok: true, appliedRounds, reason: "no_change" });
-      return {
-        outputMode: "commands",
-        commandScript: commandResult.commandScript,
-        commands: appliedCommands,
-        steps,
-        agentUsed: true,
-        iterativeApplied: true,
-        skipFinalExec: true,
-        appliedRounds,
-        sceneMutated: anySceneMutated,
-        execOk: true,
-        completed: true,
-        stopReason: "no_change",
-        tokenHint: { rounds: getStepIndex(), depth, maxSteps: preset.maxSteps }
-      };
-    }
 
     if (modelSaysDone) {
       return {
@@ -833,6 +843,24 @@ async function runSceneAgentCommandsUpdateIterative(params) {
         execOk: appliedRounds > 0,
         completed: true,
         stopReason: "model_done",
+        tokenHint: { rounds: getStepIndex(), depth, maxSteps: preset.maxSteps }
+      };
+    }
+
+    if (!modelRequestsContinuation && !responseWasCutOff) {
+      return {
+        outputMode: "commands",
+        commandScript: commandResult.commandScript,
+        commands: appliedCommands,
+        steps,
+        agentUsed: true,
+        iterativeApplied: true,
+        skipFinalExec: true,
+        appliedRounds,
+        sceneMutated: true,
+        execOk: true,
+        completed: true,
+        stopReason: "implicit_complete",
         tokenHint: { rounds: getStepIndex(), depth, maxSteps: preset.maxSteps }
       };
     }

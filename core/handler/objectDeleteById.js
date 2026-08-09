@@ -129,7 +129,7 @@ function removeObjectByThreeJsonIdCore(scene, threeJsonId, options = {}) {
     return { ok: false, error: "threeJsonId is required.", threeJsonId: "", object3D: null };
   }
 
-  const object3D = getObjectByThreeJsonId(id);
+  const object3D = getObjectByThreeJsonId(id, scene);
   if (!object3D) {
     return { ok: false, error: `Object not found for threeJsonId "${id}".`, threeJsonId: id, object3D: null };
   }
@@ -203,7 +203,7 @@ async function removeObjectByThreeJsonIdCoreAsync(scene, threeJsonId, options = 
     return { ok: false, error: "threeJsonId is required.", threeJsonId: "", object3D: null };
   }
 
-  const object3D = getObjectByThreeJsonId(id);
+  const object3D = getObjectByThreeJsonId(id, scene);
   if (!object3D) {
     return { ok: false, error: `Object not found for threeJsonId "${id}".`, threeJsonId: id, object3D: null };
   }

@@ -54,7 +54,7 @@ function resolveAttachParent(scene, parentOption) {
     if (!key) {
       return { ok: false, error: "parent threeJsonId is empty." };
     }
-    const object3D = getObjectByThreeJsonId(key);
+    const object3D = getObjectByThreeJsonId(key, scene);
     if (!object3D) {
       return { ok: false, error: `Parent not found for threeJsonId "${key}".` };
     }
@@ -127,14 +127,14 @@ function addObjectFromDescriptor(scene, descriptor, options = {}) {
   if (!threeJsonId) {
     return commandResult({ ok: false, error: "threeJsonId could not be assigned." });
   }
-  if (getObjectByThreeJsonId(threeJsonId)) {
+  if (getObjectByThreeJsonId(threeJsonId, scene)) {
     return commandResult({ ok: false, error: `duplicate threeJsonId "${threeJsonId}".` });
   }
 
   const deployOpts = buildDeployOptions(scene, options);
   let object3D = deployJsonObject(parentRes.root, record, deployOpts);
   if (!object3D) {
-    object3D = getObjectByThreeJsonId(threeJsonId);
+    object3D = getObjectByThreeJsonId(threeJsonId, scene);
   }
 
   maybeMarkDirty(record, options);
@@ -174,13 +174,13 @@ async function addObjectFromDescriptorAsync(scene, descriptor, options = {}) {
   if (!threeJsonId) {
     return commandResult({ ok: false, error: "threeJsonId could not be assigned." });
   }
-  if (getObjectByThreeJsonId(threeJsonId)) {
+  if (getObjectByThreeJsonId(threeJsonId, scene)) {
     return commandResult({ ok: false, error: `duplicate threeJsonId "${threeJsonId}".` });
   }
 
   const deployOpts = buildDeployOptions(scene, options);
   await deployJsonObjectAsync(parentRes.root, record, deployOpts);
-  const object3D = getObjectByThreeJsonId(threeJsonId);
+  const object3D = getObjectByThreeJsonId(threeJsonId, scene);
 
   maybeMarkDirty(record, options);
 

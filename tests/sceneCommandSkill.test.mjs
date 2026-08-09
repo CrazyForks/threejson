@@ -9,6 +9,7 @@ import {
   batchResultsHaveSuccessfulAdjustment,
   commandListHasMutatingOp,
   commandScriptIndicatesDone,
+  commandScriptRequestsContinuation,
   detectAssemblyParentWarnings,
   extractCommandScriptText,
   isLikelyCommandScriptText,
@@ -83,7 +84,8 @@ test("buildSceneCommandAutoUpdateSystemPrompt distinguishes agent vs single roun
   const iterative = buildSceneCommandAutoUpdateSystemPrompt({ iterativeApply: true });
   assert.ok(iterative.includes("iterative apply"));
   assert.ok(iterative.includes("# done"));
-  assert.match(iterative, /append a final `# done` line in the SAME response/);
+  assert.match(iterative, /successful mutating batch is treated as complete/);
+  assert.match(iterative, /# continue: <concrete remaining goal>/);
   assert.doesNotMatch(iterative, /MUST end with mutating commands or full scene JSON/);
 });
 
@@ -142,6 +144,12 @@ test("buildSceneCommandUpdateUserMessage uses spatial cards instead of thin obje
   assert.equal(message.includes("hidden"), false);
 });
 
+test("commandScriptRequestsContinuation requires an explicit continuation marker", () => {
+  assert.equal(commandScriptRequestsContinuation("object.patch id=a partial={}"), false);
+  assert.equal(commandScriptRequestsContinuation("object.patch id=a partial={}\n# continue: inspect lighting"), true);
+  assert.equal(commandScriptRequestsContinuation("# done"), false);
+});
+
 test("agent user message permits immediate done instead of forcing another mutation", () => {
   const message = buildSceneCommandUpdateUserMessage({
     modificationRequest: "polish the scene",
@@ -150,7 +158,8 @@ test("agent user message permits immediate done instead of forcing another mutat
     agentRound: true
   });
   assert.match(message, /already satisfies it, output # done only/);
-  assert.match(message, /append # done after the commands in the same response/);
+  assert.match(message, /successfully applied mutating batch is final by default/);
+  assert.match(message, /# continue: <concrete remaining goal>/);
   assert.doesNotMatch(message, /End the session with mutating commands or full scene JSON/);
 });
 
