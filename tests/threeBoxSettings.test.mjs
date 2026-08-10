@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 
 import {
+  THREEBOX_SETTINGS_FIELDS,
   THREEBOX_SETTINGS_DEFAULTS,
   THREEBOX_SETTINGS_STORAGE_KEY
 } from "../tools/scene-host/threebox/js/threeBoxSettingsSchema.js";
@@ -45,6 +46,14 @@ test("ThreeBox defaults remember API keys locally", () => {
   assert.equal(THREEBOX_SETTINGS_DEFAULTS.io.showMeshExportWarnings, true);
   assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.maxAutoRefineRounds, 6);
   assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.agentPolicyVersion, 2);
+  assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.sceneGenerationMode, "auto");
+  const generationModeField = THREEBOX_SETTINGS_FIELDS.find(
+    (field) => field.path === "ai.sceneGenerationMode"
+  );
+  assert.deepEqual(
+    generationModeField?.options?.map(([value]) => value),
+    ["auto", "direct", "draft_refine"]
+  );
   const settings = loadThreeBoxSettingsBundle();
   assert.equal(settings.ai.rememberKeys, true);
   assert.equal(settings.ai.animationCapabilityMode, "auto");
@@ -55,6 +64,21 @@ test("ThreeBox defaults remember API keys locally", () => {
   assert.equal(settings.io.showMeshExportWarnings, true);
   assert.equal(settings.ai.maxAutoRefineRounds, 6);
   assert.equal(settings.ai.agentPolicyVersion, 2);
+  assert.equal(settings.ai.sceneGenerationMode, "auto");
+});
+
+test("ThreeBox persists valid generation modes and repairs invalid cached values", () => {
+  const store = installMemoryLocalStorage();
+  persistThreeBoxSettings({
+    ai: { sceneGenerationMode: "draft_refine", providers: [], rememberKeys: true }
+  });
+  assert.equal(loadThreeBoxSettingsBundle().ai.sceneGenerationMode, "draft_refine");
+
+  store.set(
+    THREEBOX_SETTINGS_STORAGE_KEY,
+    JSON.stringify({ ai: { sceneGenerationMode: "legacy-always-refine" } })
+  );
+  assert.equal(loadThreeBoxSettingsBundle().ai.sceneGenerationMode, "auto");
 });
 
 test("ThreeBox migrates the legacy always-refine limit away from 20", () => {

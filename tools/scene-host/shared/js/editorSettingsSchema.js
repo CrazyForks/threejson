@@ -150,6 +150,7 @@ export const EDITOR_SETTINGS_DEFAULTS = {
       maxAutoRefineRounds: 6,
       agentPolicyVersion: 2,
       agentFitViewEachRound: false,
+      sceneGenerationMode: "auto",
       incrementalUpdate: false,
       updateOutputMode: "auto",
       includeFullJson: false,
@@ -815,6 +816,17 @@ export const EDITOR_SETTINGS_FIELDS = [
       testEndpoint: "builtinBackend"
     },
     { section: "ai", path: "ai.agentFitViewEachRound", type: "checkbox", label: "每轮变更后自适应取景" },
+    {
+      section: "ai",
+      path: "ai.sceneGenerationMode",
+      type: "select",
+      label: "场景生成方式",
+      options: [
+        { value: "auto", label: "自动（由 AI 判断）" },
+        { value: "direct", label: "完整生成" },
+        { value: "draft_refine", label: "增量构建" }
+      ]
+    },
     {
       section: "ai",
       path: "ai.maxAutoRefineRounds",

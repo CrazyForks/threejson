@@ -12,6 +12,7 @@ test("ThreeBox negotiates generate versus adjust from conversation context", asy
   assert.match(source, /resolveThreeBoxNegotiatedRoute\(classified, priorTurns\)/);
   assert.match(source, /userPrompt: t\.userPrompt/);
   assert.match(source, /sceneTitle: t\.sceneTitle/);
+  assert.match(source, /const sceneGenerationMode = settings\.ai\?\.sceneGenerationMode \|\| "auto"/);
 });
 
 test("Editor keeps intent explicit while generation still negotiates execution and capabilities", async () => {
@@ -22,6 +23,7 @@ test("Editor keeps intent explicit while generation still negotiates execution a
   assert.match(generateSource, /runAiGenerateTurn\(/);
   assert.match(generateSource, /classifyAiTurnIntent\(/);
   assert.match(generateSource, /executionMode:\s*negotiation\.executionMode/);
+  assert.match(generateSource, /sceneGenerationMode:\s*host\.getEditorSettings\(\)\?\.ai\?\.sceneGenerationMode/);
   assert.match(generateSource, /requiresAnimation:\s*negotiation\.requiresAnimation/);
   assert.match(adjustSource, /runAiAdjustTurn\(/);
   assert.doesNotMatch(adjustSource, /classifyAiTurnIntent|classifyTurnIntent/);

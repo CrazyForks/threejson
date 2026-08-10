@@ -137,6 +137,9 @@ export async function loadEditorSettingsBundle() {
   const fileDefaults = await fetchEditorSettingsFileDefaults();
   const cached = readEditorSettingsCache();
   const merged = deepMergeEditorSettings(fileDefaults, cached || {});
+  if (!["auto", "direct", "draft_refine"].includes(merged.ai?.sceneGenerationMode)) {
+    merged.ai.sceneGenerationMode = "auto";
+  }
   if (Number(cached?.ai?.agentPolicyVersion || 0) < 2) {
     const legacyLimit = Number(cached?.ai?.maxAutoRefineRounds);
     merged.ai.maxAutoRefineRounds = Number.isFinite(legacyLimit) && legacyLimit > 0

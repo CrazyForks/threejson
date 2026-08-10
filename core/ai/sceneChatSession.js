@@ -40,6 +40,7 @@ const DEFAULT_SUMMARIZE_MAX_TOKENS = 400;
 const DEFAULT_TITLE_MAX_TOKENS = 400;
 const SCENE_TITLE_MAX_LENGTH = 80;
 const MAX_ESTIMATED_SCENE_SEGMENTS = 16;
+const SCENE_GENERATION_MODES = new Set(["auto", "direct", "draft_refine"]);
 /** Characters unsafe in a file/folder name across common filesystems — a generated title is used
  * verbatim as a chat host's download/export file name (see generateSceneTitle below). */
 const SCENE_TITLE_UNSAFE_CHARS = /[\\/:*?"<>|]/g;
@@ -78,7 +79,34 @@ function normalizeHistoryEntries(history) {
   return out;
 }
 
-function buildClassifyIntentSystemPrompt(animationCapabilityMode = "auto") {
+function normalizeSceneGenerationMode(value) {
+  return SCENE_GENERATION_MODES.has(value) ? value : "auto";
+}
+
+function buildExecutionModePolicyRules(sceneGenerationMode) {
+  if (sceneGenerationMode === "direct") {
+    return [
+      '- The user explicitly selected complete generation. Set executionMode to "direct" and refinementGoals to []. Produce one complete, immediately usable scene; do not reinterpret visual ambition as a request for incremental construction.'
+    ];
+  }
+  if (sceneGenerationMode === "draft_refine") {
+    return [
+      '- The user explicitly selected incremental construction. Set executionMode to "draft_refine" and provide 1-4 concrete, independently verifiable refinementGoals derived from the actual request.'
+    ];
+  }
+  return [
+    '- The user selected automatic generation mode. You MUST choose executionMode from the construction complexity of this specific request; do not default mechanically to either mode.',
+    '- Choose "direct" unless incremental construction is genuinely necessary. Direct means the generation model returns one complete, immediately usable scene including identity-defining textures, requested primary animation, lighting, and camera framing.',
+    '- Judge authoring/output complexity, not how impressive the scene sounds. High quality, realistic, detailed, textured, animated, cinematic, or professional are not by themselves reasons for incremental construction.',
+    '- Prefer "direct" when repetition can be represented compactly with groups, instancing, domain objects, bounded representative populations, or reusable materials. A furnished room, one building, a small campus, a robot or vehicle, a named planet with moons, and a conventional Solar System scene with a bounded number of bodies are direct.',
+    '- Choose "draft_refine" only when at least one concrete condition holds: (a) several independently specified regions/subsystems each need substantial unique content; (b) the request requires a large population of non-repeating authored records that cannot be compacted; (c) later construction stages genuinely need spatial inspection of earlier stages; or (d) even after compact ThreeJSON abstractions, a complete usable scene is unlikely to fit one provider response.',
+    '- If uncertain, choose "direct". The runtime can switch to incremental construction later if the provider explicitly reports a real output-length cutoff.',
+    '- Never choose "draft_refine" merely for generic polish, validation, quality improvement, ceremonial review, or because a refinement loop is available.'
+  ];
+}
+
+function buildClassifyIntentSystemPrompt(animationCapabilityMode = "auto", sceneGenerationMode = "auto") {
+  const normalizedGenerationMode = normalizeSceneGenerationMode(sceneGenerationMode);
   return [
     "You are the pre-generation negotiation model for a ThreeJSON 3D-scene app.",
     "Given the user's newest message and a list of prior conversation turns (each with a short summary), decide:",
@@ -98,7 +126,8 @@ function buildClassifyIntentSystemPrompt(animationCapabilityMode = "auto") {
     '- Choose "generationStrategy" before generation starts. "single" means the complete JSON clearly fits one response. "segmented" means the request genuinely needs multiple responses AND you can follow the host segmented-output protocol from the first response. "compact" means a literal/full expansion is too large or segmented output is unsuitable; preserve the visual intent with instancing, bounded representative populations, and fewer explicit records so complete JSON fits one response.',
     '- Complexity features are optional safeguards, not a quality setting. Never choose "segmented" merely to improve quality, reasoning, correctness, or visual detail. Never begin a large one-shot response expecting the host to repair an arbitrary cutoff later.',
     '- For "single" or "compact", estimatedSegments MUST be 1. For "segmented", use 2-16 and only when the requested JSON is clearly too large for one provider response. If you are not confident that strict segmented output is supported, choose "compact" instead.',
-    '- executionMode is independent from generationStrategy. Choose "direct" by default: the generation model should return one complete, immediately usable scene including identity-defining textures and requested primary animation. A room, a small campus, a named planet with moons, and a conventional Solar System scene with a bounded number of bodies are all direct even when they request textures or animation. Choose "draft_refine" only when the requested scene has several substantial systems/regions or so much independent detail that one complete generation is unlikely to be usable (for example a multi-district city with separately specified infrastructure and landmarks). Never choose it merely to improve quality, perform ceremonial review, or because multiple rounds are available.',
+    '- executionMode is independent from generationStrategy: generationStrategy controls how one complete JSON response is transported; executionMode controls complete generation versus incremental construction.',
+    ...buildExecutionModePolicyRules(normalizedGenerationMode),
     '- refinementGoals is empty for "direct". For "draft_refine", list 1-4 concrete remaining goals that can be completed and verified (for example "populate the four city districts"), not generic goals such as "improve quality" or "review the scene".',
     '- selectedCapabilityIds lists only the capability ids whose detailed syntax/examples the generation model needs. Do semantic reasoning; do not select capabilities merely because a keyword appears.',
     '- If the user asks to add, show, write, label, title, caption, or otherwise render visible words in the 3D scene, select "sceneText". Plain text defaults to SDF scene text. Select "infoPanel" instead only when the requested text needs a visible board/card/screen/panel backing; explicit extruded/beveled/solid lettering may use mesh text.',
@@ -142,12 +171,15 @@ function buildClassifyIntentUserMessage(userPrompt, historyEntries) {
  * `classificationFailed` and avoid silently treating that fallback as a new-scene request.
  *
  * @param {{ userPrompt: string, history?: Array<{turnId: string, summary: string}> }} input
- * @param {object} [options] requestChatCompletion transport options (provider/apiKey/model/baseUrl/...)
- * @returns {Promise<{ intent: "generate"|"adjust", targetTurnId: string|null, note: string, classificationFailed: boolean, generationStrategy: "single"|"segmented"|"compact", estimatedSegments: number }>}
+ * @param {object} [options] requestChatCompletion transport options plus
+ *   sceneGenerationMode: "auto"|"direct"|"draft_refine"
+ * @returns {Promise<{ intent: "generate"|"adjust", targetTurnId: string|null, note: string, classificationFailed: boolean, generationStrategy: "single"|"segmented"|"compact", estimatedSegments: number, executionMode: "direct"|"draft_refine", refinementGoals: string[] }>}
  */
 async function classifyTurnIntent(input = {}, options = {}) {
   const userPrompt = String(input?.userPrompt || "").trim();
   const historyEntries = normalizeHistoryEntries(input?.history);
+  const sceneGenerationMode = normalizeSceneGenerationMode(options.sceneGenerationMode);
+  const fallbackExecutionMode = sceneGenerationMode === "draft_refine" ? "draft_refine" : "direct";
   const fallback = {
     intent: "generate",
     targetTurnId: null,
@@ -155,7 +187,7 @@ async function classifyTurnIntent(input = {}, options = {}) {
     classificationFailed: true,
     generationStrategy: "single",
     estimatedSegments: 1,
-    executionMode: "direct",
+    executionMode: fallbackExecutionMode,
     refinementGoals: [],
     // Undefined preserves core/ai's local intent hints when negotiation could not be parsed.
     selectedCapabilityIds: undefined,
@@ -170,7 +202,10 @@ async function classifyTurnIntent(input = {}, options = {}) {
     const content = await requestChatCompletion({
       ...pickChatCompletionOptions(options, DEFAULT_CLASSIFY_MAX_TOKENS),
       messages: [
-        { role: "system", content: buildClassifyIntentSystemPrompt(options.animationCapabilityMode) },
+        {
+          role: "system",
+          content: buildClassifyIntentSystemPrompt(options.animationCapabilityMode, sceneGenerationMode)
+        },
         { role: "user", content: buildClassifyIntentUserMessage(userPrompt, historyEntries) }
       ]
     });
@@ -203,7 +238,10 @@ async function classifyTurnIntent(input = {}, options = {}) {
         : "single";
     const generationStrategy = parsedStrategy;
     const estimatedSegments = generationStrategy === "segmented" ? Math.max(2, boundedSegments) : 1;
-    const executionMode = parsed?.executionMode === "draft_refine" ? "draft_refine" : "direct";
+    const modelExecutionMode = parsed?.executionMode === "draft_refine" ? "draft_refine" : "direct";
+    const executionMode = sceneGenerationMode === "auto"
+      ? modelExecutionMode
+      : sceneGenerationMode;
     const refinementGoals = executionMode === "draft_refine" && Array.isArray(parsed?.refinementGoals)
       ? [...new Set(parsed.refinementGoals.map((goal) => String(goal || "").trim()).filter(Boolean))].slice(0, 4)
       : [];

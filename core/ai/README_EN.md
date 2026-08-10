@@ -100,6 +100,8 @@ Common ops: `object.patch`, `material.patch`, `object.add`, `object.reconcile`, 
 
 ## Adaptive scene execution (`runSceneAgent`)
 
+Host settings use one tri-state parameter on `classifyTurnIntent(input, { sceneGenerationMode })`: `"auto"` (default; the negotiation model judges actual construction/output complexity), `"direct"` (complete generation), or `"draft_refine"` (incremental construction). The resolved `executionMode` is then passed to `runSceneAgent`. If automatic mode selects direct generation and the provider explicitly reports an output cutoff, the executor can still fall back safely to incremental construction.
+
 There is no separate single-turn/multi-turn quality switch. `executionMode: "direct"` returns one complete usable scene and is the default. `"draft_refine"` is reserved for genuinely complex scenes selected during negotiation, or for a detected direct output-limit fallback. Layout/material LLM review is off by default. The model ends incremental work with `# done`; `agent.maxRefineRounds` (default 6, hard maximum 20) is only a runaway guard, and repeated/no-op output also terminates immediately. All provider calls in one `runSceneAgent` share a total deadline (180 seconds by default, configurable through `turnTimeoutMs` or absolute `turnDeadlineAt`), so several stalled requests cannot accumulate into a many-minute hang.
 
 ```js

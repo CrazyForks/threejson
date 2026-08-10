@@ -1109,9 +1109,9 @@ async function main() {
     const allPriorTurns = await getTurnsForConversation(conversationId).catch(() => []);
     const priorTurns = allPriorTurns.filter(isSceneContextTurn);
 
-    // Clearly bounded first requests take the local direct fast path (animation/capability hints
-    // are inferred locally), so an Earth/Moon scene does not pay for a separate classifier call.
-    // Follow-ups and explicitly large requests still use model negotiation for routing/execution.
+    // Intent and automatic construction-mode selection share one core/ai negotiation call. Only
+    // an explicitly selected complete-generation mode may use the bounded local fast path; auto
+    // always lets the model apply the documented complexity criteria.
     const history = priorTurns.map((t) => ({
       turnId: t.id,
       summary: t.recapSummary || t.userPrompt,
@@ -1121,6 +1121,7 @@ async function main() {
       sceneTitle: t.sceneTitle
     }));
     const animationCapabilityMode = settings.ai?.animationCapabilityMode || "auto";
+    const sceneGenerationMode = settings.ai?.sceneGenerationMode || "auto";
     const classified = await classifyThreeBoxTurnIntent(
       { userPrompt: text, history },
       {
@@ -1128,7 +1129,8 @@ async function main() {
         threeBoxTurnContext: turnContext,
         turnDeadlineAt,
         signal: turnAbortController.signal,
-        animationCapabilityMode
+        animationCapabilityMode,
+        sceneGenerationMode
       }
     );
     const route = resolveThreeBoxNegotiatedRoute(classified, priorTurns);

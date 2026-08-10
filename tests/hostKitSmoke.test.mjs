@@ -41,6 +41,7 @@ test("editorSettingsSchema imports resolve through the public threejson/threejso
   assert.equal(mod.EDITOR_SETTINGS_DEFAULTS.editing.highlightChannels.alarm, "#DC3A2F");
   assert.equal(mod.EDITOR_SETTINGS_DEFAULTS.ai.maxAutoRefineRounds, 6);
   assert.equal(mod.EDITOR_SETTINGS_DEFAULTS.ai.agentPolicyVersion, 2);
+  assert.equal(mod.EDITOR_SETTINGS_DEFAULTS.ai.sceneGenerationMode, "auto");
   assert.equal("agentEnabled" in mod.EDITOR_SETTINGS_DEFAULTS.ai, false);
   assert.equal("agentDepth" in mod.EDITOR_SETTINGS_DEFAULTS.ai, false);
   // Portable default: no reference to the monorepo's examples/ folder.

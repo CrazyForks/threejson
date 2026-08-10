@@ -38,19 +38,24 @@ test("image generation wires the same incremental draft command executor as text
   assert.match(imageRunner, /applyDraftCommands:\s*applyAiDraftCommands/);
 });
 
-test("bounded first generations skip a redundant classifier call while large requests still negotiate", () => {
-  const direct = resolveImmediateDirectGeneration({
-    userPrompt: "生成一个地月系统，地球自转，月球绕地球公转",
+test("automatic first generations negotiate while an explicit complete mode may use the bounded fast path", () => {
+  assert.equal(resolveImmediateDirectGeneration({
+    userPrompt: "Generate an Earth-Moon system with rotation and orbit",
     history: []
-  });
+  }), null);
+
+  const direct = resolveImmediateDirectGeneration({
+    userPrompt: "Generate an Earth-Moon system with rotation and orbit",
+    history: []
+  }, { sceneGenerationMode: "direct" });
   assert.equal(direct?.executionMode, "direct");
   assert.equal(direct?.generationStrategy, "single");
   assert.equal(direct?.selectedCapabilityIds, undefined);
 
   assert.equal(resolveImmediateDirectGeneration({
-    userPrompt: "生成一座包含四个分区、交通基础设施和数百栋建筑的城市",
+    userPrompt: "Generate a city with four districts, infrastructure and hundreds of buildings",
     history: []
-  }), null);
+  }, { sceneGenerationMode: "direct" }), null);
   const adjust = resolveImmediateDirectGeneration({
     userPrompt: "把月球改成红色",
     history: [{ turnId: "earth", summary: "地月系统" }]

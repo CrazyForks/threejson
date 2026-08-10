@@ -803,7 +803,8 @@ export function App() {
             {
               ...sceneProviderOptions,
               signal: controller.signal,
-              animationCapabilityMode: settings.ai.animationCapabilityMode || "auto"
+              animationCapabilityMode: settings.ai.animationCapabilityMode || "auto",
+              sceneGenerationMode: settings.ai.sceneGenerationMode || "auto"
             }
           );
           const result = await runAiGenerateTurn({

@@ -83,6 +83,8 @@ window.ThreeJsonAI.runSceneAgent
 
 ## 接口：自适应场景执行（`runSceneAgent`）
 
+宿主设置使用 `classifyTurnIntent(input, { sceneGenerationMode })` 的单一三态参数：`"auto"`（默认，由协商模型按实际构建/输出复杂度判断）、`"direct"`（完整生成）或 `"draft_refine"`（增量构建）。协商结果中的具体 `executionMode` 再传给 `runSceneAgent`；自动模式若先选完整生成但供应商明确报告输出截断，仍会安全切换到增量构建。
+
 `runSceneAgent` 不再区分含义模糊的“单轮/多轮 Agent”。`executionMode: "direct"` 是默认值：一次生成完整、可直接使用的场景，然后只做本地结构校验；只有本地能力检查发现用户明确要求的能力缺失时，才追加一次针对性修正。`executionMode: "draft_refine"` 仅供方案协商模型判定为真正复杂的场景使用；直接生成遇到供应商输出上限时也会自动切换到该模式。布局/材质 LLM 审查默认关闭。
 
 增量模式的模型用 `# done` 按实际完成情况结束。`agent.maxRefineRounds` 只是防失控上限（默认 6、硬上限 20），不是要执行的目标轮数；重复命令和无变化输出也会立即终止。一次 `runSceneAgent` 的所有模型调用还共享总截止时间（默认 180 秒，可通过 `turnTimeoutMs` 或绝对的 `turnDeadlineAt` 调整），因此多个卡住的供应商请求不会串成几十分钟。

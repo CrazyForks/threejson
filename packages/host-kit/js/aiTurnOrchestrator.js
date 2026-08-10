@@ -251,12 +251,9 @@ export async function classifyAiTurnIntent({ userPrompt, history }, providerOpti
 }
 
 /**
- * Avoids spending a complete provider round trip to rediscover that a short, clearly bounded
- * first request is a direct generation. Capability syntax is still inferred locally by
- * runAiGenerateTurn, including declarative animation for rotation/orbit prompts. Ambiguous
- * follow-ups and requests with explicit large-scale complexity continue through model
- * negotiation; a direct response that genuinely hits the provider output limit can also escalate
- * inside core/ai without being regenerated wholesale.
+ * Keeps the zero-risk local route for an obvious adjustment of the latest scene. A first-scene
+ * generation skips model negotiation only when the user explicitly selected complete generation;
+ * automatic mode always lets core/ai judge construction complexity from the full criteria prompt.
  */
 export function resolveImmediateDirectGeneration({ userPrompt, history }, providerOptions = {}) {
   const text = String(userPrompt || "").trim();
@@ -283,6 +280,9 @@ export function resolveImmediateDirectGeneration({ userPrompt, history }, provid
         requiresAnimation: animationMode === "on" ? true : animationMode === "off" ? false : undefined
       };
     }
+    return null;
+  }
+  if (providerOptions?.sceneGenerationMode !== "direct") {
     return null;
   }
   const explicitlyLarge = /(?:very\s+large|massive|large[- ]scale|\bcomplex\b|\bmany\b|multi[- ]district|\bdistricts?\b|\bmetropolis\b|\bcity(?:scape)?\b|\binfrastructure\b|\bhundreds?\b|\bthousands?\b|\bevery\s+building\b|复杂|超大|巨型|大规模|大量|许多|众多|多区域|多个区域|分区|城市|基础设施|数百|上千|每栋建筑)/i.test(text);

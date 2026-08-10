@@ -439,9 +439,9 @@ export function createEditorAiGeneratePanel(host) {
         threeBoxTurnContext: createEditorAiTurnContext(userText),
         turnDeadlineAt
       };
-      // The tab already fixes the intent to "generate". Clearly bounded prompts resolve locally;
-      // explicitly large/ambiguous prompts still use model negotiation for execution policy.
-      // Local capability matching supplies animation syntax even when no classifier call is made.
+      // The tab already fixes the intent to "generate". Automatic construction mode still uses
+      // the core/ai negotiation criteria; explicit complete/incremental settings override only
+      // that execution choice, not capability or animation negotiation.
       const negotiation = await classifyAiTurnIntent(
         {
           userPrompt:
@@ -454,7 +454,8 @@ export function createEditorAiGeneratePanel(host) {
         {
           ...providerOptions,
           signal: abortController.signal,
-          animationCapabilityMode: "auto"
+          animationCapabilityMode: "auto",
+          sceneGenerationMode: host.getEditorSettings()?.ai?.sceneGenerationMode || "auto"
         }
       );
       let resultText;

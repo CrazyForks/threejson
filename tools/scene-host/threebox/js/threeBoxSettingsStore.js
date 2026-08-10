@@ -112,6 +112,9 @@ function ensureBuiltinProviderSeeded(merged) {
 export function loadThreeBoxSettingsBundle() {
   const cached = readThreeBoxSettingsCache();
   const merged = deepMergeThreeBoxSettings(THREEBOX_SETTINGS_DEFAULTS, cached || {});
+  if (!["auto", "direct", "draft_refine"].includes(merged.ai?.sceneGenerationMode)) {
+    merged.ai.sceneGenerationMode = "auto";
+  }
   if (cached?.io?.sceneJsonFormat !== "standard" && cached?.io?.sceneJsonFormat !== "friendly") {
     merged.io.sceneJsonFormat = cached?.io?.copyFriendlyJson === true ? "friendly" : "standard";
   }

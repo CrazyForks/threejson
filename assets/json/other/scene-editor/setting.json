@@ -123,6 +123,7 @@
     "maxAutoRefineRounds": 6,
     "agentPolicyVersion": 2,
     "agentFitViewEachRound": false,
+    "sceneGenerationMode": "auto",
     "incrementalUpdate": false,
     "updateOutputMode": "auto",
     "includeFullJson": false,

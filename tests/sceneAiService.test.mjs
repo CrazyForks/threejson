@@ -1171,6 +1171,80 @@ test("classifyTurnIntent negotiates incremental execution independently from tra
   assert.deepEqual(result.refinementGoals, ["build four districts", "add transit network", "add district landmarks"]);
 });
 
+test("classifyTurnIntent automatic mode exposes concrete complexity criteria to the model", async () => {
+  let systemPrompt = "";
+  globalThis.fetch = async (_url, init = {}) => {
+    const request = JSON.parse(init.body);
+    systemPrompt = request.messages[0].content;
+    return {
+      ok: true,
+      async json() {
+        return {
+          choices: [{ message: { content: JSON.stringify({
+            intent: "generate",
+            targetTurnId: null,
+            note: "bounded authored output",
+            generationStrategy: "single",
+            estimatedSegments: 1,
+            executionMode: "direct",
+            refinementGoals: []
+          }) } }]
+        };
+      }
+    };
+  };
+
+  const result = await classifyTurnIntent(
+    { userPrompt: "A detailed realistic Earth and Moon scene", history: [] },
+    { provider: "chatgpt", apiKey: "test-key", sceneGenerationMode: "auto" }
+  );
+
+  assert.match(systemPrompt, /Judge authoring\/output complexity, not how impressive the scene sounds/);
+  assert.match(systemPrompt, /If uncertain, choose "direct"/);
+  assert.match(systemPrompt, /provider explicitly reports a real output-length cutoff/);
+  assert.equal(result.executionMode, "direct");
+});
+
+test("classifyTurnIntent honors explicit complete and incremental generation modes", async () => {
+  let systemPrompt = "";
+  globalThis.fetch = async (_url, init = {}) => {
+    const request = JSON.parse(init.body);
+    systemPrompt = request.messages[0].content;
+    return {
+      ok: true,
+      async json() {
+        return {
+          choices: [{ message: { content: JSON.stringify({
+            intent: "generate",
+            targetTurnId: null,
+            note: "model suggestion",
+            generationStrategy: "single",
+            estimatedSegments: 1,
+            executionMode: "draft_refine",
+            refinementGoals: ["build the requested regions"]
+          }) } }]
+        };
+      }
+    };
+  };
+
+  const complete = await classifyTurnIntent(
+    { userPrompt: "Build a city", history: [] },
+    { provider: "chatgpt", apiKey: "test-key", sceneGenerationMode: "direct" }
+  );
+  assert.match(systemPrompt, /explicitly selected complete generation/);
+  assert.equal(complete.executionMode, "direct");
+  assert.deepEqual(complete.refinementGoals, []);
+
+  const incremental = await classifyTurnIntent(
+    { userPrompt: "Build a city", history: [] },
+    { provider: "chatgpt", apiKey: "test-key", sceneGenerationMode: "draft_refine" }
+  );
+  assert.match(systemPrompt, /explicitly selected incremental construction/);
+  assert.equal(incremental.executionMode, "draft_refine");
+  assert.deepEqual(incremental.refinementGoals, ["build the requested regions"]);
+});
+
 test("classifyTurnIntent prompt keeps bounded planet scenes in direct mode", async () => {
   let systemPrompt = "";
   globalThis.fetch = async (_url, init = {}) => {

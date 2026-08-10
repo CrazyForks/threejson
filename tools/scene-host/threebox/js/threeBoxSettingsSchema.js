@@ -31,6 +31,7 @@ export const THREEBOX_SETTINGS_DEFAULTS = {
     // setting rather than hardcoded because ThreeBox is open source — anyone can run their own.
     builtinBackendUrl: DEFAULT_BUILTIN_BACKEND_URL,
     selfName: "ThreeBox",
+    sceneGenerationMode: "auto",
     updateOutputMode: "commands",
     includeSpatialSummary: true,
     includeFullJson: false,
@@ -97,6 +98,13 @@ export const THREEBOX_SETTINGS_FIELDS = [
     testEndpoint: "builtinBackend"
   },
   { section: "ai", path: "ai.selfName", type: "text", label: "AI 自称" },
+  {
+    section: "ai",
+    path: "ai.sceneGenerationMode",
+    type: "select",
+    label: "场景生成方式",
+    options: [["auto", "自动（由 AI 判断）"], ["direct", "完整生成"], ["draft_refine", "增量构建"]]
+  },
   { section: "ai", path: "ai.updateOutputMode", type: "select", label: "调整优先方式", options: [["commands", "操作命令"], ["json-incremental", "JSON Patch"], ["json-full", "完整 JSON"]] },
   { section: "ai", path: "ai.includeSpatialSummary", type: "checkbox", label: "调整时附带空间摘要" },
   { section: "ai", path: "ai.includeFullJson", type: "checkbox", label: "调整时附带完整 JSON（更耗费 Token）" },
