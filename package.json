@@ -19,6 +19,7 @@
   "exports": {
     ".": "./builtins/full.js",
     "./core": "./core/index.js",
+    "./archive": "./core/archive/index.js",
     "./builtins": "./builtins/register.js",
     "./builtins/register": "./builtins/register.js",
     "./domains/*": "./domains/*/index.js",

@@ -43,6 +43,27 @@ import { createJsonScene } from "threejson/core";
 
 路径以**站点根**为准（与 `/assets/...` 相同）。
 
+普通 JSON 场景不需要加载 `.tjz` 压缩实现，也不需要在 import map 中配置 `fflate`。
+只有页面显式调用归档 API 时，才增加独立入口和依赖：
+
+```html
+<script type="importmap">
+{
+  "imports": {
+    "threejson/archive": "/core/archive/index.js",
+    "fflate": "https://esm.sh/fflate@0.8.3"
+  }
+}
+</script>
+```
+
+```js
+import { packTjzArchive, parseTjzArchiveForScene } from "threejson/archive";
+```
+
+为兼容已有代码，`threejson` 与 `threejson/core` 仍提供同名归档 API，但会在首次调用时
+动态加载压缩模块；裸 ESM 页面实际调用这些兼容 API 时同样需要映射 `fflate`。
+
 ## 拆开导入（教学页）
 
 [`track-00-runtime/00-05-import-paths.html`](./track-00-runtime/00-05-import-paths.html) 演示相对路径，**不**使用上表中的 `threejson` 别名：

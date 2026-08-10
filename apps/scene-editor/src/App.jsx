@@ -44,7 +44,7 @@ import { downloadBlob } from "@threejson/host-kit/js/meshExport.js";
 import { exportSceneAsGlb, exportSelectedObjectAsGlb } from "./lib/editorMeshExport.js";
 import { exportNativeSceneJson } from "./lib/editorNativeJsonExport.js";
 import { exportSceneAsTjz } from "./lib/editorTjzExport.js";
-import { parseTjzArchiveForScene } from "threejson";
+import { parseTjzArchiveForScene } from "threejson/archive";
 
 const DEFAULT_SCENE = "json/portShow.json";
 

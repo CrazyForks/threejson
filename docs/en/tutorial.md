@@ -117,7 +117,7 @@ After this track you should: load friendly/standard scenes with `createJsonScene
 | t07-01 | t00-04 | ↳ sdf / texture | [07-01-text-modes.html](../../examples/html-demo/track-07-text/07-01-text-modes.html) | [07-01-text-modes.json](../../assets/json/tutorial/track-07/07-01-text-modes.json) |
 | t07-02 | t07-01 | ↳ mesh extruded text | [07-02-text-mesh.html](../../examples/html-demo/track-07-text/07-02-text-mesh.html) | [07-02-text-mesh.json](../../assets/json/tutorial/track-07/07-02-text-mesh.json) |
 
-Track 7 HTML pages include `troika-three-text` + `fflate` in the import map (SDF mode). Other tutorial pages omit them; troika is lazy-loaded only when needed.
+Track 7 HTML pages include `troika-three-text` + `fflate` in the import map (SDF mode). Other tutorial pages omit them because text and `.tjz` archive dependencies stay lazy until used; a page that explicitly imports `threejson/archive` must map `fflate`.
 
 ## Roadmap (no standalone demo yet)
 
@@ -129,6 +129,6 @@ Aligned with [json-format.md § Out of scope](./json-format.md#暂不纳入当�
 2. Add HTML under `examples/html-demo/track-XX-*/` (copy the [00-03-friendly-full-scene template](../../examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html)).
 3. Add entries to [`demo-catalog.zh.json`](../../examples/html-demo/demo-catalog.zh.json) and [`demo-catalog.en.json`](../../examples/html-demo/demo-catalog.en.json) (each locale file is self-contained; `demo.html` loads one by locale), and update this syllabus. Run `npm run validate:demo-catalog` to verify zh/en structural parity.
 4. Do not point catalog `path` at non-track legacy pages; add new lessons under `track-*`.
-5. For lessons using SDF text, keep `troika-three-text` + `fflate` in the page import map (see Track 7).
+5. For lessons using SDF text, keep `troika-three-text` + `fflate` in the page import map (see Track 7). A lesson that explicitly uses `threejson/archive` also needs the `fflate` mapping.
 
 Catalog metadata: [`demo-catalog.zh.json`](../../examples/html-demo/demo-catalog.zh.json) and [`demo-catalog.en.json`](../../examples/html-demo/demo-catalog.en.json) (full per-locale arrays). Nested nav items (FPS, stat, text, CSS3D curved screen) use **different HTML paths per step** so the iframe actually switches scenes.

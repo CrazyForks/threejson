@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { packTjzArchive } from "../core/archive/tjzPackager.js";
-import { isTjzLike, parseTjzArchiveForScene } from "../core/archive/tjzArchive.js";
+import {
+  isTjzLike,
+  packTjzArchive,
+  parseTjzArchiveForScene
+} from "../core/archive/index.js";
 import {
   createJsonSceneFromArchive,
   createJsonSceneFromObjectRecord,
@@ -27,6 +30,17 @@ test("packTjzArchive + parseTjzArchiveForScene roundtrip", async () => {
 
   const parsed = await parseTjzArchiveForScene(bytes);
   assert.equal(parsed.manifest.format, "threejson-archive");
+  assert.equal(parsed.payload.threeJsonId, "tjz-test-scene");
+  parsed.dispose();
+});
+
+test("core root keeps the archive API through its lazy compatibility facade", async () => {
+  const coreApi = await import("../core/index.js");
+  assert.equal(typeof coreApi.packTjzArchive, "function");
+  assert.equal(typeof coreApi.parseTjzArchiveForScene, "function");
+
+  const bytes = await coreApi.packTjzArchive(buildMinimalPayload(), { outputType: "bytes" });
+  const parsed = await coreApi.parseTjzArchiveForScene(bytes);
   assert.equal(parsed.payload.threeJsonId, "tjz-test-scene");
   parsed.dispose();
 });

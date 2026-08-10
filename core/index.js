@@ -210,10 +210,10 @@ export * from "./util/sceneCaptureUtil.js";
 export * from "./util/archiveCommon.js";
 export * from "./util/descriptorExportSanitize.js";
 export * from "./util/boxTextureUrl.js";
-// .tjz archive pack/parse — previously reachable only via a deep-relative import (forbidden for
-// apps/*); added so apps/scene-editor's .tjz export/import can use the bare "threejson" specifier.
-export * from "./archive/tjzPackager.js";
-export * from "./archive/tjzArchive.js";
+// Preserve the archive API names added to the root surface without statically promoting `fflate`
+// into every browser scene's dependency graph. New archive consumers should prefer
+// `threejson/archive`; these wrappers dynamically load the same implementation on first use.
+export * from "./archive/lazyArchiveApi.js";
 
 export * from "./command/index.js";
 export * from "./ai/index.js";
