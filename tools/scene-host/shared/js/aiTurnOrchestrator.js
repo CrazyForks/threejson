@@ -441,8 +441,10 @@ async function runAiAgentAdjustTurn({
   const updateContext = {
     ...baseContextPayload,
     userMessage: envelope,
-    currentSceneJsonString: targetSceneJsonString,
-    fullSceneJson: targetSceneJsonString
+    // Execution needs the authoritative full JSON locally, but the model must see it only when
+    // resolveContextPayload explicitly selected fullSceneJson. Keeping these concerns separate
+    // makes the default spatial-summary setting effective for large scenes.
+    currentSceneJsonString: targetSceneJsonString
   };
 
   if (mode.outputMode !== "commands") {
@@ -485,23 +487,34 @@ async function runAiAgentAdjustTurn({
 
   const usesHostRuntime =
     typeof hostApplyCommands === "function" && typeof hostRefreshContext === "function";
-  const offscreenRuntime = usesHostRuntime
-    ? null
-    : await createOffscreenRuntimeFromSceneJsonString(targetSceneJsonString);
+  let offscreenRuntime = null;
+  const getOffscreenRuntime = async () => {
+    if (!offscreenRuntime) {
+      offscreenRuntime = await createOffscreenRuntimeFromSceneJsonString(targetSceneJsonString);
+    }
+    return offscreenRuntime;
+  };
   try {
     let latestSceneJsonString = targetSceneJsonString;
-    const refreshContext = usesHostRuntime ? hostRefreshContext : async () => {
-      latestSceneJsonString = exportRuntimeSceneJsonString(offscreenRuntime);
+    let latestRefreshContext = null;
+    const refreshContext = async () => {
+      if (usesHostRuntime) {
+        latestRefreshContext = await hostRefreshContext();
+        return latestRefreshContext;
+      }
+      const runtime = await getOffscreenRuntime();
+      latestSceneJsonString = exportRuntimeSceneJsonString(runtime);
       const latestSceneJson = parseSceneJsonString(latestSceneJsonString);
       const contextPayload = resolveContextPayload?.(latestSceneJson) || {};
-      return {
+      latestRefreshContext = {
         ...contextPayload,
-        currentSceneJsonString: latestSceneJsonString,
-        fullSceneJson: latestSceneJsonString
+        currentSceneJsonString: latestSceneJsonString
       };
+      return latestRefreshContext;
     };
     const applyCommands = usesHostRuntime ? hostApplyCommands : async (commands) => {
-      const ctx = createCommandContextForRuntime(offscreenRuntime);
+      const runtime = await getOffscreenRuntime();
+      const ctx = createCommandContextForRuntime(runtime);
       const execResult = await executeCommands(ctx, commands);
       const results = Array.isArray(execResult.results) ? execResult.results : [];
       const ok = results.length ? results.every((r) => r.ok !== false) : execResult.ok !== false;
@@ -558,8 +571,11 @@ async function runAiAgentAdjustTurn({
       if (!applied.ok) {
         throw new Error(applied.error || "Agent command apply failed.");
       }
+      // A compatibility runner may defer its only mutation batch until this point. Any context
+      // captured before that batch is stale and must not become the returned scene JSON.
+      latestRefreshContext = null;
     }
-    const finalContext = await refreshContext();
+    const finalContext = latestRefreshContext || await refreshContext();
     const sceneJsonString = String(
       finalContext?.currentSceneJsonString ||
       finalContext?.fullSceneJson ||
@@ -686,7 +702,7 @@ export async function runAiAdjustTurn({
     // error instead, since the user explicitly asked for commands-only.
     const cmdResult = await requestUpdatedSceneEditCommands(
       userPrompt,
-      { userMessage: envelope, currentSceneJsonString: targetSceneJsonString, fullSceneJson: targetSceneJsonString },
+      { userMessage: envelope, currentSceneJsonString: targetSceneJsonString },
       {
         ...providerOptions,
         outputMode: "commands",

@@ -429,8 +429,7 @@ export function createEditorAiAdjustPanel(host) {
           const currentSceneJson = parseSceneJsonString(currentSceneJsonString);
           return {
             ...resolveAiAdjustContextPayload(currentSceneJson, host.getEditorSettings()?.ai || {}),
-            currentSceneJsonString,
-            fullSceneJson: currentSceneJsonString
+            currentSceneJsonString
           };
         },
         capabilityLookup: true,

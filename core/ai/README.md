@@ -89,6 +89,8 @@ window.ThreeJsonAI.runSceneAgent
 
 增量模式的模型用 `# done` 按实际完成情况结束。`agent.maxRefineRounds` 只是防失控上限（默认 6、硬上限 20），不是要执行的目标轮数；重复命令和无变化输出也会立即终止。一次 `runSceneAgent` 的所有模型调用还共享总截止时间（默认 180 秒，可通过 `turnTimeoutMs` 或绝对的 `turnDeadlineAt` 调整），因此多个卡住的供应商请求不会串成几十分钟。
 
+场景调整默认在第一批成功变更后结束；仅当模型明确输出 `# continue: <具体剩余目标>`、需要读取对象或供应商真实截断时才继续。命令调整使用独立的 `commandMaxTokens`（默认 3000），不继承完整场景重写的 6000 Token 预算。`currentSceneJsonString` 只用于本地执行、校验和兜底；只有调用方明确提供 `fullSceneJson` 时，完整场景才会进入模型上下文。
+
 ```js
 const result = await aiClient.runSceneAgent(
   { mode: "generate", prompt: "智慧园区，含道路与两栋建筑" },

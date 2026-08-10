@@ -1354,6 +1354,11 @@ async function requestUpdatedSceneEditCommands(prompt, context = {}, options = {
       return patchAttempt;
     }
     if (!fallbackToJson || !currentSceneJsonString) {
+      if (isLengthFinishReason(finishReason)) {
+        throw createSceneOutputLimitError(
+          "AI command response exceeded the provider output limit."
+        );
+      }
       throw new Error(reason);
     }
     const sceneJsonString = await requestUpdatedSceneJsonString(

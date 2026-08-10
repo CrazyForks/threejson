@@ -789,6 +789,7 @@ async function main() {
     let previewRenderQueue = Promise.resolve();
     let previewQueueOpen = true;
     let lastQueuedPreviewJson = "";
+    const adjustmentUsesSceneCardRuntime = true;
     api.appendToBody(textEl, sceneCard.el);
     const queueScenePreview = (sceneJsonString, progress = {}) => {
       if (!sceneJsonString || sceneJsonString === lastQueuedPreviewJson) {
@@ -810,16 +811,26 @@ async function main() {
             progress.commands.length > 0 &&
             sceneCard.getRuntime()
           ) {
+            // The shared adjuster already applied this batch through the live scene-card callback
+            // below. Replaying the progress event would execute every mutation twice.
+            if (adjustmentUsesSceneCardRuntime) {
+              return null;
+            }
             return sceneCard.applyCommands(progress.commands, {
               sceneJson,
               label: text,
               draft: true
             });
           }
-          return sceneCard.render(sceneJson, { label: text, draft: true });
+          return sceneCard.render(sceneJson, {
+            label: text,
+            draft: true,
+            authoritative: adjustmentUsesSceneCardRuntime
+          });
         });
+      return previewRenderQueue;
     };
-    queueScenePreview(targetSceneJsonString);
+    const initialScenePreviewPromise = queueScenePreview(targetSceneJsonString);
     const updateAgentProgress = createAgentProgressUpdater(streaming, queueScenePreview);
 
     // See handleGenerateTurn's matching comment.
@@ -868,6 +879,31 @@ async function main() {
         // always iterative and stops as soon as the model returns # done.
         generationStrategy,
         estimatedSegments,
+        // The visible card is already loading this exact scene while the provider thinks. Reuse
+        // it as the authoritative command runtime instead of constructing a second hidden scene.
+        applyCommands: async (commands, meta = {}) => {
+          await initialScenePreviewPromise;
+          return sceneCard.applyCommandsWithResult(commands, {
+            label: text,
+            draft: true,
+            readOnly: meta.readOnly === true
+          });
+        },
+        refreshContext: async () => {
+          await initialScenePreviewPromise;
+          const currentSceneJsonString = await sceneCard.exportSceneJsonString({
+            label: text,
+            draft: true
+          });
+          if (!currentSceneJsonString) {
+            throw new Error("ThreeBox adjustment scene runtime is not ready.");
+          }
+          const currentSceneJson = JSON.parse(currentSceneJsonString);
+          return {
+            ...resolveAdjustContextPayload(currentSceneJson, settings.ai),
+            currentSceneJsonString
+          };
+        },
         signal: abortController.signal
       });
       clearBusyIfCurrent();

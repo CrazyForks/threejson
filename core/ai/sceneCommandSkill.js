@@ -497,7 +497,7 @@ export function buildSceneCommandUpdateSystemPrompt(options = {}) {
  * @param {Array<{ threeJsonId?: string, name?: string, objType?: string }>} [params.objectList]
  * @param {string|null} [params.selectionId]
  * @param {object|null} [params.selectionDescriptor]
- * @param {string} [params.fullSceneJson]
+ * @param {string|object} [params.fullSceneJson]
  * @param {Array<object>} [params.objectSpatialCards]
  * @param {object} [params.sceneScaleProfile]
  * @param {Array<object>} [params.referenceObjects]
@@ -558,7 +558,11 @@ export function buildSceneCommandUpdateUserMessage({
     parts.push(`Current selection:\n${JSON.stringify(selectionBlock, null, 2)}`);
   }
 
-  const fullJson = String(fullSceneJson || "").trim();
+  const fullJson = typeof fullSceneJson === "string"
+    ? fullSceneJson.trim()
+    : fullSceneJson && typeof fullSceneJson === "object"
+      ? JSON.stringify(fullSceneJson, null, 2)
+      : "";
   if (fullJson) {
     parts.push(`Full scene JSON (reference only — do not echo back):\n${fullJson}`);
   }

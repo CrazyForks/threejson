@@ -5,6 +5,7 @@ import {
   generateSceneJsonString,
   parseSceneJsonString,
   requestSceneRefinementStep,
+  requestUpdatedSceneEditCommands,
   requestUpdatedSceneJsonString,
   requestChatCompletion,
   createThreeBoxTurnContext,
@@ -264,6 +265,36 @@ const originalFetch = globalThis.fetch;
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+});
+
+test("command updates surface a provider length cutoff instead of spending repair rounds", async () => {
+  globalThis.fetch = async () => ({
+    ok: true,
+    async json() {
+      return {
+        choices: [{
+          message: { content: "incomplete command output" },
+          finish_reason: "length"
+        }]
+      };
+    }
+  });
+
+  await assert.rejects(
+    requestUpdatedSceneEditCommands(
+      "change the floor",
+      { currentSceneJsonString: '{"threeJsonId":"cutoff","objectList":[]}' },
+      {
+        provider: "chatgpt",
+        apiKey: "test-key",
+        fallbackToJson: false,
+        agentRound: true,
+        iterativeApply: true,
+        maxTokens: 3000
+      }
+    ),
+    (error) => error?.code === "SCENE_OUTPUT_LIMIT"
+  );
 });
 
 test("requestChatCompletion stream aggregates SSE deltas", async () => {

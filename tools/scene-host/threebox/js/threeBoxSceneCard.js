@@ -252,9 +252,12 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
           resetScene: true,
           assetsBase: sceneHostAssetUrl("assets/"),
           assetGateway: typeof cardOptions.assetGateway === "function" ? cardOptions.assetGateway() : cardOptions.assetGateway,
-          autoFillLights: true,
-          autoFillCamera: true,
-          autoFitCamera: true,
+          // An adjustment card can be the authoritative command runtime. In that mode, preview
+          // conveniences must not silently alter the scene that will later be exported as the
+          // adjustment result. Host-only auxiliary lights below still keep the preview readable.
+          autoFillLights: options.authoritative !== true,
+          autoFillCamera: options.authoritative !== true,
+          autoFitCamera: options.authoritative !== true,
           onRuntimeReady: ({ runtime: readyRuntime }) => {
             activateRuntime(readyRuntime);
           },
@@ -284,13 +287,9 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
     return runtime;
   }
 
-  /** Applies an AI command refinement to the already-visible runtime. This preserves the camera,
-   * WebGL context and in-flight/loaded textures instead of destroying and rebuilding the whole
-   * card for every incremental step. The caller supplies the authoritative post-command JSON so
-   * downloads/history stay aligned with the runtime without another export pass. */
-  async function applyCommands(commands, options = {}) {
+  async function executeCommandBatch(commands, options = {}) {
     if (!runtime || !Array.isArray(commands) || commands.length === 0) {
-      return null;
+      return { ok: false, sceneMutated: false, results: [], error: "Scene preview runtime is not ready." };
     }
     const { createCommandContext, executeCommands } = await import("threejson");
     const ctx = createCommandContext({
@@ -302,8 +301,15 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
     const execResult = await executeCommands(ctx, commands);
     const results = Array.isArray(execResult?.results) ? execResult.results : [];
     const failed = results.find((entry) => entry?.ok === false);
-    if (failed || execResult?.ok === false) {
-      throw new Error(failed?.error || "Scene preview command application failed.");
+    const ok = !failed && execResult?.ok !== false;
+    if (!ok) {
+      return {
+        ok: false,
+        sceneMutated: false,
+        execResult,
+        results,
+        error: failed?.error || "Scene preview command application failed."
+      };
     }
     if (options.sceneJson && typeof options.sceneJson === "object") {
       currentSceneJson = options.sceneJson;
@@ -316,7 +322,61 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
         ? cardOptions.shouldUsePreviewAuxiliaryLights() !== false
         : cardOptions.previewAuxiliaryLights !== false
     );
-    return runtime;
+    const objectGetFeedback = results
+      .filter((entry) => entry?.ok && entry.op === "object.get" && entry.data)
+      .map((entry) => JSON.stringify({
+        threeJsonId: entry.data?.threeJsonId || entry.data?.id || "",
+        path: entry.data?.path ?? null,
+        value: entry.data?.value
+      }, null, 2))
+      .join("\n\n");
+    return {
+      ok: true,
+      sceneMutated: options.readOnly === true ? false : results.some((entry) => entry?.ok !== false),
+      execResult,
+      results,
+      objectGetFeedback,
+      runtime
+    };
+  }
+
+  /** Applies an AI command refinement to the already-visible runtime. This preserves the camera,
+   * WebGL context and in-flight/loaded textures instead of destroying and rebuilding the whole
+   * card for every incremental step. The caller supplies the authoritative post-command JSON so
+   * downloads/history stay aligned with the runtime without another export pass. */
+  async function applyCommands(commands, options = {}) {
+    const result = await executeCommandBatch(commands, options);
+    if (!result.ok) {
+      if (result.error === "Scene preview runtime is not ready.") {
+        return null;
+      }
+      throw new Error(result.error);
+    }
+    return result.runtime;
+  }
+
+  /** Applies a command batch and returns executor metadata for the shared AI adjustment loop. */
+  async function applyCommandsWithResult(commands, options = {}) {
+    return executeCommandBatch(commands, options);
+  }
+
+  /** Exports the already-visible authoritative runtime without constructing a second hidden
+   * ThreeJSON scene. Updating currentSceneJson keeps finalize/download/history aligned. */
+  async function exportSceneJsonString(options = {}) {
+    if (!runtime?.scene?.isScene) {
+      return "";
+    }
+    const { sceneToStandardJsonSimple } = await import("threejson");
+    const sceneJson = sceneToStandardJsonSimple(runtime.scene, {
+      merge: false,
+      runtimeTarget: runtime
+    });
+    currentSceneJson = sceneJson;
+    setLabel(options.label);
+    if (Object.prototype.hasOwnProperty.call(options, "draft")) {
+      setDraftState(options.draft === true);
+    }
+    return JSON.stringify(sceneJson, null, 2);
   }
 
   /** Clears draft chrome without reloading an identical scene. */
@@ -530,6 +590,8 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
     canvas,
     render,
     applyCommands,
+    applyCommandsWithResult,
+    exportSceneJsonString,
     finalize,
     dispose,
     setLabel,

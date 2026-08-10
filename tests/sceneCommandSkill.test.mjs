@@ -144,6 +144,19 @@ test("buildSceneCommandUpdateUserMessage uses spatial cards instead of thin obje
   assert.equal(message.includes("hidden"), false);
 });
 
+test("buildSceneCommandUpdateUserMessage serializes an explicitly requested full-scene object", () => {
+  const message = buildSceneCommandUpdateUserMessage({
+    modificationRequest: "change the floor",
+    fullSceneJson: {
+      threeJsonId: "full-context-scene",
+      objectList: [{ threeJsonId: "floor", objType: "box" }]
+    }
+  });
+  assert.match(message, /Full scene JSON/);
+  assert.match(message, /"threeJsonId": "full-context-scene"/);
+  assert.doesNotMatch(message, /\[object Object\]/);
+});
+
 test("commandScriptRequestsContinuation requires an explicit continuation marker", () => {
   assert.equal(commandScriptRequestsContinuation("object.patch id=a partial={}"), false);
   assert.equal(commandScriptRequestsContinuation("object.patch id=a partial={}\n# continue: inspect lighting"), true);

@@ -67,6 +67,10 @@ const DRAFT_MAX_TOKENS = 2200;
  * rewrite for one round when neither of those is available) — generous headroom for a single
  * small step, still far below a whole-scene rewrite budget. */
 const REFINE_ROUND_MAX_TOKENS = 3000;
+/** Command-first adjustments should not inherit the full-scene rewrite budget. A real command
+ * cutoff is surfaced immediately so the host can continue incrementally or use its Patch/full
+ * JSON fallback instead of retrying the same oversized response until the round guard expires. */
+const COMMAND_UPDATE_MAX_TOKENS = 3000;
 /** Only reached when a round has no incremental-apply mechanism available at all (bare `core/ai`
  * callers with no live/offscreen runtime) — the lowest-priority fallback, not the common path. */
 const FULL_REWRITE_MAX_TOKENS = 6000;
@@ -427,9 +431,12 @@ async function runSceneAgentCommandsUpdate(params) {
         fallbackToJson: false,
         agentRound: true,
         singleRound: false,
-        maxTokens: isRepair ? preset.repairMaxTokens : preset.generateMaxTokens
+        maxTokens: isRepair ? preset.repairMaxTokens : preset.commandMaxTokens
       });
     } catch (err) {
+      if (isSceneOutputLimitError(err)) {
+        throw err;
+      }
       lastError = String(err?.message || err);
       steps.push({
         kind: isRepair ? "repair" : "commands",
@@ -648,9 +655,12 @@ async function runSceneAgentCommandsUpdateIterative(params) {
         agentRound: true,
         iterativeApply: true,
         singleRound: false,
-        maxTokens: preset.generateMaxTokens
+        maxTokens: preset.commandMaxTokens
       });
     } catch (err) {
+      if (isSceneOutputLimitError(err)) {
+        throw err;
+      }
       lastError = String(err?.message || err);
       steps.push({ kind: "refine", round: refineRound, ok: false, error: lastError });
       continue;
@@ -1333,6 +1343,9 @@ async function runSceneAgent(input = {}, options = {}) {
 
   // Layout/material review is opt-in. Capability review is local-first and only spends another
   // model call when a concrete requested capability is missing.
+  const configuredCommandMaxTokens = Number(
+    options.commandMaxTokens ?? (mode === "update" ? options.maxTokens : NaN)
+  );
   const preset = {
     maxSteps: maxRefineRounds,
     maxRefineRounds,
@@ -1344,6 +1357,9 @@ async function runSceneAgent(input = {}, options = {}) {
           ? Number(options.maxTokens)
           : FULL_REWRITE_MAX_TOKENS,
     repairMaxTokens: REFINE_ROUND_MAX_TOKENS,
+    commandMaxTokens: Number.isFinite(configuredCommandMaxTokens)
+      ? Math.max(512, Math.min(FULL_REWRITE_MAX_TOKENS, Math.round(configuredCommandMaxTokens)))
+      : COMMAND_UPDATE_MAX_TOKENS,
     layoutReviewMaxTokens: REFINE_ROUND_MAX_TOKENS,
     reviewMaxTokens: 800,
     runOutline: requestedExecutionMode === "draft_refine",

@@ -82,11 +82,15 @@ test("runAiAdjustTurn applies automatic rounds through host live-runtime callbac
     "# done"
   ];
   const applied = [];
-  const fetchMock = mock.fn(async () => ({
-    ok: true,
-    async text() { return ""; },
-    async json() { return { choices: [{ message: { content: replies.shift() || "# done" } }] }; }
-  }));
+  const requestBodies = [];
+  const fetchMock = mock.fn(async (_url, init = {}) => {
+    requestBodies.push(JSON.parse(init.body));
+    return {
+      ok: true,
+      async text() { return ""; },
+      async json() { return { choices: [{ message: { content: replies.shift() || "# done" } }] }; }
+    };
+  });
   const originalFetch = globalThis.fetch;
   globalThis.fetch = fetchMock;
   try {
@@ -104,7 +108,6 @@ test("runAiAdjustTurn applies automatic rounds through host live-runtime callbac
       },
       refreshContext: async () => ({
         currentSceneJsonString: CHANGED_SCENE,
-        fullSceneJson: CHANGED_SCENE,
         objectList: [{ threeJsonId: "floor", objType: "box" }]
       })
     });
@@ -115,6 +118,10 @@ test("runAiAdjustTurn applies automatic rounds through host live-runtime callbac
     assert.equal(applied.length, 1);
     assert.equal(result.commands.length, 1);
     assert.equal(fetchMock.mock.calls.length, 2);
+    assert.ok(requestBodies.every((body) => body.max_tokens === 3000));
+    assert.ok(requestBodies.every((body) => body.messages[1].content.includes('"floor"')));
+    assert.ok(requestBodies.every((body) => !body.messages[1].content.includes('"geometry"')));
+    assert.ok(requestBodies.every((body) => !body.messages[1].content.includes("#888888")));
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -146,7 +153,6 @@ test("runAiAdjustTurn rejects a false command success and falls back to a verifi
       // not change because a different canvas was mutated.
       refreshContext: async () => ({
         currentSceneJsonString: SCENE,
-        fullSceneJson: SCENE,
         objectList: [{ threeJsonId: "floor", objType: "box" }]
       })
     });
