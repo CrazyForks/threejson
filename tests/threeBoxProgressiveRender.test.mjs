@@ -6,7 +6,7 @@ const appUrl = new URL("../tools/scene-host/threebox/js/threeBoxApp.js", import.
 const cardUrl = new URL("../tools/scene-host/threebox/js/threeBoxSceneCard.js", import.meta.url);
 const panelUrl = new URL("../tools/scene-host/threebox/js/threeBoxChatPanel.js", import.meta.url);
 
-test("ThreeBox routes every request through adaptive local-or-model negotiation", async () => {
+test("ThreeBox uses adaptive policy negotiation while core fixes an empty-history route to generation", async () => {
   const source = await readFile(appUrl, "utf8");
   assert.match(source, /const classified = await classifyThreeBoxTurnIntent\(/);
   assert.match(source, /resolveThreeBoxNegotiatedRoute\(classified, priorTurns\)/);

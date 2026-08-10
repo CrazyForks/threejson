@@ -238,7 +238,8 @@ export async function runAiImageGenerateTurn({
 }
 
 /**
- * Classifies whether a follow-up message is a new generation or an adjustment of a prior turn.
+ * Negotiates generation policy and, only when history exists, classifies new generation versus
+ * adjustment. core/ai fixes an empty-history request to generation without model-based routing.
  * @param {{ userPrompt: string, history: Array<{turnId:string, summary:string}> }} input
  * @param {object} providerOptions
  */
@@ -252,8 +253,8 @@ export async function classifyAiTurnIntent({ userPrompt, history }, providerOpti
 
 /**
  * Keeps the zero-risk local route for an obvious adjustment of the latest scene. A first-scene
- * generation skips model negotiation only when the user explicitly selected complete generation;
- * automatic mode always lets core/ai judge construction complexity from the full criteria prompt.
+ * generation skips policy negotiation only when the user explicitly selected complete generation;
+ * automatic mode still lets core/ai judge construction complexity, but never the first-turn route.
  */
 export function resolveImmediateDirectGeneration({ userPrompt, history }, providerOptions = {}) {
   const text = String(userPrompt || "").trim();

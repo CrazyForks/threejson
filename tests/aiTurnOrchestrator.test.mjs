@@ -38,7 +38,7 @@ test("image generation wires the same incremental draft command executor as text
   assert.match(imageRunner, /applyDraftCommands:\s*applyAiDraftCommands/);
 });
 
-test("automatic first generations negotiate while an explicit complete mode may use the bounded fast path", () => {
+test("automatic first generations negotiate construction policy while complete mode may use the bounded fast path", () => {
   assert.equal(resolveImmediateDirectGeneration({
     userPrompt: "Generate an Earth-Moon system with rotation and orbit",
     history: []

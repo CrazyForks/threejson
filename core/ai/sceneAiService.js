@@ -287,20 +287,60 @@ function resolveVisionImageUrl(image) {
   return `data:${mime};base64,${body}`;
 }
 
+function completionContentToText(value) {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (!Array.isArray(value)) {
+    return "";
+  }
+  return value.map((part) => {
+    if (typeof part === "string") {
+      return part;
+    }
+    if (typeof part?.text === "string") {
+      return part.text;
+    }
+    if (typeof part?.text?.value === "string") {
+      return part.text.value;
+    }
+    return "";
+  }).join("");
+}
+
+function extractChatCompletionChoiceContent(choice) {
+  const candidates = [
+    choice?.delta?.content,
+    typeof choice?.delta === "string" ? choice.delta : undefined,
+    choice?.message?.content,
+    choice?.text
+  ];
+  for (const candidate of candidates) {
+    const text = completionContentToText(candidate);
+    if (text) {
+      return text;
+    }
+  }
+  return "";
+}
+
+function createChatCompletionPayloadError(payload, prefix = "AI stream failed") {
+  const providerError = payload?.error;
+  const detail = typeof providerError === "string"
+    ? providerError
+    : providerError?.message || providerError?.code || "provider returned an error event";
+  const error = new Error(`${prefix}: ${detail}`);
+  error.providerError = providerError && typeof providerError === "object" ? providerError : payload;
+  if (typeof providerError?.code === "string" && providerError.code) {
+    error.code = providerError.code;
+  }
+  return error;
+}
+
 /**
- * Low-level HTTP: call an OpenAI-compatible chat/completions endpoint and parse choices[0].message.content.
- * @param {object} params
- * @param {string} [params.provider='chatgpt']
- * @param {string} params.apiKey
- * @param {Array<{role:string,content:string|Array}>} params.messages
- * @param {string} [params.model]
- * @param {number} [params.temperature=0.2]
- * @param {number} [params.maxTokens=4000]
- * @param {string} [params.baseUrl] Override default apiBase
- * @param {string} [params.userId] Anonymous application user identifier. Sent only to providers
- * whose documented API supports an isolation field (currently DeepSeek's `user_id`).
- */
-/**
+ * Read an OpenAI-compatible streaming response. Besides standard SSE deltas, tolerate two common
+ * compatibility behaviours: a final event without a trailing newline, and a provider that ignores
+ * `stream: true` and returns one ordinary JSON chat completion instead.
  * @param {ReadableStream<Uint8Array>} body
  * @param {(chunk: string) => void} [onDelta]
  * @param {(metadata:{finishReason:string|null})=>void} [onCompletionMetadata]
@@ -310,43 +350,88 @@ async function readSseChatCompletionStream(body, onDelta, onCompletionMetadata) 
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let rawBody = "";
   let content = "";
   let finishReason = null;
+  let sawSsePayload = false;
+
+  const appendChoice = (json) => {
+    if (json?.error) {
+      throw createChatCompletionPayloadError(json);
+    }
+    const choice = json?.choices?.[0];
+    if (typeof choice?.finish_reason === "string" && choice.finish_reason) {
+      finishReason = choice.finish_reason;
+    }
+    const delta = extractChatCompletionChoiceContent(choice);
+    if (delta) {
+      content += delta;
+      if (typeof onDelta === "function") {
+        onDelta(delta);
+      }
+    }
+  };
+
+  const processLine = (line) => {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) {
+      return;
+    }
+    sawSsePayload = true;
+    const payload = trimmed.slice(5).trim();
+    if (!payload || payload === "[DONE]") {
+      return;
+    }
+    try {
+      appendChoice(JSON.parse(payload));
+    } catch (error) {
+      // Surface explicit provider error events; tolerate only genuinely malformed compatibility
+      // chunks so a single bad event does not discard otherwise valid streamed content.
+      if (error?.providerError) {
+        throw error;
+      }
+    }
+  };
+
   while (true) {
     const { done, value } = await reader.read();
     if (done) {
       break;
     }
-    buffer += decoder.decode(value, { stream: true });
+    const decoded = decoder.decode(value, { stream: true });
+    rawBody += decoded;
+    buffer += decoded;
     const lines = buffer.split("\n");
     buffer = lines.pop() || "";
     for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("data:")) {
-        continue;
-      }
-      const payload = trimmed.slice(5).trim();
-      if (payload === "[DONE]") {
-        continue;
-      }
-      try {
-        const json = JSON.parse(payload);
-        const choice = json?.choices?.[0];
-        const delta = choice?.delta?.content;
-        if (typeof choice?.finish_reason === "string" && choice.finish_reason) {
-          finishReason = choice.finish_reason;
-        }
-        if (typeof delta === "string" && delta.length > 0) {
-          content += delta;
-          if (typeof onDelta === "function") {
-            onDelta(delta);
-          }
-        }
-      } catch {
-        /* ignore malformed SSE chunks */
-      }
+      processLine(line);
     }
   }
+
+  const decoderTail = decoder.decode();
+  rawBody += decoderTail;
+  buffer += decoderTail;
+  if (buffer.trim()) {
+    processLine(buffer);
+  }
+
+  // A number of nominally OpenAI-compatible endpoints acknowledge `stream: true` but still send
+  // `application/json`. Their body is a valid completion, not an empty SSE stream.
+  if (!sawSsePayload && !content.trim() && rawBody.trim()) {
+    let json;
+    try {
+      json = JSON.parse(rawBody);
+    } catch {
+      json = null;
+    }
+    if (json?.error) {
+      throw createChatCompletionPayloadError(json);
+    }
+    if (json) {
+      appendChoice(json);
+    }
+  }
+
   if (typeof onCompletionMetadata === "function") {
     onCompletionMetadata({ finishReason });
   }
@@ -378,6 +463,19 @@ function createRequestAbortScope(parentSignal, timeoutMs, minimumTimeoutMs = 100
   };
 }
 
+/**
+ * Low-level HTTP: call an OpenAI-compatible chat/completions endpoint and parse its assistant content.
+ * @param {object} params
+ * @param {string} [params.provider='chatgpt']
+ * @param {string} params.apiKey
+ * @param {Array<{role:string,content:string|Array}>} params.messages
+ * @param {string} [params.model]
+ * @param {number} [params.temperature=0.2]
+ * @param {number} [params.maxTokens=4000]
+ * @param {string} [params.baseUrl] Override default apiBase
+ * @param {string} [params.userId] Anonymous application user identifier. Sent only to providers
+ * whose documented API supports an isolation field (currently DeepSeek's `user_id`).
+ */
 async function requestChatCompletion({
   provider = "chatgpt",
   apiKey,
@@ -521,8 +619,11 @@ async function requestChatCompletion({
     }
 
     const data = await response.json();
-    const content = data?.choices?.[0]?.message?.content;
-    if (typeof content !== "string" || !content.trim()) {
+    if (data?.error) {
+      throw createChatCompletionPayloadError(data, "AI request failed");
+    }
+    const content = extractChatCompletionChoiceContent(data?.choices?.[0]);
+    if (!content.trim()) {
       throw new Error("AI response content is empty.");
     }
     if (typeof onCompletionMetadata === "function") {

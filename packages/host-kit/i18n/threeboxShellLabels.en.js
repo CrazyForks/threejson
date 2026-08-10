@@ -73,7 +73,7 @@ export const THREEBOX_SHELL_LABELS_EN = {
   "threebox.app.templateTouchLabel": "Template: {label}",
   "threebox.app.processingFailed": "Processing failed: {error}",
   "threebox.chat.preparingScene": "JSON generated. Parsing and preparing the scene preview (no tokens used)…",
-  "threebox.chat.preparingRequest": "Analyzing this request with conversation context and deciding whether to create or adjust a scene…",
+  "threebox.chat.preparingRequest": "Analyzing the request and preparing the scene…",
   "threebox.chat.preparingAction": "Preparing…",
   "threebox.chat.adjusting": "Adjusting…",
   "threebox.chat.noProcessingResult": "Processing finished without a displayable result.",

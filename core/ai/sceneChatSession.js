@@ -105,23 +105,43 @@ function buildExecutionModePolicyRules(sceneGenerationMode) {
   ];
 }
 
-function buildClassifyIntentSystemPrompt(animationCapabilityMode = "auto", sceneGenerationMode = "auto") {
+function buildClassifyIntentSystemPrompt(
+  animationCapabilityMode = "auto",
+  sceneGenerationMode = "auto",
+  generationOnly = false
+) {
   const normalizedGenerationMode = normalizeSceneGenerationMode(sceneGenerationMode);
   return [
     "You are the pre-generation negotiation model for a ThreeJSON 3D-scene app.",
-    "Given the user's newest message and a list of prior conversation turns (each with a short summary), decide:",
-    "- \"generate\": the user wants a brand-new scene, unrelated to (or not clearly continuing) any prior turn.",
-    "- \"adjust\": the user wants to modify the scene produced by a specific prior turn.",
+    generationOnly
+      ? "This is the first scene-producing message in a new conversation. Its route is already fixed as a brand-new scene generation. Do NOT classify it as generate versus adjust; negotiate only how to generate it."
+      : "Given the user's newest message and a list of prior conversation turns (each with a short summary), decide whether it generates a new scene or adjusts a prior scene.",
+    ...(generationOnly
+      ? []
+      : [
+          "- \"generate\": the user wants a brand-new scene, unrelated to (or not clearly continuing) any prior turn.",
+          "- \"adjust\": the user wants to modify the scene produced by a specific prior turn."
+        ]),
     "",
     "Output shape (strict):",
-    '{ "intent": "generate"|"adjust", "targetTurnId": string|null, "note": string, "generationStrategy": "single"|"segmented"|"compact", "estimatedSegments": integer, "executionMode": "direct"|"draft_refine", "refinementGoals": string[], "selectedCapabilityIds": string[], "requiresAnimation": boolean }',
+    generationOnly
+      ? '{ "note": string, "generationStrategy": "single"|"segmented"|"compact", "estimatedSegments": integer, "executionMode": "direct"|"draft_refine", "refinementGoals": string[], "selectedCapabilityIds": string[], "requiresAnimation": boolean }'
+      : '{ "intent": "generate"|"adjust", "targetTurnId": string|null, "note": string, "generationStrategy": "single"|"segmented"|"compact", "estimatedSegments": integer, "executionMode": "direct"|"draft_refine", "refinementGoals": string[], "selectedCapabilityIds": string[], "requiresAnimation": boolean }',
     "",
     "Rules:",
-    '- "targetTurnId" MUST be one of the provided turn ids, or null. Never invent an id.',
-    '- If intent is "generate", "targetTurnId" MUST be null.',
-    '- If intent is "adjust" but you cannot tell which prior turn is meant, still pick the single most recent turn as targetTurnId (most conversations continue the latest result) and explain the ambiguity in "note".',
-    '- Conversation continuity is the default when prior scene turns exist. Requests to add, remove, replace, recolor, resize, move, rotate, animate, label, improve, simplify, or otherwise change something normally mean "adjust"—including short follow-ups such as "再加一棵树", "把它改成红色", or "让机器人挥手".',
-    '- Choose "generate" with prior turns only when the user clearly asks for a new/separate scene, asks to start over, or the newest request is clearly unrelated to every prior scene. Do not classify a follow-up as "generate" merely because it contains enough detail to describe a complete scene.',
+    ...(generationOnly
+      ? ['- The operation is unconditionally a new scene generation. Do not output or infer intent or targetTurnId.']
+      : [
+          '- "targetTurnId" MUST be one of the provided turn ids, or null. Never invent an id.',
+          '- If intent is "generate", "targetTurnId" MUST be null.',
+          '- If intent is "adjust" but you cannot tell which prior turn is meant, still pick the single most recent turn as targetTurnId (most conversations continue the latest result) and explain the ambiguity in "note".'
+        ]),
+    ...(generationOnly
+      ? []
+      : [
+          '- Conversation continuity is the default when prior scene turns exist. Requests to add, remove, replace, recolor, resize, move, rotate, animate, label, improve, simplify, or otherwise change something normally mean "adjust"—including short follow-ups such as "再加一棵树", "把它改成红色", or "让机器人挥手".',
+          '- Choose "generate" with prior turns only when the user clearly asks for a new/separate scene, asks to start over, or the newest request is clearly unrelated to every prior scene. Do not classify a follow-up as "generate" merely because it contains enough detail to describe a complete scene.'
+        ]),
     '- "note" is one short sentence explaining your choice.',
     '- Choose "generationStrategy" before generation starts. "single" means the complete JSON clearly fits one response. "segmented" means the request genuinely needs multiple responses AND you can follow the host segmented-output protocol from the first response. "compact" means a literal/full expansion is too large or segmented output is unsuitable; preserve the visual intent with instancing, bounded representative populations, and fewer explicit records so complete JSON fits one response.',
     '- Complexity features are optional safeguards, not a quality setting. Never choose "segmented" merely to improve quality, reasoning, correctness, or visual detail. Never begin a large one-shot response expecting the host to repair an arbitrary cutoff later.',
@@ -165,8 +185,9 @@ function buildClassifyIntentUserMessage(userPrompt, historyEntries) {
 }
 
 /**
- * Classify whether the user's next chat message is a new-scene request or an adjustment of a
- * specific prior turn. Safe-by-default: any network/parse/validation failure resolves to
+ * Negotiate generation policy and, when prior scene turns exist, classify whether the user's next
+ * message is a new-scene request or an adjustment of a specific prior turn. A first message is
+ * always routed locally as generation. Safe-by-default: any network/parse/validation failure resolves to
  * a marked fallback result rather than throwing. Chat hosts with prior scene context must inspect
  * `classificationFailed` and avoid silently treating that fallback as a new-scene request.
  *
@@ -178,6 +199,9 @@ function buildClassifyIntentUserMessage(userPrompt, historyEntries) {
 async function classifyTurnIntent(input = {}, options = {}) {
   const userPrompt = String(input?.userPrompt || "").trim();
   const historyEntries = normalizeHistoryEntries(input?.history);
+  // With no prior scene there is nothing to adjust. The model call remains useful for automatic
+  // complete-vs-incremental construction and capability negotiation, but never controls routing.
+  const generationOnly = historyEntries.length === 0;
   const sceneGenerationMode = normalizeSceneGenerationMode(options.sceneGenerationMode);
   const fallbackExecutionMode = sceneGenerationMode === "draft_refine" ? "draft_refine" : "direct";
   const fallback = {
@@ -204,14 +228,24 @@ async function classifyTurnIntent(input = {}, options = {}) {
       messages: [
         {
           role: "system",
-          content: buildClassifyIntentSystemPrompt(options.animationCapabilityMode, sceneGenerationMode)
+          content: buildClassifyIntentSystemPrompt(
+            options.animationCapabilityMode,
+            sceneGenerationMode,
+            generationOnly
+          )
         },
         { role: "user", content: buildClassifyIntentUserMessage(userPrompt, historyEntries) }
       ]
     });
     const jsonText = extractJsonText(content);
     const parsed = JSON.parse(sanitizeAiJsonText(jsonText));
-    const intent = parsed?.intent === "adjust" ? "adjust" : parsed?.intent === "generate" ? "generate" : null;
+    const intent = generationOnly
+      ? "generate"
+      : parsed?.intent === "adjust"
+        ? "adjust"
+        : parsed?.intent === "generate"
+          ? "generate"
+          : null;
     if (!intent) {
       return { ...fallback, note: "fallback: model returned an unrecognized intent" };
     }
@@ -288,7 +322,10 @@ async function classifyTurnIntent(input = {}, options = {}) {
     ) {
       throw error;
     }
-    return { ...fallback, note: `fallback: classification failed (${error?.message || error})` };
+    return {
+      ...fallback,
+      note: `fallback: ${generationOnly ? "generation policy negotiation" : "classification"} failed (${error?.message || error})`
+    };
   }
 }
 

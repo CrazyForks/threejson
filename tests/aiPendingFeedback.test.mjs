@@ -15,6 +15,7 @@ test("ThreeBox paints a preparation activity before backend turn routing starts"
   assert.ok(paintIndex > activityIndex);
   assert.ok(requestIndex > paintIndex);
   assert.match(source, /setBusy\(true, \{ stoppable: false \}\)/);
+  assert.doesNotMatch(source, /判断是新建还是调整场景/);
 });
 
 test("ThreeBox generation and adjustment consume the already-visible activity", async () => {

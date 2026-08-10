@@ -67,7 +67,7 @@
   "threebox.app.templateTouchLabel": "模板：{label}",
   "threebox.app.processingFailed": "处理失败：{error}",
   "threebox.chat.preparingScene": "JSON 已生成，正在解析并准备场景预览（不消耗 Token）…",
-  "threebox.chat.preparingRequest": "正在结合会话上下文分析请求，并判断是新建还是调整场景…",
+  "threebox.chat.preparingRequest": "正在分析请求并准备场景…",
   "threebox.chat.preparingAction": "正在准备…",
   "threebox.chat.adjusting": "正在调整…",
   "threebox.chat.noProcessingResult": "处理已结束，但没有返回可显示的结果。",

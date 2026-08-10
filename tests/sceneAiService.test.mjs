@@ -335,6 +335,87 @@ test("requestChatCompletion stream aggregates SSE deltas", async () => {
   assert.equal(completionMetadata?.finishReason, "length");
 });
 
+test("requestChatCompletion stream consumes a final SSE event without a trailing newline", async () => {
+  globalThis.fetch = async () => ({
+    ok: true,
+    body: new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(
+          'data: {"choices":[{"delta":{"content":"complete tail"},"finish_reason":"stop"}]}'
+        ));
+        controller.close();
+      }
+    })
+  });
+
+  const content = await requestChatCompletion({
+    provider: "deepseek",
+    apiKey: "test-key",
+    messages: [{ role: "user", content: "hi" }],
+    stream: true
+  });
+  assert.equal(content, "complete tail");
+});
+
+test("requestChatCompletion stream accepts a normal JSON completion returned by a non-streaming-compatible provider", async () => {
+  const responseJson = JSON.stringify({
+    choices: [{
+      message: { content: [{ type: "text", text: "JSON fallback" }] },
+      finish_reason: "stop"
+    }]
+  });
+  globalThis.fetch = async () => ({
+    ok: true,
+    headers: new Headers({ "Content-Type": "application/json" }),
+    body: new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(responseJson));
+        controller.close();
+      }
+    })
+  });
+
+  const deltas = [];
+  let completionMetadata = null;
+  const content = await requestChatCompletion({
+    provider: "deepseek",
+    apiKey: "test-key",
+    messages: [{ role: "user", content: "hi" }],
+    stream: true,
+    onDelta: (delta) => deltas.push(delta),
+    onCompletionMetadata: (metadata) => {
+      completionMetadata = metadata;
+    }
+  });
+  assert.equal(content, "JSON fallback");
+  assert.deepEqual(deltas, ["JSON fallback"]);
+  assert.equal(completionMetadata?.finishReason, "stop");
+});
+
+test("requestChatCompletion stream surfaces provider error events", async () => {
+  globalThis.fetch = async () => ({
+    ok: true,
+    body: new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(
+          'data: {"error":{"code":"UPSTREAM_EMPTY","message":"provider generated no content"}}\n\n'
+        ));
+        controller.close();
+      }
+    })
+  });
+
+  await assert.rejects(
+    requestChatCompletion({
+      provider: "deepseek",
+      apiKey: "test-key",
+      messages: [{ role: "user", content: "hi" }],
+      stream: true
+    }),
+    (error) => error?.code === "UPSTREAM_EMPTY" && /provider generated no content/.test(error.message)
+  );
+});
+
 test("requestChatCompletion respects AbortSignal", async () => {
   globalThis.fetch = async (_url, init) =>
     new Promise((_resolve, reject) => {
@@ -1150,7 +1231,7 @@ test("classifyTurnIntent negotiates a compact strategy even when there are no pr
         return {
           choices: [{
             message: {
-              content: '{"intent":"generate","targetTurnId":null,"note":"compact forest","generationStrategy":"compact","estimatedSegments":8}'
+              content: '{"intent":"adjust","targetTurnId":"invented","note":"compact forest","generationStrategy":"compact","estimatedSegments":8}'
             }
           }]
         };
@@ -1164,7 +1245,12 @@ test("classifyTurnIntent negotiates a compact strategy even when there are no pr
   );
 
   assert.deepEqual(JSON.parse(requestBody.messages[1].content).priorSceneTurns, []);
+  assert.doesNotMatch(requestBody.messages[0].content, /"intent"\s*:/);
+  assert.doesNotMatch(requestBody.messages[0].content, /"targetTurnId"\s*:/);
+  assert.match(requestBody.messages[0].content, /route is already fixed as a brand-new scene generation/);
   assert.match(requestBody.messages[0].content, /If you are not confident that strict segmented output is supported, choose "compact"/);
+  assert.equal(result.intent, "generate");
+  assert.equal(result.targetTurnId, null);
   assert.equal(result.generationStrategy, "compact");
   assert.equal(result.estimatedSegments, 1);
   assert.equal(result.executionMode, "direct");

@@ -1145,9 +1145,9 @@ async function main() {
     const allPriorTurns = await getTurnsForConversation(conversationId).catch(() => []);
     const priorTurns = allPriorTurns.filter(isSceneContextTurn);
 
-    // Intent and automatic construction-mode selection share one core/ai negotiation call. Only
-    // an explicitly selected complete-generation mode may use the bounded local fast path; auto
-    // always lets the model apply the documented complexity criteria.
+    // A first scene is always routed as generation by core/ai; its negotiation call decides only
+    // transport/construction/capabilities. With prior scene turns, that same call also resolves
+    // whether the user is starting over or adjusting existing context.
     const history = priorTurns.map((t) => ({
       turnId: t.id,
       summary: t.recapSummary || t.userPrompt,
