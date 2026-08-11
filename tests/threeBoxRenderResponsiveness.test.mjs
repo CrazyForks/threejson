@@ -31,6 +31,19 @@ test("ThreeBox JSON viewer opens as plain text and upgrades in idle chunks", asy
   assert.match(source, /plainBlock\.replaceWith\(richBlock\)/);
 });
 
+test("ThreeBox settings keep controls aligned and place field hints below their controls", async () => {
+  const css = await readWorkspaceFile("tools/scene-host/threebox/css/threebox.css");
+  assert.match(
+    css,
+    /\.settingsField\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(160px, 280px\)/s
+  );
+  assert.match(css, /\.settingsFieldHint\s*\{[^}]*grid-column:\s*2/s);
+  assert.match(
+    css,
+    /@media \(max-width:\s*720px\)[\s\S]*?\.settingsField \.settingsFieldHint\s*\{\s*grid-column:\s*1;/
+  );
+});
+
 test("built-in provider quota UI omits monetary cost estimates", async () => {
   const [threeBoxSource, editorSource] = await Promise.all([
     readWorkspaceFile("tools/scene-host/threebox/js/threeBoxSettingsModal.js"),

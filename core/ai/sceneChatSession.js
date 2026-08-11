@@ -25,19 +25,8 @@ import { requestChatCompletion, extractJsonText } from "./sceneAiService.js";
 import { sanitizeAiJsonText } from "./sceneJsonSanitize.js";
 import { THREE_JSON_AGENT_CAPABILITY_INDEX } from "./sceneCapabilityIndex.js";
 
-// Intent negotiation now also returns generation strategy, capability ids and animation intent.
-// 300 tokens was enough for the original two-field route response, but can truncate the expanded
-// structured response (especially on reasoning providers), which used to silently route every
-// failed classification to a brand-new scene.
-const DEFAULT_CLASSIFY_MAX_TOKENS = 800;
-const DEFAULT_SUMMARIZE_MAX_TOKENS = 400;
-// The title output itself is tiny (SCENE_TITLE_MAX_LENGTH caps it at 80 chars), but reasoning
-// providers spend their token budget on hidden reasoning *before* emitting any content — 60 was so
-// small that the whole budget went to reasoning and `content` came back empty, silently yielding no
-// title. Match the summarize budget (which reliably produces output on the same providers); a
-// mid-length reasoning pass fits, while non-reasoning models are unaffected since max_tokens is a
-// cap, not a target, and the sanitizer still trims the result to SCENE_TITLE_MAX_LENGTH.
-const DEFAULT_TITLE_MAX_TOKENS = 400;
+// Negotiation, summaries and titles deliberately have no engine-owned completion ceiling. Their
+// prompts constrain response shape; callers may opt into independent stage-specific limits.
 const SCENE_TITLE_MAX_LENGTH = 80;
 const MAX_ESTIMATED_SCENE_SEGMENTS = 16;
 const SCENE_GENERATION_MODES = new Set(["auto", "direct", "draft_refine"]);
@@ -45,8 +34,9 @@ const SCENE_GENERATION_MODES = new Set(["auto", "direct", "draft_refine"]);
  * verbatim as a chat host's download/export file name (see generateSceneTitle below). */
 const SCENE_TITLE_UNSAFE_CHARS = /[\\/:*?"<>|]/g;
 
-/** Keep only chat-completion transport options (avoid leaking unrelated caller options into the HTTP body). */
-function pickChatCompletionOptions(source, fallbackMaxTokens) {
+/** Keep only chat-completion transport options. A stage-specific optional ceiling wins over the
+ * legacy common maxTokens option; neither is invented here. */
+function pickChatCompletionOptions(source, stageMaxTokensKey) {
   const keys = ["provider", "apiKey", "model", "baseUrl", "temperature", "signal", "threeBoxTurnContext", "userId", "thinkingPreference"];
   const out = {};
   for (const k of keys) {
@@ -54,8 +44,22 @@ function pickChatCompletionOptions(source, fallbackMaxTokens) {
       out[k] = source[k];
     }
   }
-  out.maxTokens = Number.isFinite(Number(source?.maxTokens)) ? Number(source.maxTokens) : fallbackMaxTokens;
+  const requestedMaxTokens = source?.[stageMaxTokensKey] ?? source?.maxTokens;
+  if (Number.isFinite(Number(requestedMaxTokens)) && Number(requestedMaxTokens) > 0) {
+    out.maxTokens = Math.round(Number(requestedMaxTokens));
+  }
   return out;
+}
+
+function normalizeEstimatedOutputTokens(value) {
+  const rawMin = Number(value?.min);
+  const rawMax = Number(value?.max);
+  if (!Number.isFinite(rawMin) && !Number.isFinite(rawMax)) {
+    return undefined;
+  }
+  const min = Math.max(1, Math.round(Number.isFinite(rawMin) ? rawMin : rawMax));
+  const max = Math.max(min, Math.round(Number.isFinite(rawMax) ? rawMax : rawMin));
+  return { min, max };
 }
 
 function normalizeHistoryEntries(history) {
@@ -125,8 +129,8 @@ function buildClassifyIntentSystemPrompt(
     "",
     "Output shape (strict):",
     generationOnly
-      ? '{ "note": string, "generationStrategy": "single"|"segmented"|"compact", "estimatedSegments": integer, "executionMode": "direct"|"draft_refine", "refinementGoals": string[], "selectedCapabilityIds": string[], "requiresAnimation": boolean }'
-      : '{ "intent": "generate"|"adjust", "targetTurnId": string|null, "note": string, "generationStrategy": "single"|"segmented"|"compact", "estimatedSegments": integer, "executionMode": "direct"|"draft_refine", "refinementGoals": string[], "selectedCapabilityIds": string[], "requiresAnimation": boolean }',
+      ? '{ "note": string, "generationStrategy": "single"|"segmented"|"compact", "estimatedSegments": integer, "estimatedOutputTokens": {"min": integer, "max": integer}, "executionMode": "direct"|"draft_refine", "refinementGoals": string[], "selectedCapabilityIds": string[], "requiresAnimation": boolean }'
+      : '{ "intent": "generate"|"adjust", "targetTurnId": string|null, "note": string, "generationStrategy": "single"|"segmented"|"compact", "estimatedSegments": integer, "estimatedOutputTokens": {"min": integer, "max": integer}, "executionMode": "direct"|"draft_refine", "refinementGoals": string[], "selectedCapabilityIds": string[], "requiresAnimation": boolean }',
     "",
     "Rules:",
     ...(generationOnly
@@ -146,6 +150,7 @@ function buildClassifyIntentSystemPrompt(
     '- Choose "generationStrategy" before generation starts. "single" means the complete JSON clearly fits one response. "segmented" means the request genuinely needs multiple responses AND you can follow the host segmented-output protocol from the first response. "compact" means a literal/full expansion is too large or segmented output is unsuitable; preserve the visual intent with instancing, bounded representative populations, and fewer explicit records so complete JSON fits one response.',
     '- Complexity features are optional safeguards, not a quality setting. Never choose "segmented" merely to improve quality, reasoning, correctness, or visual detail. Never begin a large one-shot response expecting the host to repair an arbitrary cutoff later.',
     '- For "single" or "compact", estimatedSegments MUST be 1. For "segmented", use 2-16 and only when the requested JSON is clearly too large for one provider response. If you are not confident that strict segmented output is supported, choose "compact" instead.',
+    '- estimatedOutputTokens is a broad advisory range for the usable scene-authoring output after applying ThreeJSON compaction (not hidden reasoning and not input/context tokens). Estimate honestly; it is planning metadata, never a hard cutoff and never a reason to omit requested content.',
     '- executionMode is independent from generationStrategy: generationStrategy controls how one complete JSON response is transported; executionMode controls complete generation versus incremental construction.',
     ...buildExecutionModePolicyRules(normalizedGenerationMode),
     '- refinementGoals is empty for "direct". For "draft_refine", list 1-4 concrete remaining goals that can be completed and verified (for example "populate the four city districts"), not generic goals such as "improve quality" or "review the scene".',
@@ -194,7 +199,7 @@ function buildClassifyIntentUserMessage(userPrompt, historyEntries) {
  * @param {{ userPrompt: string, history?: Array<{turnId: string, summary: string}> }} input
  * @param {object} [options] requestChatCompletion transport options plus
  *   sceneGenerationMode: "auto"|"direct"|"draft_refine"
- * @returns {Promise<{ intent: "generate"|"adjust", targetTurnId: string|null, note: string, classificationFailed: boolean, generationStrategy: "single"|"segmented"|"compact", estimatedSegments: number, executionMode: "direct"|"draft_refine", refinementGoals: string[] }>}
+ * @returns {Promise<{ intent: "generate"|"adjust", targetTurnId: string|null, note: string, classificationFailed: boolean, generationStrategy: "single"|"segmented"|"compact", estimatedSegments: number, estimatedOutputTokens?: {min:number,max:number}, executionMode: "direct"|"draft_refine", refinementGoals: string[] }>}
  */
 async function classifyTurnIntent(input = {}, options = {}) {
   const userPrompt = String(input?.userPrompt || "").trim();
@@ -211,6 +216,7 @@ async function classifyTurnIntent(input = {}, options = {}) {
     classificationFailed: true,
     generationStrategy: "single",
     estimatedSegments: 1,
+    estimatedOutputTokens: undefined,
     executionMode: fallbackExecutionMode,
     refinementGoals: [],
     // Undefined preserves core/ai's local intent hints when negotiation could not be parsed.
@@ -224,7 +230,7 @@ async function classifyTurnIntent(input = {}, options = {}) {
 
   try {
     const content = await requestChatCompletion({
-      ...pickChatCompletionOptions(options, DEFAULT_CLASSIFY_MAX_TOKENS),
+      ...pickChatCompletionOptions(options, "negotiationMaxTokens"),
       taskKind: "scene_negotiate",
       messages: [
         {
@@ -273,6 +279,7 @@ async function classifyTurnIntent(input = {}, options = {}) {
         : "single";
     const generationStrategy = parsedStrategy;
     const estimatedSegments = generationStrategy === "segmented" ? Math.max(2, boundedSegments) : 1;
+    const estimatedOutputTokens = normalizeEstimatedOutputTokens(parsed?.estimatedOutputTokens);
     const modelExecutionMode = parsed?.executionMode === "draft_refine" ? "draft_refine" : "direct";
     const executionMode = sceneGenerationMode === "auto"
       ? modelExecutionMode
@@ -300,6 +307,7 @@ async function classifyTurnIntent(input = {}, options = {}) {
       classificationFailed: false,
       generationStrategy,
       estimatedSegments,
+      estimatedOutputTokens,
       executionMode,
       refinementGoals,
       selectedCapabilityIds,
@@ -380,7 +388,7 @@ function buildSummarizeTurnUserMessage({ userPrompt, mode, targetTurnId, turnId,
 async function summarizeSceneTurn(input = {}, options = {}) {
   try {
     const content = await requestChatCompletion({
-      ...pickChatCompletionOptions(options, DEFAULT_SUMMARIZE_MAX_TOKENS),
+      ...pickChatCompletionOptions(options, "summaryMaxTokens"),
       taskKind: "scene_summary",
       messages: [
         { role: "system", content: buildSummarizeTurnSystemPrompt(input.selfName) },
@@ -454,7 +462,7 @@ function sanitizeSceneTitleText(raw) {
 async function generateSceneTitle(input = {}, options = {}) {
   try {
     const content = await requestChatCompletion({
-      ...pickChatCompletionOptions(options, DEFAULT_TITLE_MAX_TOKENS),
+      ...pickChatCompletionOptions(options, "titleMaxTokens"),
       taskKind: "scene_title",
       messages: [
         { role: "system", content: buildGenerateTitleSystemPrompt() },
@@ -486,7 +494,8 @@ async function generateSceneTitle(input = {}, options = {}) {
  *   adjustOutputMode?: "commands"|"json-incremental"|"json-full"|null,
  *   globalPromptPrefix?: string|null,
  *   includeReferenceLinks?: boolean,
- *   generationStrategy?: "single"|"segmented"|"compact"
+ *   generationStrategy?: "single"|"segmented"|"compact",
+ *   estimatedOutputTokens?: {min:number,max:number},
  *   executionMode?: "direct"|"draft_refine",
  *   refinementGoals?: string[],
  *   selectedCapabilityIds?: string[],
@@ -531,6 +540,13 @@ function buildStructuredTurnEnvelope(input = {}) {
       ? input.generationStrategy
       : "single";
     envelope.generationStrategy = strategy;
+    const estimatedOutputTokens = normalizeEstimatedOutputTokens(input?.estimatedOutputTokens);
+    if (estimatedOutputTokens) {
+      envelope.estimatedOutputTokens = {
+        ...estimatedOutputTokens,
+        advisoryOnly: true
+      };
+    }
     envelope.executionMode = input?.executionMode === "draft_refine" ? "draft_refine" : "direct";
     if (envelope.executionMode === "draft_refine" && Array.isArray(input?.refinementGoals)) {
       const goals = [...new Set(input.refinementGoals.map((goal) => String(goal || "").trim()).filter(Boolean))].slice(0, 4);

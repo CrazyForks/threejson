@@ -151,6 +151,8 @@ export const EDITOR_SETTINGS_DEFAULTS = {
       agentPolicyVersion: 2,
       agentFitViewEachRound: false,
       sceneGenerationMode: "auto",
+      // 0 keeps the engine neutral: max_tokens is omitted and the provider/server decides.
+      sceneMaxOutputTokens: 0,
       incrementalUpdate: false,
       updateOutputMode: "auto",
       includeFullJson: false,
@@ -826,6 +828,13 @@ export const EDITOR_SETTINGS_FIELDS = [
         { value: "direct", label: "完整生成" },
         { value: "draft_refine", label: "增量构建" }
       ]
+    },
+    {
+      section: "ai",
+      path: "ai.sceneMaxOutputTokens",
+      type: "number",
+      label: "单次场景输出上限（0 = 由供应商/服务端决定）",
+      min: 0
     },
     {
       section: "ai",

@@ -20,7 +20,8 @@ import {
   resolveAdjustContextPayload,
   isProviderVisionCapable,
   resolveTurnSceneJsonString,
-  resolveThreeBoxAgentOptions
+  resolveThreeBoxAgentOptions,
+  resolveThreeBoxSceneTokenOptions
 } from "./threeBoxOrchestrator.js";
 import { ensureBuiltinApiKey, getDisplayDeviceId } from "./threeBoxBuiltinProvider.js";
 import { createThreeBoxAttachedContext } from "./threeBoxAttachedContext.js";
@@ -474,6 +475,7 @@ async function main() {
     turnDeadlineAt = Date.now() + 180000,
     abortController: providedAbortController,
     estimatedSegments = 1,
+    estimatedOutputTokens,
     selectedCapabilityIds,
     requiresAnimation
   }) {
@@ -561,11 +563,13 @@ async function main() {
           streaming.update(streamBuffer);
         },
         onGenerationPhase: async (phase) => {
-          if (phase?.phase === "compact-retry") {
+          if (phase?.phase === "compact-retry" || phase?.phase === "segmented-recovery") {
             streamBuffer = "";
             streaming.update("");
             if (typeof streaming.processing === "function") {
-              streaming.processing(t("threebox.app.compactRetry", "输出过长，正在简化场景并重新生成…"));
+              streaming.processing(phase?.phase === "segmented-recovery"
+                ? t("threebox.app.segmentedRecovery", "本段输出已满，正在继续生成完整场景…")
+                : t("threebox.app.compactRetry", "输出过长，正在简化场景并重新生成…"));
             }
             await waitForStatusPaint();
           } else if (phase?.phase === "processing") {
@@ -604,7 +608,9 @@ async function main() {
         executionMode,
         refinementGoals,
         estimatedSegments,
+        estimatedOutputTokens,
         maxSceneSegments: settings.ai?.maxSceneSegments,
+        ...resolveThreeBoxSceneTokenOptions(settings),
         selectedCapabilityIds,
         requiresAnimation,
         signal: abortController.signal
@@ -723,6 +729,7 @@ async function main() {
         executionMode,
         refinementGoals,
         estimatedSegments,
+        estimatedOutputTokens,
         selectedCapabilityIds,
         requiresAnimation
       }));
@@ -879,6 +886,7 @@ async function main() {
         // always iterative and stops as soon as the model returns # done.
         generationStrategy,
         estimatedSegments,
+        ...resolveThreeBoxSceneTokenOptions(settings),
         // The visible card is already loading this exact scene while the provider thinks. Reuse
         // it as the authoritative command runtime instead of constructing a second hidden scene.
         applyCommands: async (commands, meta = {}) => {
@@ -1196,6 +1204,7 @@ async function main() {
         executionMode: classified.executionMode,
         refinementGoals: classified.refinementGoals,
         estimatedSegments: classified.estimatedSegments,
+        estimatedOutputTokens: classified.estimatedOutputTokens,
         selectedCapabilityIds: classified.selectedCapabilityIds,
         requiresAnimation: classified.requiresAnimation
       });

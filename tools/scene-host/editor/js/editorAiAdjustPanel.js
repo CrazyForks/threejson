@@ -377,6 +377,10 @@ export function createEditorAiAdjustPanel(host) {
       void historyCtl.persistTurn("user", prompt);
 
       const agentOptions = getAgentOptions(host);
+      const configuredSceneMaxTokens = Number(host.getEditorSettings()?.ai?.sceneMaxOutputTokens);
+      const sceneTokenOptions = Number.isFinite(configuredSceneMaxTokens) && configuredSceneMaxTokens > 0
+        ? { maxTokens: Math.round(configuredSceneMaxTokens) }
+        : {};
       const providerOptions = {
         provider: creds.provider,
         apiKey: creds.apiKey,
@@ -402,6 +406,7 @@ export function createEditorAiAdjustPanel(host) {
         envelope,
         targetSceneJsonString,
         providerOptions,
+        ...sceneTokenOptions,
         agentOptions,
         updateOutputMode,
         strictOutputMode: updateOutputMode !== "auto",

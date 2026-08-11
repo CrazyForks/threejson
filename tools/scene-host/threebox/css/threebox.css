@@ -605,16 +605,24 @@ details[open] > .sidebarSectionTitle::before { transform: rotate(90deg); }
 .settingsNav::-webkit-scrollbar-thumb { border-radius: 999px; background: var(--scrollbar-thumb); }
 .settingsSectionPanel[hidden] { display: none; }
 .settingsSectionPanel { display: flex; flex-direction: column; gap: 14px; }
-.settingsField { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.settingsFieldLabel { font-size: 13.5px; color: var(--text); flex: 1; min-width: 0; }
-.settingsFieldControl { flex: 0 0 auto; }
+.settingsField {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(160px, 280px);
+  align-items: center; column-gap: 16px; row-gap: 6px;
+}
+.settingsFieldLabel { min-width: 0; font-size: 13.5px; color: var(--text); }
+.settingsFieldControl {
+  min-width: 0; width: 100%; display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+}
 .settingsFieldControl select, .settingsFieldControl input[type="text"], .settingsFieldControl input[type="number"], .settingsFieldControl input[type="password"] {
   height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px;
-  background: var(--button); color: var(--text); font-size: 13px; min-width: 160px;
+  flex: 1 1 auto; width: 100%; min-width: 0; box-sizing: border-box;
+  background: var(--button); color: var(--text); font-size: 13px;
 }
 .settingsFieldControl input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--brand); cursor: pointer; }
-.settingsField:has(textarea) { flex-direction: column; align-items: stretch; gap: 6px; }
-.settingsField:has(textarea) .settingsFieldControl { flex: 1 1 auto; width: 100%; }
+.settingsField:has(input[type="checkbox"]) { grid-template-columns: minmax(0, 1fr) auto; }
+.settingsField:has(input[type="checkbox"]) .settingsFieldControl { width: auto; }
+.settingsField:has(textarea) { grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 6px; }
+.settingsField:has(textarea) .settingsFieldControl { grid-column: 1; width: 100%; }
 .settingsFieldControl textarea {
   width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
   background: var(--button); color: var(--text); font-size: 13px; font-family: inherit;
@@ -657,7 +665,10 @@ details[open] > .sidebarSectionTitle::before { transform: rotate(90deg); }
 }
 .addProviderBtn:hover { color: var(--text); border-color: var(--brand); }
 .settingsEmptyHint { padding: 10px 0; color: var(--muted); font-size: 12.5px; }
-.settingsFieldHint { padding: 0 0 2px; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+.settingsFieldHint {
+  grid-column: 2; min-width: 0; padding: 0 0 2px;
+  color: var(--muted); font-size: 11.5px; line-height: 1.5;
+}
 .providerCardBuiltin { border-style: dashed; }
 .providerBuiltinHeading { font-size: 12.5px; font-weight: 600; color: var(--text); }
 .providerBuiltinIdControl { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -874,10 +885,17 @@ details[open] > .sidebarSectionTitle::before { transform: rotate(90deg); }
     gap: 14px;
   }
   .settingsField {
+    grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
-    flex-direction: column;
     gap: 7px;
   }
+  .settingsField .settingsFieldControl,
+  .settingsField .settingsFieldHint { grid-column: 1; }
+  .settingsField:has(input[type="checkbox"]) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+  .settingsField:has(input[type="checkbox"]) .settingsFieldControl { grid-column: 2; }
   .settingsFieldControl,
   .settingsFieldControl select,
   .settingsFieldControl input[type="text"],

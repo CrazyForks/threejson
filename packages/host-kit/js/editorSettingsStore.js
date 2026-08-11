@@ -140,6 +140,10 @@ export async function loadEditorSettingsBundle() {
   if (!["auto", "direct", "draft_refine"].includes(merged.ai?.sceneGenerationMode)) {
     merged.ai.sceneGenerationMode = "auto";
   }
+  const configuredSceneMaxTokens = Number(merged.ai?.sceneMaxOutputTokens);
+  merged.ai.sceneMaxOutputTokens = Number.isFinite(configuredSceneMaxTokens) && configuredSceneMaxTokens > 0
+    ? Math.round(configuredSceneMaxTokens)
+    : 0;
   if (Number(cached?.ai?.agentPolicyVersion || 0) < 2) {
     const legacyLimit = Number(cached?.ai?.maxAutoRefineRounds);
     merged.ai.maxAutoRefineRounds = Number.isFinite(legacyLimit) && legacyLimit > 0

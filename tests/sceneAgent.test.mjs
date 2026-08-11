@@ -241,6 +241,59 @@ test("runSceneAgent escalates a real direct output cutoff to incremental constru
   }
 });
 
+test("runSceneAgent recovers when both direct generation and the first structural draft hit their limits", async () => {
+  const scenePayload = JSON.stringify(MINIMAL_SCENE);
+  const requestBodies = [];
+  let call = 0;
+  const fetchMock = mock.fn(async (_url, init = {}) => {
+    call += 1;
+    requestBodies.push(JSON.parse(init.body));
+    const content = call === 1
+      ? '{"threeJsonId":"direct-cut-off","objectList":['
+      : call === 2
+        ? "- establish the park layout and primary attractions"
+        : call === 3
+          ? '{"threeJsonId":"draft-cut-off","objectList":['
+          : call === 4
+            ? scenePayload
+            : "# done";
+    return {
+      ok: true,
+      async text() { return ""; },
+      async json() {
+        return {
+          choices: [{
+            message: { content },
+            finish_reason: call === 1 || call === 3 ? "length" : "stop"
+          }]
+        };
+      }
+    };
+  });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = fetchMock;
+  try {
+    const result = await runSceneAgent(
+      { mode: "generate", prompt: "创建一个游乐园" },
+      { apiKey: "test-key", provider: "deepseek", agent: { maxRefineRounds: 2 } }
+    );
+
+    assert.equal(result.executionMode, "draft_refine");
+    assert.equal(result.completed, true);
+    assert.equal(fetchMock.mock.calls.length, 5);
+    assert.equal(Object.hasOwn(requestBodies[2], "max_tokens"), false);
+    assert.equal(Object.hasOwn(requestBodies[3], "max_tokens"), false);
+    assert.match(requestBodies[2].messages.at(-1).content, /STRUCTURAL DRAFT CONTRACT/);
+    assert.match(requestBodies[2].messages.at(-1).content, /do not obey or invent an arbitrary token or object-count quota/);
+    assert.match(requestBodies[3].messages[0].content, /SEGMENTED OUTPUT PROTOCOL/);
+    assert.match(requestBodies[3].messages.at(-1).content, /COMPACT STRUCTURAL-DRAFT REGENERATION REQUIREMENT/);
+    assert.doesNotMatch(requestBodies[3].messages.at(-1).content, /Generate the complete scene again/);
+    assert.ok(result.steps.some((step) => step.kind === "execution_fallback" && step.reason === "output_limit"));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('runSceneAgent keeps generationStrategy "compact" independent from automatic refinement', async () => {
   const scenePayload = JSON.stringify(MINIMAL_SCENE);
   let call = 0;

@@ -31,11 +31,17 @@ test("image generation wires the same incremental draft command executor as text
     new URL("../tools/scene-host/shared/js/aiTurnOrchestrator.js", import.meta.url),
     "utf8"
   );
+  const hostKitSource = await readFile(
+    new URL("../packages/host-kit/js/aiTurnOrchestrator.js", import.meta.url),
+    "utf8"
+  );
   const imageRunner = source.slice(
     source.indexOf("export async function runAiImageGenerateTurn"),
     source.indexOf("export async function classifyAiTurnIntent")
   );
   assert.match(imageRunner, /applyDraftCommands:\s*applyAiDraftCommands/);
+  assert.doesNotMatch(source, /maxTokens\s*=\s*\d+/);
+  assert.doesNotMatch(hostKitSource, /maxTokens\s*=\s*\d+/);
 });
 
 test("automatic first generations negotiate construction policy while complete mode may use the bounded fast path", () => {
@@ -118,7 +124,7 @@ test("runAiAdjustTurn applies automatic rounds through host live-runtime callbac
     assert.equal(applied.length, 1);
     assert.equal(result.commands.length, 1);
     assert.equal(fetchMock.mock.calls.length, 2);
-    assert.ok(requestBodies.every((body) => body.max_tokens === 3000));
+    assert.ok(requestBodies.every((body) => !Object.hasOwn(body, "max_tokens")));
     assert.ok(requestBodies.every((body) => body.messages[1].content.includes('"floor"')));
     assert.ok(requestBodies.every((body) => !body.messages[1].content.includes('"geometry"')));
     assert.ok(requestBodies.every((body) => !body.messages[1].content.includes("#888888")));

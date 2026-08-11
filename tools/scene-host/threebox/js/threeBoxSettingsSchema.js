@@ -35,6 +35,9 @@ export const THREEBOX_SETTINGS_DEFAULTS = {
     // output budget for usable JSON, so keep thinking off unless the user deliberately opts in.
     thinkingPreference: "disabled",
     sceneGenerationMode: "auto",
+    // 0 means core/ai does not send max_tokens. A direct provider then uses its own policy; the
+    // built-in provider is still bounded by the administrator's threebox-server configuration.
+    sceneMaxOutputTokens: 0,
     updateOutputMode: "commands",
     includeSpatialSummary: true,
     includeFullJson: false,
@@ -120,6 +123,14 @@ export const THREEBOX_SETTINGS_FIELDS = [
     type: "select",
     label: "场景生成方式",
     options: [["auto", "自动（由 AI 判断）"], ["direct", "完整生成"], ["draft_refine", "增量构建"]]
+  },
+  {
+    section: "ai",
+    path: "ai.sceneMaxOutputTokens",
+    type: "number",
+    label: "单次场景输出上限（0 = 由供应商/服务端决定）",
+    hint: "这是可选的用户侧上限。保持 0 时 ThreeJSON 不发送 max_tokens；内置供应商仍遵循服务端管理员配置。",
+    min: 0
   },
   { section: "ai", path: "ai.updateOutputMode", type: "select", label: "调整优先方式", options: [["commands", "操作命令"], ["json-incremental", "JSON Patch"], ["json-full", "完整 JSON"]] },
   { section: "ai", path: "ai.includeSpatialSummary", type: "checkbox", label: "调整时附带空间摘要" },

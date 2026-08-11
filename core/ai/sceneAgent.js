@@ -57,23 +57,6 @@ import {
  * @property {object} [usageEstimate]
  */
 
-/** Cheap, text-only planning call before any scene JSON is authored. */
-const OUTLINE_MAX_TOKENS = 1200;
-/** First-pass scene: deliberately small so it is structurally unable to hit an output-length
- * truncation — a rough, correctly-structured blockout, not the finished scene. Detail is added
- * afterward by the incremental refine loop, a small step at a time. */
-const DRAFT_MAX_TOKENS = 2200;
-/** Per-round budget for the incremental refine loop (commands / JSON Patch / a bounded full-JSON
- * rewrite for one round when neither of those is available) — generous headroom for a single
- * small step, still far below a whole-scene rewrite budget. */
-const REFINE_ROUND_MAX_TOKENS = 3000;
-/** Command-first adjustments should not inherit the full-scene rewrite budget. A real command
- * cutoff is surfaced immediately so the host can continue incrementally or use its Patch/full
- * JSON fallback instead of retrying the same oversized response until the round guard expires. */
-const COMMAND_UPDATE_MAX_TOKENS = 3000;
-/** Only reached when a round has no incremental-apply mechanism available at all (bare `core/ai`
- * callers with no live/offscreen runtime) — the lowest-priority fallback, not the common path. */
-const FULL_REWRITE_MAX_TOKENS = 6000;
 /** Default runaway guard for the comparatively rare incremental path. */
 const DEFAULT_MAX_REFINE_ROUNDS = 6;
 /** Hard ceiling enforced regardless of what a caller/user configures — a stuck loop (model never
@@ -93,6 +76,19 @@ function normalizeAgentOptions(agentOptions = {}) {
       ? Math.max(1, Math.min(HARD_MAX_REFINE_ROUNDS, Math.round(raw)))
       : DEFAULT_MAX_REFINE_ROUNDS;
   return { maxRefineRounds };
+}
+
+/** Returns the first explicitly configured positive token ceiling. An absent value deliberately
+ * remains absent so core/ai never manufactures a provider output limit. */
+function resolveOptionalTokenLimit(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null || value === "") continue;
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return Math.max(1, Math.round(numeric));
+    }
+  }
+  return undefined;
 }
 
 function normalizeExecutionMode(value) {
@@ -960,7 +956,7 @@ async function runAutomaticDraftRefinement(params) {
         agentRound: true,
         iterativeApply: true,
         singleRound: false,
-        maxTokens: preset.repairMaxTokens || preset.generateMaxTokens
+        maxTokens: preset.repairMaxTokens ?? preset.generateMaxTokens
       });
     } catch (error) {
       feedback = String(error?.message || error);
@@ -1093,7 +1089,7 @@ async function runAutomaticDraftRefinement(params) {
  * available, just now the last resort — when that attempt throws or produces something invalid.
  * @param {string} fixPrompt describes the specific problem to fix
  * @param {string} sceneJsonString current (valid) scene JSON to fix
- * @param {{chatOptions: object, chatOptionsFullUpdate: object, applyDraftCommands?: Function, refineMaxTokens: number, fullRewriteMaxTokens: number}} config
+ * @param {{chatOptions: object, chatOptionsFullUpdate: object, applyDraftCommands?: Function, refineMaxTokens?: number, fullRewriteMaxTokens?: number}} config
  * @returns {Promise<string>}
  */
 /**
@@ -1343,25 +1339,53 @@ async function runSceneAgent(input = {}, options = {}) {
 
   // Layout/material review is opt-in. Capability review is local-first and only spends another
   // model call when a concrete requested capability is missing.
-  const configuredCommandMaxTokens = Number(
-    options.commandMaxTokens ?? (mode === "update" ? options.maxTokens : NaN)
-  );
+  const tokenBudget = options.tokenBudget && typeof options.tokenBudget === "object"
+    ? options.tokenBudget
+    : {};
+  const commonMaxTokens = resolveOptionalTokenLimit(options.maxTokens, tokenBudget.maxTokens);
   const preset = {
     maxSteps: maxRefineRounds,
     maxRefineRounds,
-    outlineMaxTokens: OUTLINE_MAX_TOKENS,
-    generateMaxTokens:
-      requestedExecutionMode === "draft_refine"
-        ? DRAFT_MAX_TOKENS
-        : Number.isFinite(Number(options.maxTokens))
-          ? Number(options.maxTokens)
-          : FULL_REWRITE_MAX_TOKENS,
-    repairMaxTokens: REFINE_ROUND_MAX_TOKENS,
-    commandMaxTokens: Number.isFinite(configuredCommandMaxTokens)
-      ? Math.max(512, Math.min(FULL_REWRITE_MAX_TOKENS, Math.round(configuredCommandMaxTokens)))
-      : COMMAND_UPDATE_MAX_TOKENS,
-    layoutReviewMaxTokens: REFINE_ROUND_MAX_TOKENS,
-    reviewMaxTokens: 800,
+    outlineMaxTokens: resolveOptionalTokenLimit(
+      options.outlineMaxTokens,
+      tokenBudget.outlineMaxTokens,
+      commonMaxTokens
+    ),
+    draftMaxTokens: resolveOptionalTokenLimit(
+      options.draftMaxTokens,
+      tokenBudget.draftMaxTokens,
+      commonMaxTokens
+    ),
+    generateMaxTokens: resolveOptionalTokenLimit(
+      options.generateMaxTokens,
+      tokenBudget.generateMaxTokens,
+      commonMaxTokens
+    ),
+    repairMaxTokens: resolveOptionalTokenLimit(
+      options.repairMaxTokens,
+      tokenBudget.repairMaxTokens,
+      commonMaxTokens
+    ),
+    commandMaxTokens: resolveOptionalTokenLimit(
+      options.commandMaxTokens,
+      tokenBudget.commandMaxTokens,
+      mode === "update" ? commonMaxTokens : undefined
+    ),
+    layoutReviewMaxTokens: resolveOptionalTokenLimit(
+      options.layoutReviewMaxTokens,
+      tokenBudget.layoutReviewMaxTokens,
+      commonMaxTokens
+    ),
+    reviewMaxTokens: resolveOptionalTokenLimit(
+      options.reviewMaxTokens,
+      tokenBudget.reviewMaxTokens,
+      commonMaxTokens
+    ),
+    fullRewriteMaxTokens: resolveOptionalTokenLimit(
+      options.fullRewriteMaxTokens,
+      tokenBudget.fullRewriteMaxTokens,
+      commonMaxTokens
+    ),
     runOutline: requestedExecutionMode === "draft_refine",
     runRepair: true,
     runCapabilityReview: true,
@@ -1477,7 +1501,15 @@ async function runSceneAgent(input = {}, options = {}) {
   const buildInitialPrompt = () => {
     const draftHint =
       effectiveExecutionMode === "draft_refine" && (mode === "generate" || mode === "fromImage")
-        ? "\n\nThis is the first usable structural draft of an incrementally built scene. Keep it compact, but include every primary subject, identity-defining bundled texture (especially named planets), requested primary animation, basic lighting, and a fitted camera now. Defer only secondary detail and large repeated populations; do not make a deliberately textureless placeholder."
+        ? [
+            "",
+            "STRUCTURAL DRAFT CONTRACT (mandatory):",
+            "This is the first usable blockout of an incrementally built scene, not the final detailed scene.",
+            "Return one complete valid standard scheme-B JSON document. Use compact JSON formatting and ensure syntactic closure before adding secondary content.",
+            "Keep only the primary visual anchors needed for a useful first render. Consolidate repeated elements with instancedList/transforms, bounded representative samples, and reusable materials; do not obey or invent an arbitrary token or object-count quota.",
+            "Include every primary subject, identity-defining bundled texture (especially named planets), requested primary animation, basic lighting, and a fitted camera now. Defer secondary props, decoration, and large populations to later incremental command rounds.",
+            "Do not expand every outline bullet into separate objects and do not create a deliberately textureless placeholder."
+          ].join("\n")
         : "\n\nReturn the complete, immediately usable scene now. Include identity-defining textures, requested animation, lighting, and a fitted camera in this response; do not reserve ordinary work for later review rounds.";
     return (
       (outline && effectiveExecutionMode === "draft_refine" ? `${prompt}\n\nFollow this outline:\n${outline}` : prompt) +
@@ -1488,12 +1520,16 @@ async function runSceneAgent(input = {}, options = {}) {
 
   const generateInitialScene = async () => {
     const generatePrompt = buildInitialPrompt();
+    const incrementalDraft =
+      effectiveExecutionMode === "draft_refine" && (mode === "generate" || mode === "fromImage");
     const generationOptions = {
       ...chatOptionsGenerate,
-      maxTokens: effectiveExecutionMode === "draft_refine" ? DRAFT_MAX_TOKENS : preset.generateMaxTokens,
-      // SceneAgent has a better fallback than repeating another whole scene: one detected direct
-      // cutoff switches to a small validated draft plus incremental commands immediately.
-      compactRetryOnTruncation: false,
+      maxTokens: effectiveExecutionMode === "draft_refine" ? preset.draftMaxTokens : preset.generateMaxTokens,
+      // A direct cutoff switches policies immediately instead of repeating another whole final
+      // scene. A structural draft is already the incremental policy, so a genuine cutoff restarts
+      // under the compact segmented-continuation protocol instead of becoming a visible failure.
+      compactRetryOnTruncation: incrementalDraft,
+      incrementalDraft,
       segmentedOutput:
         effectiveExecutionMode === "draft_refine" ? false : chatOptionsGenerate.segmentedOutput
     };
@@ -1528,7 +1564,7 @@ async function runSceneAgent(input = {}, options = {}) {
       },
       onProgress
     );
-    outline = await requestOptionalOutline({ prompt: userRequest, mode }, chatOptions, OUTLINE_MAX_TOKENS);
+    outline = await requestOptionalOutline({ prompt: userRequest, mode }, chatOptions, preset.outlineMaxTokens);
     steps.push({ kind: "execution_fallback", ok: true, reason: "output_limit" });
     steps.push({ kind: "outline", ok: Boolean(outline), length: outline.length });
     sceneJsonString = await generateInitialScene();
@@ -1689,8 +1725,8 @@ async function runSceneAgent(input = {}, options = {}) {
         chatOptions,
         chatOptionsFullUpdate,
         applyDraftCommands,
-        refineMaxTokens: preset.repairMaxTokens || preset.generateMaxTokens,
-        fullRewriteMaxTokens: FULL_REWRITE_MAX_TOKENS
+        refineMaxTokens: preset.repairMaxTokens ?? preset.generateMaxTokens,
+        fullRewriteMaxTokens: preset.fullRewriteMaxTokens
       });
       sceneJsonString = applyKnownPlanetTextureDefaults(
         sceneJsonString,
@@ -1753,8 +1789,8 @@ async function runSceneAgent(input = {}, options = {}) {
       chatOptions,
       chatOptionsFullUpdate,
       applyDraftCommands,
-      refineMaxTokens: preset.layoutReviewMaxTokens || preset.repairMaxTokens,
-      fullRewriteMaxTokens: FULL_REWRITE_MAX_TOKENS
+      refineMaxTokens: preset.layoutReviewMaxTokens ?? preset.repairMaxTokens,
+      fullRewriteMaxTokens: preset.fullRewriteMaxTokens
     });
     validation = await validateSceneJsonWithNormalizer(sceneJsonString);
     steps.push({ kind: "layout_review", ok: validation.ok, error: validation.error });
@@ -1787,7 +1823,7 @@ async function runSceneAgent(input = {}, options = {}) {
     try {
       const dry = await planTexturesDry(sceneJsonString, userRequest, {
         ...chatOptions,
-        maxTokens: preset.reviewMaxTokens || 800
+        maxTokens: preset.reviewMaxTokens
       });
       steps.push({
         kind: "texture_review",

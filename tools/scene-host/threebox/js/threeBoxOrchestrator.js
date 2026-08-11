@@ -61,6 +61,16 @@ export function resolveThreeBoxAgentOptions(settings = {}) {
   return { maxRefineRounds: settings?.ai?.maxAutoRefineRounds };
 }
 
+/** Optional user ceiling for scene-authoring responses. Zero/blank means no client-side limit:
+ * direct providers use their own default and the built-in provider remains governed by the
+ * administrator's threebox-server policy. */
+export function resolveThreeBoxSceneTokenOptions(settings = {}) {
+  const configured = Number(settings?.ai?.sceneMaxOutputTokens);
+  return Number.isFinite(configured) && configured > 0
+    ? { maxTokens: Math.round(configured) }
+    : {};
+}
+
 export function buildResultDigest(sceneJson) {
   return buildAiResultDigest(sceneJson);
 }

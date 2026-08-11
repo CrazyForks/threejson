@@ -10,6 +10,7 @@ import {
   loadThreeBoxSettingsBundle,
   persistThreeBoxSettings
 } from "../tools/scene-host/threebox/js/threeBoxSettingsStore.js";
+import { resolveThreeBoxSceneTokenOptions } from "../tools/scene-host/threebox/js/threeBoxOrchestrator.js";
 
 const originalLocalStorage = globalThis.localStorage;
 
@@ -47,6 +48,7 @@ test("ThreeBox defaults remember API keys locally", () => {
   assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.maxAutoRefineRounds, 6);
   assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.agentPolicyVersion, 2);
   assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.sceneGenerationMode, "auto");
+  assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.sceneMaxOutputTokens, 0);
   assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.thinkingPreference, "disabled");
   const generationModeField = THREEBOX_SETTINGS_FIELDS.find(
     (field) => field.path === "ai.sceneGenerationMode"
@@ -62,6 +64,10 @@ test("ThreeBox defaults remember API keys locally", () => {
     thinkingField?.options?.map(([value]) => value),
     ["disabled", "high", "max", "inherit"]
   );
+  assert.equal(
+    THREEBOX_SETTINGS_FIELDS.find((field) => field.path === "ai.sceneMaxOutputTokens")?.min,
+    0
+  );
   const settings = loadThreeBoxSettingsBundle();
   assert.equal(settings.ai.rememberKeys, true);
   assert.equal(settings.ai.animationCapabilityMode, "auto");
@@ -73,7 +79,24 @@ test("ThreeBox defaults remember API keys locally", () => {
   assert.equal(settings.ai.maxAutoRefineRounds, 6);
   assert.equal(settings.ai.agentPolicyVersion, 2);
   assert.equal(settings.ai.sceneGenerationMode, "auto");
+  assert.equal(settings.ai.sceneMaxOutputTokens, 0);
   assert.equal(settings.ai.thinkingPreference, "disabled");
+});
+
+test("ThreeBox keeps the scene output ceiling opt-in", () => {
+  const store = installMemoryLocalStorage();
+  store.set(
+    THREEBOX_SETTINGS_STORAGE_KEY,
+    JSON.stringify({ ai: { sceneMaxOutputTokens: 12000 } })
+  );
+  assert.equal(loadThreeBoxSettingsBundle().ai.sceneMaxOutputTokens, 12000);
+  assert.deepEqual(resolveThreeBoxSceneTokenOptions(loadThreeBoxSettingsBundle()), { maxTokens: 12000 });
+  store.set(
+    THREEBOX_SETTINGS_STORAGE_KEY,
+    JSON.stringify({ ai: { sceneMaxOutputTokens: -5 } })
+  );
+  assert.equal(loadThreeBoxSettingsBundle().ai.sceneMaxOutputTokens, 0);
+  assert.deepEqual(resolveThreeBoxSceneTokenOptions(loadThreeBoxSettingsBundle()), {});
 });
 
 test("ThreeBox persists valid generation modes and repairs invalid cached values", () => {

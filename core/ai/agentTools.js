@@ -142,7 +142,6 @@ async function planTexturesDry(sceneJsonStringOrObject, userHint = "", chatOptio
 async function requestSceneOutline({ prompt, mode = "generate" }, chatOptions = {}) {
   const content = await requestChatCompletion({
     ...chatOptions,
-    maxTokens: chatOptions.maxTokens || 1200,
     temperature: chatOptions.temperature ?? 0.3,
     taskKind: chatOptions.taskKind || "scene_outline",
     messages: [

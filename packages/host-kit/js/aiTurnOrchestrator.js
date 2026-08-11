@@ -190,7 +190,7 @@ export async function runAiImageGenerateTurn({
   providerOptions,
   agentOptions,
   imageDetail = "auto",
-  maxTokens = 8192,
+  maxTokens,
   executionMode = "direct",
   refinementGoals = [],
   selectedCapabilityIds,

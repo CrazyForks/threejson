@@ -543,6 +543,23 @@ function createRequestAbortScope(parentSignal, timeoutMs, minimumTimeoutMs = 100
 }
 
 /**
+ * Normalizes an explicitly configured completion ceiling without inventing one. `undefined`,
+ * `null`, an empty string, zero and invalid values all mean "let the provider/gateway decide".
+ * This is deliberately separate from prompt-level output estimates, which are advisory and must
+ * never become an accidental terminal budget.
+ */
+function normalizeOptionalMaxTokens(value) {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return undefined;
+  }
+  return Math.max(1, Math.round(numeric));
+}
+
+/**
  * Low-level HTTP: call an OpenAI-compatible chat/completions endpoint and parse its assistant content.
  * @param {object} params
  * @param {string} [params.provider='chatgpt']
@@ -550,7 +567,8 @@ function createRequestAbortScope(parentSignal, timeoutMs, minimumTimeoutMs = 100
  * @param {Array<{role:string,content:string|Array}>} params.messages
  * @param {string} [params.model]
  * @param {number} [params.temperature=0.2]
- * @param {number} [params.maxTokens=4000]
+ * @param {number} [params.maxTokens] Optional caller/provider output ceiling. When omitted,
+ * `max_tokens` is not sent and the provider (or an upstream gateway) owns the limit.
  * @param {string} [params.baseUrl] Override default apiBase
  * @param {string} [params.userId] Anonymous application user identifier. Sent only to providers
  * whose documented API supports an isolation field (currently DeepSeek's `user_id`).
@@ -563,7 +581,7 @@ async function requestChatCompletion({
   messages,
   model,
   temperature = 0.2,
-  maxTokens = 4000,
+  maxTokens,
   baseUrl,
   stream = false,
   signal,
@@ -598,6 +616,7 @@ async function requestChatCompletion({
   if (!Array.isArray(messages) || messages.length === 0) {
     throw new Error("messages must be a non-empty array.");
   }
+  const normalizedMaxTokens = normalizeOptionalMaxTokens(maxTokens);
 
   const endpointBase = (baseUrl || providerConfig.apiBase || "").replace(/\/$/, "");
   if (!endpointBase) {
@@ -654,7 +673,9 @@ async function requestChatCompletion({
       body: JSON.stringify({
         model: model || providerConfig.defaultModel,
         temperature,
-        max_tokens: maxTokens,
+        ...(normalizedMaxTokens !== undefined
+          ? { max_tokens: normalizedMaxTokens }
+          : {}),
         messages,
         stream: stream === true,
         ...thinkingOptions,
@@ -785,7 +806,6 @@ async function dryRunUpdateCommands(commands, sceneJsonString) {
   });
 }
 
-const DEFAULT_GENERATE_MAX_TOKENS = 6000;
 const DEFAULT_MAX_SCENE_SEGMENTS = 16;
 const HARD_MAX_SCENE_SEGMENTS = 64;
 const DEFAULT_AUTO_CONTINUE_MIN_CHARS = 8000;
@@ -918,12 +938,19 @@ function createSceneOutputLimitError(message) {
 }
 
 function buildCompactSceneRetryMessage(prompt, referenceMaterial = "", options = {}) {
+  const incrementalDraft = options.incrementalDraft === true;
   return [
     buildGenerateUserMessage(prompt, "", options),
     referenceMaterial,
-    "COMPACT FULL-REGENERATION REQUIREMENT:",
-    "The previous one-response attempt exceeded the provider output limit. Generate the complete scene again from the beginning; do not continue, quote, or repair the previous fragment.",
-    "Preserve the visual story, but reduce explicit JSON size aggressively: use instancedList/transforms for repeated objects, use a bounded varied sample for words such as many, reuse materials and simple assemblies, omit optional details, and close every array/object in this response.",
+    incrementalDraft
+      ? "COMPACT STRUCTURAL-DRAFT REGENERATION REQUIREMENT:"
+      : "COMPACT FULL-REGENERATION REQUIREMENT:",
+    incrementalDraft
+      ? "The previous structural-draft attempt exceeded the provider output limit. Generate a fresh, complete, valid structural draft from the beginning; do not continue, quote, or repair the previous fragment. This is still an incremental draft, not the final detailed scene."
+      : "The previous one-response attempt exceeded the provider output limit. Generate the complete scene again from the beginning; do not continue, quote, or repair the previous fragment.",
+    incrementalDraft
+      ? "Keep only the primary visual anchors; defer every secondary prop and decoration to later incremental command rounds. Prefer compact JSON formatting and close every array/object before adding optional content. Do not invent an arbitrary token or object-count quota."
+      : "Preserve the visual story, but reduce explicit JSON size aggressively: use instancedList/transforms for repeated objects, use a bounded varied sample for words such as many, reuse materials and simple assemblies, omit optional details, and close every array/object in this response.",
     "Return one complete valid standard scheme-B JSON document only."
   ].filter(Boolean).join("\n\n");
 }
@@ -991,6 +1018,66 @@ async function requestSegmentedSceneJsonContent(messages, options, maxTokens) {
   );
 }
 
+function addSegmentedProtocolToMessages(messages, estimatedSegments) {
+  let foundSystem = false;
+  const withProtocol = messages.map((message) => {
+    if (!foundSystem && message?.role === "system") {
+      foundSystem = true;
+      return {
+        ...message,
+        content: [message.content, buildSegmentedSceneProtocolPrompt(estimatedSegments)].join("\n\n")
+      };
+    }
+    return { ...message };
+  });
+  if (!foundSystem) {
+    withProtocol.unshift({ role: "system", content: buildSegmentedSceneProtocolPrompt(estimatedSegments) });
+  }
+  return withProtocol;
+}
+
+/** Runs a JSON-producing completion without an engine-owned ceiling. If an explicit provider or
+ * gateway ceiling still cuts the JSON, restart under the exact-fragment continuation protocol.
+ * Used by image generation and full/Patch adjustment paths; command output has its own adaptive
+ * commands -> Patch -> full fallback chain. */
+async function requestJsonCompletionWithSegmentedRecovery(messages, options = {}, taskKind = "scene_json") {
+  const maxTokens = normalizeOptionalMaxTokens(options.maxTokens);
+  let completionMetadata = { finishReason: null };
+  const content = await requestChatCompletion({
+    ...options,
+    maxTokens,
+    taskKind,
+    messages,
+    onCompletionMetadata: (metadata) => {
+      completionMetadata = { ...completionMetadata, ...metadata };
+      if (typeof options.onCompletionMetadata === "function") {
+        options.onCompletionMetadata(metadata);
+      }
+    }
+  });
+  if (!isSceneOutputCutoff(content, completionMetadata, options)) {
+    return content;
+  }
+  if (options.compactRetryOnTruncation === false) {
+    throw createSceneOutputLimitError(
+      "JSON output reached the provider limit before the document was complete."
+    );
+  }
+  await emitSceneGenerationPhase(options, {
+    phase: "segmented-recovery",
+    reason: "provider-output-limit"
+  });
+  const estimatedSegments = Math.max(
+    2,
+    clampInteger(options.estimatedSegments, 2, 1, DEFAULT_MAX_SCENE_SEGMENTS)
+  );
+  return requestSegmentedSceneJsonContent(
+    addSegmentedProtocolToMessages(messages, estimatedSegments),
+    { ...options, taskKind, estimatedSegments },
+    maxTokens
+  );
+}
+
 /**
  * @param {string} prompt
  * @param {string} [outline]
@@ -1042,7 +1129,9 @@ async function resolveEffectiveGeneratePrompt(prompt, options = {}) {
     { prompt, mode: "generate" },
     {
       ...stripChatTransportOptions(options),
-      maxTokens: options.outlineMaxTokens || 1000,
+      ...(normalizeOptionalMaxTokens(options.outlineMaxTokens) !== undefined
+        ? { maxTokens: normalizeOptionalMaxTokens(options.outlineMaxTokens) }
+        : {}),
       temperature: options.outlineTemperature ?? 0.3
     }
   );
@@ -1082,7 +1171,9 @@ async function maybeApplyCapabilityReview(prompt, sceneJsonString, options = {})
     try {
       current = await requestUpdatedSceneJsonString(fixPrompt, current, {
         ...stripChatTransportOptions(options),
-        maxTokens: options.capabilityReviewMaxTokens || options.maxTokens || DEFAULT_GENERATE_MAX_TOKENS
+        ...(normalizeOptionalMaxTokens(options.capabilityReviewMaxTokens ?? options.maxTokens) !== undefined
+          ? { maxTokens: normalizeOptionalMaxTokens(options.capabilityReviewMaxTokens ?? options.maxTokens) }
+          : {})
       });
     } catch (error) {
       // This review pass only ever *improves* capability usage on top of an already-valid,
@@ -1106,7 +1197,8 @@ async function maybeApplyCapabilityReview(prompt, sceneJsonString, options = {})
  * @param {"auto"|boolean} [options.segmentedOutput="auto"] Use multi-response output explicitly,
  *   disable it explicitly, or in auto mode use it only when estimatedSegments is greater than 1
  * @param {number} [options.maxSceneSegments=16] Maximum responses when segmented output is active (clamped to 1..64)
- * @param {boolean} [options.compactRetryOnTruncation=true] Retry once from scratch with compact-scene constraints after a genuine one-shot cutoff
+ * @param {boolean} [options.compactRetryOnTruncation=true] Recover a genuine one-shot cutoff by
+ *   restarting under the compact segmented-continuation protocol
  * @returns {Promise<string>}
  */
 async function generateSceneJsonString(prompt, options = {}) {
@@ -1119,7 +1211,7 @@ async function generateSceneJsonString(prompt, options = {}) {
     ? options.selectedCapabilityIds.some((id) => ["particleEmitter", "weatherDomain"].includes(id))
     : shouldAllowParticleEffects(trimmedPrompt);
   const effectivePrompt = await resolveEffectiveGeneratePrompt(trimmedPrompt, options);
-  const maxTokens = options.maxTokens ?? DEFAULT_GENERATE_MAX_TOKENS;
+  const maxTokens = normalizeOptionalMaxTokens(options.maxTokens);
   const referenceMaterial = await resolveReferenceMaterialForPrompt(effectivePrompt, options);
 
   const estimatedSegments = clampInteger(options.estimatedSegments, 1, 1, DEFAULT_MAX_SCENE_SEGMENTS);
@@ -1164,31 +1256,28 @@ async function generateSceneJsonString(prompt, options = {}) {
     }
     if (shouldRetryCompactSceneOutput(content, completionMetadata, options)) {
       await emitSceneGenerationPhase(options, {
-        phase: "compact-retry",
+        phase: "segmented-recovery",
         reason: "provider-output-limit"
       });
-      let retryMetadata = { finishReason: null };
-      content = await requestChatCompletion({
-        ...options,
-        maxTokens,
-        taskKind: options.taskKind || "scene_generate_compact_retry",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: buildCompactSceneRetryMessage(effectivePrompt, referenceMaterial, options) }
-        ],
-        onCompletionMetadata: (metadata) => {
-          retryMetadata = { ...retryMetadata, ...metadata };
-          if (typeof options.onCompletionMetadata === "function") {
-            options.onCompletionMetadata(metadata);
+      // A genuine finish_reason=length is a transport boundary, not proof that the requested
+      // scene is impossible. Restart once under the explicit continuation protocol, then keep
+      // requesting exact subsequent JSON fragments until the document closes. This also covers
+      // gateways that enforce their own per-request ceiling while core/ai leaves maxTokens unset.
+      const recoveryEstimatedSegments = Math.max(2, estimatedSegments);
+      content = await requestSegmentedSceneJsonContent(
+        [
+          {
+            role: "system",
+            content: [systemPrompt, buildSegmentedSceneProtocolPrompt(recoveryEstimatedSegments)].join("\n\n")
+          },
+          {
+            role: "user",
+            content: buildCompactSceneRetryMessage(effectivePrompt, referenceMaterial, options)
           }
-        }
-      });
-      if (shouldRetryCompactSceneOutput(content, retryMetadata, { ...options, compactRetryOnTruncation: true })) {
-        throw createSceneOutputLimitError(
-          "Scene JSON exceeded the provider output limit even after one compact full-regeneration attempt. " +
-          "Use planned segmented output or simplify the requested scene."
-        );
-      }
+        ],
+        { ...options, estimatedSegments: recoveryEstimatedSegments },
+        maxTokens
+      );
     }
   }
 
@@ -1249,14 +1338,11 @@ async function generateSceneJsonFromImage(input = {}, options = {}) {
       : DEFAULT_SCENE_IMAGE_PROMPT;
 
   const effectivePrompt = await resolveEffectiveGeneratePrompt(trimmedPrompt, chatOptions);
-  const maxTokens = chatOptions.maxTokens ?? DEFAULT_GENERATE_MAX_TOKENS;
+  const maxTokens = normalizeOptionalMaxTokens(chatOptions.maxTokens);
   const referenceMaterial = await resolveReferenceMaterialForPrompt(effectivePrompt, chatOptions);
 
-  const content = await requestChatCompletion({
-    ...options,
-    maxTokens,
-    taskKind: options.taskKind || "scene_generate_image",
-    messages: [
+  const content = await requestJsonCompletionWithSegmentedRecovery(
+    [
       {
         role: "system",
         content: buildSceneImageGenerationSystemPrompt(chatOptions)
@@ -1274,8 +1360,10 @@ async function generateSceneJsonFromImage(input = {}, options = {}) {
           }
         ]
       }
-    ]
-  });
+    ],
+    { ...options, maxTokens },
+    options.taskKind || "scene_generate_image"
+  );
 
   let jsonText = extractJsonText(content);
   let sceneJsonString = projectSceneJsonString(jsonText, "standard");
@@ -1319,11 +1407,8 @@ async function requestUpdatedSceneJsonString(prompt, currentSceneJsonString, opt
 
   if (updateMode === "incremental") {
     const currentScenePrettyJson = prettyJson(currentSceneObj);
-    const content = await requestChatCompletion({
-      ...options,
-      ...chatOpts,
-      taskKind: options.taskKind || "scene_adjust_patch",
-      messages: [
+    const content = await requestJsonCompletionWithSegmentedRecovery(
+      [
         {
           role: "system",
           content: buildSceneIncrementalUpdateSystemPrompt(options)
@@ -1336,8 +1421,10 @@ async function requestUpdatedSceneJsonString(prompt, currentSceneJsonString, opt
             `Current scene JSON:\n${currentScenePrettyJson}`
           ].filter(Boolean).join("\n\n")
         }
-      ]
-    });
+      ],
+      { ...options, ...chatOpts },
+      options.taskKind || "scene_adjust_patch"
+    );
     const patch = extractPatchOperations(content);
     const applied = applySceneJsonPatch(currentSceneObj, patch);
     if (!applied.ok) {
@@ -1350,11 +1437,8 @@ async function requestUpdatedSceneJsonString(prompt, currentSceneJsonString, opt
   }
 
   const currentScenePrettyJson = prettyJson(currentSceneObj);
-  const content = await requestChatCompletion({
-    ...options,
-    ...chatOpts,
-    taskKind: options.taskKind || "scene_adjust_json",
-    messages: [
+  const content = await requestJsonCompletionWithSegmentedRecovery(
+    [
       {
         role: "system",
         content: buildSceneUpdateSystemPrompt(options)
@@ -1367,8 +1451,10 @@ async function requestUpdatedSceneJsonString(prompt, currentSceneJsonString, opt
           `Current scene JSON:\n${currentScenePrettyJson}`
         ].filter(Boolean).join("\n\n")
       }
-    ]
-  });
+    ],
+    { ...options, ...chatOpts },
+    options.taskKind || "scene_adjust_json"
+  );
 
   const updatedJsonText = extractJsonText(content);
   const sceneJsonString = projectSceneDraftJsonString(

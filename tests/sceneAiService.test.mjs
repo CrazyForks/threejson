@@ -608,6 +608,30 @@ test("requestChatCompletion sends an anonymous user_id only to DeepSeek", async 
   assert.equal("thinking" in bodies[1], false);
 });
 
+test("requestChatCompletion omits max_tokens by default and forwards an explicit ceiling", async () => {
+  const bodies = [];
+  globalThis.fetch = async (_url, init = {}) => {
+    bodies.push(JSON.parse(init.body));
+    return {
+      ok: true,
+      async json() { return { choices: [{ message: { content: "ok" } }] }; }
+    };
+  };
+  await requestChatCompletion({
+    provider: "chatgpt",
+    apiKey: "test-key",
+    messages: [{ role: "user", content: "hello" }]
+  });
+  await requestChatCompletion({
+    provider: "chatgpt",
+    apiKey: "test-key",
+    maxTokens: 12345,
+    messages: [{ role: "user", content: "hello" }]
+  });
+  assert.equal(Object.hasOwn(bodies[0], "max_tokens"), false);
+  assert.equal(bodies[1].max_tokens, 12345);
+});
+
 test("requestChatCompletion applies explicit DeepSeek effort and sends built-in policy as context", async () => {
   const bodies = [];
   globalThis.fetch = async (_url, init) => {
@@ -977,7 +1001,7 @@ test("generateSceneJsonString does not silently turn a malformed ordinary respon
   assert.equal(requestCount, 1);
 });
 
-test("generateSceneJsonString regenerates a truncated one-shot forest once with compact constraints", async () => {
+test("generateSceneJsonString recovers a truncated one-shot forest with compact segmented output", async () => {
   const first = '{"threeJsonId":"forest","objectList":[';
   const second = '{"threeJsonId":"forest-compact","objectList":[{"threeJsonId":"robot-1","objType":"box"}]}';
   const requestBodies = [];
@@ -1012,14 +1036,15 @@ test("generateSceneJsonString regenerates a truncated one-shot forest once with 
 
   assert.equal(requestBodies.length, 2);
   assert.doesNotMatch(requestBodies[0].messages[0].content, /SEGMENTED OUTPUT PROTOCOL/);
+  assert.match(requestBodies[1].messages[0].content, /SEGMENTED OUTPUT PROTOCOL/);
   assert.equal(requestBodies[1].messages.length, 2);
   assert.equal(requestBodies[1].messages.some((message) => message.role === "assistant"), false);
   assert.match(requestBodies[1].messages.at(-1).content, /Generate the complete scene again from the beginning/);
   assert.equal(JSON.parse(output).threeJsonId, "forest-compact");
-  assert.deepEqual(progress, ["compact-retry", "processing"]);
+  assert.deepEqual(progress, ["segmented-recovery", "processing"]);
 });
 
-test("a compact full-regeneration cutoff fails after two requests instead of blind continuation", async () => {
+test("a compact recovery treats a second output cutoff as a continuation boundary", async () => {
   let requestCount = 0;
   globalThis.fetch = async () => {
     requestCount += 1;
@@ -1028,28 +1053,26 @@ test("a compact full-regeneration cutoff fails after two requests instead of bli
       async json() {
         return {
           choices: [{
-            message: {
-              content: requestCount === 1
-                ? '{"threeJsonId":"forest","objectList":['
-                : '{"threeJsonId":"forest-compact","objectList":['
-            },
-            finish_reason: "length"
+            message: { content: requestCount === 1
+              ? '{"threeJsonId":"forest","objectList":['
+              : requestCount === 2
+                ? '{"threeJsonId":"forest-compact","objectList":['
+                : '{"threeJsonId":"tree","objType":"box"}]}' },
+            finish_reason: requestCount < 3 ? "length" : "stop"
           }]
         };
       }
     };
   };
 
-  await assert.rejects(
-    generateSceneJsonString("a forest with many animals", {
-      provider: "chatgpt",
-      apiKey: "test-key",
-      capabilityReview: false,
-      estimatedSegments: 1
-    }),
-    /after one compact full-regeneration attempt/
-  );
-  assert.equal(requestCount, 2);
+  const output = await generateSceneJsonString("a forest with many animals", {
+    provider: "chatgpt",
+    apiKey: "test-key",
+    capabilityReview: false,
+    estimatedSegments: 1
+  });
+  assert.equal(requestCount, 3);
+  assert.equal(JSON.parse(output).threeJsonId, "forest-compact");
 });
 
 test("a failed capability-review pass keeps the already-drafted scene instead of failing the whole turn", async () => {
@@ -1275,21 +1298,23 @@ test("generateSceneJsonString honors the caller maxSceneSegments option", async 
   assert.equal(requestCount, 2);
 });
 
-test("classifyTurnIntent returns a bounded scene segment estimate", async () => {
-  globalThis.fetch = async () => ({
-    ok: true,
-    async json() {
-      return {
-        choices: [
-          {
+test("classifyTurnIntent returns bounded segments and an advisory output estimate", async () => {
+  let requestBody;
+  globalThis.fetch = async (_url, init = {}) => {
+    requestBody = JSON.parse(init.body);
+    return {
+      ok: true,
+      async json() {
+        return {
+          choices: [{
             message: {
-              content: '{"intent":"generate","targetTurnId":null,"note":"large city","generationStrategy":"segmented","estimatedSegments":99}'
+              content: '{"intent":"generate","targetTurnId":null,"note":"large city","generationStrategy":"segmented","estimatedSegments":99,"estimatedOutputTokens":{"min":18000,"max":42000}}'
             }
-          }
-        ]
-      };
-    }
-  });
+          }]
+        };
+      }
+    };
+  };
 
   const result = await classifyTurnIntent(
     {
@@ -1302,7 +1327,9 @@ test("classifyTurnIntent returns a bounded scene segment estimate", async () => 
   assert.equal(result.intent, "generate");
   assert.equal(result.generationStrategy, "segmented");
   assert.equal(result.estimatedSegments, 16);
+  assert.deepEqual(result.estimatedOutputTokens, { min: 18000, max: 42000 });
   assert.equal(result.executionMode, "direct");
+  assert.match(requestBody.messages[0].content, /planning metadata, never a hard cutoff/);
 });
 
 test("classifyTurnIntent negotiates a compact strategy even when there are no prior turns", async () => {
@@ -1510,7 +1537,7 @@ test("classifyTurnIntent preserves an adjust decision when the model omits its t
   );
 
   const negotiationInput = JSON.parse(requestBody.messages[1].content);
-  assert.equal(requestBody.max_tokens, 800);
+  assert.equal(Object.hasOwn(requestBody, "max_tokens"), false);
   assert.equal(negotiationInput.priorSceneTurns[1].isLatestScene, true);
   assert.equal(negotiationInput.priorSceneTurns[1].originalRequest, "再加一个木屋");
   assert.match(requestBody.messages[0].content, /Conversation continuity is the default/);
@@ -1703,6 +1730,38 @@ test("requestUpdatedSceneJsonString does not carry proactive online texture prom
   const systemContent = requestBodies[0].messages[0].content;
   assert.doesNotMatch(systemContent, /Online texture rule/);
   assert.doesNotMatch(systemContent, /self-evidently incomplete as a flat color/);
+});
+
+test("requestUpdatedSceneJsonString continues a provider-truncated full JSON adjustment", async () => {
+  const requestBodies = [];
+  let call = 0;
+  globalThis.fetch = async (_url, init = {}) => {
+    call += 1;
+    requestBodies.push(JSON.parse(init.body));
+    const content = call === 1
+      ? '{"threeJsonId":"updated","objectList":['
+      : call === 2
+        ? '{"threeJsonId":"updated","objectList":['
+        : '{"threeJsonId":"box","objType":"box","material":{"color":"#ff0000"}}]}';
+    return {
+      ok: true,
+      async json() {
+        return {
+          choices: [{ message: { content }, finish_reason: call < 3 ? "length" : "stop" }]
+        };
+      }
+    };
+  };
+
+  const output = await requestUpdatedSceneJsonString(
+    "make the box red",
+    '{"threeJsonId":"base","objectList":[{"threeJsonId":"box","objType":"box"}]}',
+    { provider: "chatgpt", apiKey: "test-key", updateMode: "full" }
+  );
+
+  assert.equal(call, 3);
+  assert.match(requestBodies[1].messages[0].content, /SEGMENTED OUTPUT PROTOCOL/);
+  assert.equal(JSON.parse(output).objectList[0].material.color, "#ff0000");
 });
 
 test("requestUpdatedSceneJsonString forwards negotiated sceneText guidance", async () => {

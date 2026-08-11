@@ -207,6 +207,19 @@ test("buildStructuredTurnEnvelope carries the negotiated compact generation stra
   assert.match(envelope.generationConstraints.instruction, /instancedList\/transforms/);
 });
 
+test("buildStructuredTurnEnvelope keeps negotiated output size advisory", () => {
+  const envelope = JSON.parse(buildStructuredTurnEnvelope({
+    userPrompt: "a detailed city",
+    intent: "generate",
+    estimatedOutputTokens: { min: 12000, max: 36000 }
+  }));
+  assert.deepEqual(envelope.estimatedOutputTokens, {
+    min: 12000,
+    max: 36000,
+    advisoryOnly: true
+  });
+});
+
 test("buildStructuredTurnEnvelope carries negotiated capabilities", () => {
   const envelope = JSON.parse(buildStructuredTurnEnvelope({
     userPrompt: "animate it",

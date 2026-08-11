@@ -102,7 +102,7 @@ export function buildResultDigest(sceneJson) {
  * returns a complete usable scene in one generation call; `draft_refine` is reserved for scenes
  * that genuinely need incremental construction. A direct output-limit failure may still escalate
  * safely inside core/ai. Raw deltas are forwarded only for the direct generation call.
- * @param {{ userPrompt: string, providerOptions: object, onDelta?: (delta:string)=>void, onGenerationPhase?: (phase:object)=>void|Promise<void>, onSceneDraft?: (sceneJsonString:string)=>void|Promise<void>, signal?: AbortSignal, globalPromptPrefix?: string, agentOptions?: {maxRefineRounds?: number}, onAgentProgress?: (p: object)=>void, includeReferenceLinks?: boolean, locale?: string, onlineTextureHints?: boolean, generationStrategy?: "single"|"segmented"|"compact", executionMode?: "direct"|"draft_refine", refinementGoals?: string[], estimatedSegments?: number, maxSceneSegments?: number }} input
+ * @param {{ userPrompt: string, providerOptions: object, onDelta?: (delta:string)=>void, onGenerationPhase?: (phase:object)=>void|Promise<void>, onSceneDraft?: (sceneJsonString:string)=>void|Promise<void>, signal?: AbortSignal, globalPromptPrefix?: string, agentOptions?: {maxRefineRounds?: number}, onAgentProgress?: (p: object)=>void, includeReferenceLinks?: boolean, locale?: string, onlineTextureHints?: boolean, generationStrategy?: "single"|"segmented"|"compact", executionMode?: "direct"|"draft_refine", refinementGoals?: string[], estimatedSegments?: number, estimatedOutputTokens?: {min:number,max:number}, maxSceneSegments?: number, maxTokens?: number }} input
  */
 export async function runAiGenerateTurn({
   userPrompt,
@@ -122,7 +122,9 @@ export async function runAiGenerateTurn({
   executionMode = "direct",
   refinementGoals = [],
   estimatedSegments,
+  estimatedOutputTokens,
   maxSceneSegments,
+  maxTokens,
   selectedCapabilityIds,
   requiresAnimation
 }) {
@@ -139,6 +141,7 @@ export async function runAiGenerateTurn({
     globalPromptPrefix,
     includeReferenceLinks,
     generationStrategy,
+    estimatedOutputTokens,
     executionMode,
     refinementGoals,
     selectedCapabilityIds,
@@ -149,6 +152,7 @@ export async function runAiGenerateTurn({
     {
       ...providerOptions,
       signal,
+      maxTokens: maxTokens ?? providerOptions?.maxTokens,
       stream: true,
       onDelta,
       agent: { maxRefineRounds: agentOptions?.maxRefineRounds },
@@ -188,7 +192,7 @@ export async function runAiImageGenerateTurn({
   providerOptions,
   agentOptions,
   imageDetail = "auto",
-  maxTokens = 8192,
+  maxTokens,
   executionMode = "direct",
   refinementGoals = [],
   selectedCapabilityIds,
@@ -217,7 +221,7 @@ export async function runAiImageGenerateTurn({
       ...providerOptions,
       signal,
       imageDetail,
-      maxTokens,
+      maxTokens: maxTokens ?? providerOptions?.maxTokens,
       executionMode,
       refinementGoals,
       agent: { maxRefineRounds: agentOptions?.maxRefineRounds },
@@ -432,6 +436,7 @@ async function runAiAgentAdjustTurn({
   animationCapabilities,
   generationStrategy,
   estimatedSegments,
+  maxTokens,
   applyCommands: hostApplyCommands,
   refreshContext: hostRefreshContext,
   signal
@@ -458,6 +463,7 @@ async function runAiAgentAdjustTurn({
       },
       {
         ...providerOptions,
+        maxTokens: maxTokens ?? providerOptions?.maxTokens,
         updateMode: mode.updateMode,
         agent: { maxRefineRounds: agentOptions?.maxRefineRounds },
         resolveReferenceUrl: resolveSceneAiReferenceUrl,
@@ -532,6 +538,7 @@ async function runAiAgentAdjustTurn({
       },
       {
         ...providerOptions,
+        maxTokens: maxTokens ?? providerOptions?.maxTokens,
         // These callbacks opt the core runner into apply-as-you-go adjustment. The model stops as
         // soon as it is satisfied via # done; the configured round count is only a safety budget.
         agent: { maxRefineRounds: agentOptions?.maxRefineRounds },
@@ -647,6 +654,7 @@ export async function runAiAdjustTurn({
   animationCapabilities,
   generationStrategy,
   estimatedSegments,
+  maxTokens,
   applyCommands,
   refreshContext,
   signal
@@ -660,6 +668,7 @@ export async function runAiAdjustTurn({
     if (updateOutputMode === "json-full") {
       const fullJsonString = await requestUpdatedSceneJsonString(userPrompt, targetSceneJsonString, {
         ...providerOptions,
+        maxTokens: maxTokens ?? providerOptions?.maxTokens,
         updateMode: "full",
         stream: true,
         onDelta,
@@ -679,6 +688,7 @@ export async function runAiAdjustTurn({
         targetSceneJsonString,
         {
           ...providerOptions,
+          maxTokens: maxTokens ?? providerOptions?.maxTokens,
           updateMode: "incremental",
           includePatch: true,
           stream: true,
@@ -706,6 +716,7 @@ export async function runAiAdjustTurn({
       { userMessage: envelope, currentSceneJsonString: targetSceneJsonString },
       {
         ...providerOptions,
+        maxTokens: maxTokens ?? providerOptions?.maxTokens,
         outputMode: "commands",
         fallbackToJson: false,
         stream: true,
@@ -768,6 +779,7 @@ export async function runAiAdjustTurn({
       animationCapabilities,
       generationStrategy,
       estimatedSegments,
+      maxTokens,
       applyCommands,
       refreshContext,
       signal
@@ -778,6 +790,7 @@ export async function runAiAdjustTurn({
     }
     const commonFallbackOptions = {
       ...providerOptions,
+      maxTokens: maxTokens ?? providerOptions?.maxTokens,
       stream: true,
       onDelta,
       signal,

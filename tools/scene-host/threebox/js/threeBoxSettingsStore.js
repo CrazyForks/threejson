@@ -115,6 +115,10 @@ export function loadThreeBoxSettingsBundle() {
   if (!["auto", "direct", "draft_refine"].includes(merged.ai?.sceneGenerationMode)) {
     merged.ai.sceneGenerationMode = "auto";
   }
+  const configuredSceneMaxTokens = Number(merged.ai?.sceneMaxOutputTokens);
+  merged.ai.sceneMaxOutputTokens = Number.isFinite(configuredSceneMaxTokens) && configuredSceneMaxTokens > 0
+    ? Math.round(configuredSceneMaxTokens)
+    : 0;
   if (!["inherit", "disabled", "high", "max"].includes(merged.ai?.thinkingPreference)) {
     merged.ai.thinkingPreference = "disabled";
   }

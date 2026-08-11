@@ -367,9 +367,11 @@ export function createEditorAiGeneratePanel(host) {
         ? formatAgentProgressLabel(phaseOrProgress, t)
         : phaseOrProgress.phase === "compact-retry"
           ? t("aiAgent.progress.compactRetry", "Output too long — simplifying and regenerating the scene…")
+          : phaseOrProgress.phase === "segmented-recovery"
+            ? t("aiAgent.progress.segmentedRecovery", "This output segment is full — continuing the complete scene…")
           : phaseOrProgress.phase === "processing"
-            ? t("aiAgent.progress.parsingScene", "Parsing the generated JSON and preparing the scene…")
-            : "";
+              ? t("aiAgent.progress.parsingScene", "Parsing the generated JSON and preparing the scene…")
+              : "";
       if (!label) {
         return;
       }
@@ -429,6 +431,10 @@ export function createEditorAiGeneratePanel(host) {
       }
 
       const agentOptions = getAgentOptions(host);
+      const configuredSceneMaxTokens = Number(host.getEditorSettings()?.ai?.sceneMaxOutputTokens);
+      const sceneTokenOptions = Number.isFinite(configuredSceneMaxTokens) && configuredSceneMaxTokens > 0
+        ? { maxTokens: Math.round(configuredSceneMaxTokens) }
+        : {};
       const turnDeadlineAt = Date.now() + 180000;
       const providerOptions = {
         provider: creds.provider,
@@ -514,6 +520,7 @@ export function createEditorAiGeneratePanel(host) {
           prompt,
           image: attachment.dataUrl,
           providerOptions,
+          ...sceneTokenOptions,
           agentOptions,
           executionMode: negotiation.executionMode,
           refinementGoals: negotiation.refinementGoals,
@@ -557,11 +564,13 @@ export function createEditorAiGeneratePanel(host) {
         const result = await runAiGenerateTurn({
           userPrompt: effectivePrompt,
           providerOptions,
+          ...sceneTokenOptions,
           agentOptions,
           generationStrategy: negotiation.generationStrategy,
           executionMode: negotiation.executionMode,
           refinementGoals: negotiation.refinementGoals,
           estimatedSegments: negotiation.estimatedSegments,
+          estimatedOutputTokens: negotiation.estimatedOutputTokens,
           selectedCapabilityIds: negotiation.selectedCapabilityIds,
           requiresAnimation: negotiation.requiresAnimation,
           onlineTextureHints: true,

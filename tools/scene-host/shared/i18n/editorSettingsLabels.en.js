@@ -170,6 +170,7 @@ export const EDITOR_SETTINGS_LABELS_EN = {
   "settings.fields.ai.customApiBase": "Custom API Base",
   "settings.fields.ai.agentFitViewEachRound": "Auto-Fit View After Each Round of Changes",
   "settings.fields.ai.sceneGenerationMode": "Scene Generation Mode",
+  "settings.fields.ai.sceneMaxOutputTokens": "Per-request scene output limit (0 = provider/server policy)",
   "settings.options.ai.sceneGenerationMode.auto": "Auto (decided by AI)",
   "settings.options.ai.sceneGenerationMode.direct": "Complete Generation",
   "settings.options.ai.sceneGenerationMode.draft_refine": "Incremental Construction",
