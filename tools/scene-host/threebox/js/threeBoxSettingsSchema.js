@@ -31,6 +31,9 @@ export const THREEBOX_SETTINGS_DEFAULTS = {
     // setting rather than hardcoded because ThreeBox is open source — anyone can run their own.
     builtinBackendUrl: DEFAULT_BUILTIN_BACKEND_URL,
     selfName: "ThreeBox",
+    // DeepSeek V4 enables high-effort hidden reasoning by default. Scene generation needs the
+    // output budget for usable JSON, so keep thinking off unless the user deliberately opts in.
+    thinkingPreference: "disabled",
     sceneGenerationMode: "auto",
     updateOutputMode: "commands",
     includeSpatialSummary: true,
@@ -98,6 +101,19 @@ export const THREEBOX_SETTINGS_FIELDS = [
     testEndpoint: "builtinBackend"
   },
   { section: "ai", path: "ai.selfName", type: "text", label: "AI 自称" },
+  {
+    section: "ai",
+    path: "ai.thinkingPreference",
+    type: "select",
+    label: "DeepSeek 思考模式",
+    hint: "仅对 DeepSeek 生效；内置供应商是否允许用户覆盖，由服务端管理员控制。场景 JSON 默认建议关闭。",
+    options: [
+      ["disabled", "关闭（推荐，优先保证场景 JSON 输出）"],
+      ["high", "高"],
+      ["max", "最高"],
+      ["inherit", "继承供应商/服务器设置"]
+    ]
+  },
   {
     section: "ai",
     path: "ai.sceneGenerationMode",

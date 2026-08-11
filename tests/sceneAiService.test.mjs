@@ -267,6 +267,18 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
+test("ThreeBox request context carries only an explicit AI task and thinking preference", () => {
+  const context = createThreeBoxTurnContext("turn-policy", "create a scene");
+  const payload = buildThreeBoxRequestContext(context, {
+    taskKind: "scene_generate",
+    thinkingPreference: "max"
+  });
+  assert.deepEqual(payload.ai, {
+    task_kind: "scene_generate",
+    thinking: { mode: "enabled", effort: "max" }
+  });
+});
+
 test("command updates surface a provider length cutoff instead of spending repair rounds", async () => {
   globalThis.fetch = async () => ({
     ok: true,
@@ -416,6 +428,38 @@ test("requestChatCompletion stream surfaces provider error events", async () => 
   );
 });
 
+test("requestChatCompletion diagnoses a DeepSeek reasoning-only stream that reaches its limit", async () => {
+  globalThis.fetch = async () => ({
+    ok: true,
+    body: new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode([
+          'data: {"choices":[{"delta":{"reasoning_content":"private reasoning"}}]}\n\n',
+          'data: {"choices":[{"delta":{},"finish_reason":"length"}],"usage":{"completion_tokens_details":{"reasoning_tokens":800}}}\n\n',
+          "data: [DONE]\n\n"
+        ].join("")));
+        controller.close();
+      }
+    })
+  });
+
+  await assert.rejects(
+    requestChatCompletion({
+      provider: "deepseek",
+      apiKey: "test-key",
+      messages: [{ role: "user", content: "hi" }],
+      stream: true,
+      thinkingPreference: "max"
+    }),
+    (error) => {
+      assert.equal(error.code, "UPSTREAM_REASONING_EXHAUSTED");
+      assert.match(error.message, /reasoning_tokens=800/);
+      assert.doesNotMatch(error.message, /private reasoning/);
+      return true;
+    }
+  );
+});
+
 test("requestChatCompletion respects AbortSignal", async () => {
   globalThis.fetch = async (_url, init) =>
     new Promise((_resolve, reject) => {
@@ -559,7 +603,47 @@ test("requestChatCompletion sends an anonymous user_id only to DeepSeek", async 
   });
 
   assert.equal(bodies[0].user_id, "TB-ABC1234567");
+  assert.deepEqual(bodies[0].thinking, { type: "disabled" });
   assert.equal("user_id" in bodies[1], false);
+  assert.equal("thinking" in bodies[1], false);
+});
+
+test("requestChatCompletion applies explicit DeepSeek effort and sends built-in policy as context", async () => {
+  const bodies = [];
+  globalThis.fetch = async (_url, init) => {
+    bodies.push(JSON.parse(init.body));
+    return {
+      ok: true,
+      headers: new Headers(),
+      async json() {
+        return { choices: [{ message: { content: "ok" } }] };
+      }
+    };
+  };
+
+  await requestChatCompletion({
+    provider: "deepseek",
+    apiKey: "test-key",
+    thinkingPreference: "high",
+    messages: [{ role: "user", content: "x" }]
+  });
+  await requestChatCompletion({
+    provider: "threebox-builtin",
+    baseUrl: "https://builtin.example/v1",
+    apiKey: "test-key",
+    thinkingPreference: "max",
+    taskKind: "scene_generate",
+    threeBoxTurnContext: createThreeBoxTurnContext("turn-policy", "x"),
+    messages: [{ role: "user", content: "x" }]
+  });
+
+  assert.deepEqual(bodies[0].thinking, { type: "enabled" });
+  assert.equal(bodies[0].reasoning_effort, "high");
+  assert.equal("thinking" in bodies[1], false);
+  assert.deepEqual(bodies[1].threebox_context.ai, {
+    task_kind: "scene_generate",
+    thinking: { mode: "enabled", effort: "max" }
+  });
 });
 
 test("requestChatCompletion rejects an unsafe provider userId before fetch", async () => {

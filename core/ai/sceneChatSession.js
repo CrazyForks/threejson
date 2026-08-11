@@ -47,7 +47,7 @@ const SCENE_TITLE_UNSAFE_CHARS = /[\\/:*?"<>|]/g;
 
 /** Keep only chat-completion transport options (avoid leaking unrelated caller options into the HTTP body). */
 function pickChatCompletionOptions(source, fallbackMaxTokens) {
-  const keys = ["provider", "apiKey", "model", "baseUrl", "temperature", "signal", "threeBoxTurnContext", "userId"];
+  const keys = ["provider", "apiKey", "model", "baseUrl", "temperature", "signal", "threeBoxTurnContext", "userId", "thinkingPreference"];
   const out = {};
   for (const k of keys) {
     if (source && Object.prototype.hasOwnProperty.call(source, k)) {
@@ -225,6 +225,7 @@ async function classifyTurnIntent(input = {}, options = {}) {
   try {
     const content = await requestChatCompletion({
       ...pickChatCompletionOptions(options, DEFAULT_CLASSIFY_MAX_TOKENS),
+      taskKind: "scene_negotiate",
       messages: [
         {
           role: "system",
@@ -380,6 +381,7 @@ async function summarizeSceneTurn(input = {}, options = {}) {
   try {
     const content = await requestChatCompletion({
       ...pickChatCompletionOptions(options, DEFAULT_SUMMARIZE_MAX_TOKENS),
+      taskKind: "scene_summary",
       messages: [
         { role: "system", content: buildSummarizeTurnSystemPrompt(input.selfName) },
         { role: "user", content: buildSummarizeTurnUserMessage(input) }
@@ -453,6 +455,7 @@ async function generateSceneTitle(input = {}, options = {}) {
   try {
     const content = await requestChatCompletion({
       ...pickChatCompletionOptions(options, DEFAULT_TITLE_MAX_TOKENS),
+      taskKind: "scene_title",
       messages: [
         { role: "system", content: buildGenerateTitleSystemPrompt() },
         { role: "user", content: buildGenerateTitleUserMessage(input) }

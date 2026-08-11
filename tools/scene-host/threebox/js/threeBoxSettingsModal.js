@@ -33,6 +33,10 @@ function fieldPlaceholderKey(field) {
   return `threebox.settings.fieldPlaceholder.${field.path.replace(/\./g, "_")}`;
 }
 
+function fieldHintKey(field) {
+  return `threebox.settings.fieldHint.${field.path.replace(/\./g, "_")}`;
+}
+
 function optionLabelKey(field, value) {
   return `threebox.settings.option.${field.path.replace(/\./g, "_")}.${value}`;
 }
@@ -128,6 +132,12 @@ export function createThreeBoxSettingsModal(host = {}) {
       controlWrap.appendChild(testBtn);
     }
     row.appendChild(controlWrap);
+    if (field.hint) {
+      const hint = document.createElement("div");
+      hint.className = "settingsFieldHint";
+      hint.textContent = t(fieldHintKey(field), field.hint);
+      row.appendChild(hint);
+    }
     return row;
   }
 

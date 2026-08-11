@@ -115,6 +115,9 @@ export function loadThreeBoxSettingsBundle() {
   if (!["auto", "direct", "draft_refine"].includes(merged.ai?.sceneGenerationMode)) {
     merged.ai.sceneGenerationMode = "auto";
   }
+  if (!["inherit", "disabled", "high", "max"].includes(merged.ai?.thinkingPreference)) {
+    merged.ai.thinkingPreference = "disabled";
+  }
   if (cached?.io?.sceneJsonFormat !== "standard" && cached?.io?.sceneJsonFormat !== "friendly") {
     merged.io.sceneJsonFormat = cached?.io?.copyFriendlyJson === true ? "friendly" : "standard";
   }

@@ -46,3 +46,13 @@ test("AI error feedback gives unknown failures a friendly message", () => {
   assert.ok(feedback.message);
   assert.match(feedback.detail, /low-level failure/);
 });
+
+test("AI error feedback explains direct upstream reasoning exhaustion", () => {
+  const feedback = getAiErrorFeedback({
+    code: "UPSTREAM_REASONING_EXHAUSTED",
+    message: "finish_reason=length, reasoning_tokens=800"
+  });
+  assert.equal(feedback.code, "UPSTREAM_REASONING_EXHAUSTED");
+  assert.match(feedback.message, /思考|reasoning/i);
+  assert.doesNotMatch(feedback.detail, /private/);
+});

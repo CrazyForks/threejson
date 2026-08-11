@@ -47,12 +47,20 @@ test("ThreeBox defaults remember API keys locally", () => {
   assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.maxAutoRefineRounds, 6);
   assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.agentPolicyVersion, 2);
   assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.sceneGenerationMode, "auto");
+  assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.thinkingPreference, "disabled");
   const generationModeField = THREEBOX_SETTINGS_FIELDS.find(
     (field) => field.path === "ai.sceneGenerationMode"
   );
   assert.deepEqual(
     generationModeField?.options?.map(([value]) => value),
     ["auto", "direct", "draft_refine"]
+  );
+  const thinkingField = THREEBOX_SETTINGS_FIELDS.find(
+    (field) => field.path === "ai.thinkingPreference"
+  );
+  assert.deepEqual(
+    thinkingField?.options?.map(([value]) => value),
+    ["disabled", "high", "max", "inherit"]
   );
   const settings = loadThreeBoxSettingsBundle();
   assert.equal(settings.ai.rememberKeys, true);
@@ -65,6 +73,7 @@ test("ThreeBox defaults remember API keys locally", () => {
   assert.equal(settings.ai.maxAutoRefineRounds, 6);
   assert.equal(settings.ai.agentPolicyVersion, 2);
   assert.equal(settings.ai.sceneGenerationMode, "auto");
+  assert.equal(settings.ai.thinkingPreference, "disabled");
 });
 
 test("ThreeBox persists valid generation modes and repairs invalid cached values", () => {
@@ -79,6 +88,20 @@ test("ThreeBox persists valid generation modes and repairs invalid cached values
     JSON.stringify({ ai: { sceneGenerationMode: "legacy-always-refine" } })
   );
   assert.equal(loadThreeBoxSettingsBundle().ai.sceneGenerationMode, "auto");
+});
+
+test("ThreeBox persists valid thinking preferences and repairs unsupported values", () => {
+  const store = installMemoryLocalStorage();
+  persistThreeBoxSettings({
+    ai: { thinkingPreference: "max", providers: [], rememberKeys: true }
+  });
+  assert.equal(loadThreeBoxSettingsBundle().ai.thinkingPreference, "max");
+
+  store.set(
+    THREEBOX_SETTINGS_STORAGE_KEY,
+    JSON.stringify({ ai: { thinkingPreference: "low" } })
+  );
+  assert.equal(loadThreeBoxSettingsBundle().ai.thinkingPreference, "disabled");
 });
 
 test("ThreeBox migrates the legacy always-refine limit away from 20", () => {

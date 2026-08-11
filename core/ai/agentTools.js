@@ -144,6 +144,7 @@ async function requestSceneOutline({ prompt, mode = "generate" }, chatOptions = 
     ...chatOptions,
     maxTokens: chatOptions.maxTokens || 1200,
     temperature: chatOptions.temperature ?? 0.3,
+    taskKind: chatOptions.taskKind || "scene_outline",
     messages: [
       {
         role: "system",

@@ -90,6 +90,29 @@ function ensureProvider(provider) {
   return normalized;
 }
 
+const THINKING_PREFERENCES = new Set(["inherit", "disabled", "high", "max"]);
+
+function normalizeThinkingPreference(value) {
+  return THINKING_PREFERENCES.has(String(value)) ? String(value) : "disabled";
+}
+
+function isOfficialDeepSeekEndpoint(provider, endpointBase) {
+  if (provider === "deepseek") return true;
+  try {
+    const host = new URL(endpointBase).hostname.toLowerCase();
+    return host === "deepseek.com" || host.endsWith(".deepseek.com");
+  } catch {
+    return false;
+  }
+}
+
+function buildDeepSeekThinkingOptions(preference) {
+  const normalized = normalizeThinkingPreference(preference);
+  if (normalized === "inherit") return {};
+  if (normalized === "disabled") return { thinking: { type: "disabled" } };
+  return { thinking: { type: "enabled" }, reasoning_effort: normalized };
+}
+
 /** Shared mutable state for every provider request spawned by one user-authored ThreeBox turn. */
 function createThreeBoxTurnContext(turnId, originalPrompt) {
   return {
@@ -101,11 +124,22 @@ function createThreeBoxTurnContext(turnId, originalPrompt) {
   };
 }
 
-function buildThreeBoxRequestContext(context) {
+function buildThreeBoxRequestContext(context, options = {}) {
   if (!isObject(context) || !String(context.turnId || "").trim()) {
     return undefined;
   }
   const hasReceipt = Boolean(String(context.moderationReceipt || "").trim());
+  const taskKind = /^[a-z][a-z0-9_-]{0,63}$/i.test(String(options.taskKind || "").trim())
+    ? String(options.taskKind).trim()
+    : "";
+  const thinkingPreference = Object.prototype.hasOwnProperty.call(options, "thinkingPreference")
+    ? normalizeThinkingPreference(options.thinkingPreference)
+    : "inherit";
+  const thinking = thinkingPreference === "inherit"
+    ? null
+    : thinkingPreference === "disabled"
+      ? { mode: "disabled" }
+      : { mode: "enabled", effort: thinkingPreference };
   return {
     protocol_version: 1,
     turn_id: String(context.turnId).trim(),
@@ -116,7 +150,13 @@ function buildThreeBoxRequestContext(context) {
       status: hasReceipt ? String(context.moderationStatus || "allowed") : "pending",
       ...(hasReceipt ? { receipt: String(context.moderationReceipt) } : {}),
       ...(context.originalPromptHash ? { prompt_hash: String(context.originalPromptHash) } : {})
-    }
+    },
+    ...((taskKind || thinking) ? {
+      ai: {
+        ...(taskKind ? { task_kind: taskKind } : {}),
+        ...(thinking ? { thinking } : {})
+      }
+    } : {})
   };
 }
 
@@ -337,13 +377,40 @@ function createChatCompletionPayloadError(payload, prefix = "AI stream failed") 
   return error;
 }
 
+function createEmptyChatCompletionError({ finishReason = null, reasoningChars = 0, reasoningTokens = null } = {}) {
+  const detail = [
+    finishReason ? `finish_reason=${finishReason}` : "",
+    reasoningChars > 0 ? `reasoning_chars=${reasoningChars}` : "",
+    reasoningTokens !== null ? `reasoning_tokens=${reasoningTokens}` : ""
+  ].filter(Boolean).join(", ");
+  const suffix = detail ? ` (${detail})` : "";
+  let code = "UPSTREAM_EMPTY_COMPLETION";
+  let message = `AI provider returned no completion content${suffix}.`;
+  if (finishReason === "length" && (reasoningChars > 0 || (reasoningTokens ?? 0) > 0)) {
+    code = "UPSTREAM_REASONING_EXHAUSTED";
+    message = `AI provider exhausted its output budget during reasoning before producing completion content${suffix}.`;
+  } else if (finishReason === "length") {
+    code = "UPSTREAM_OUTPUT_LIMIT";
+    message = `AI provider reached its output limit before producing completion content${suffix}.`;
+  } else if (finishReason === "content_filter") {
+    code = "UPSTREAM_CONTENT_FILTERED";
+    message = `AI provider filtered the response before producing completion content${suffix}.`;
+  } else if (finishReason === "insufficient_system_resource") {
+    code = "UPSTREAM_RESOURCE_UNAVAILABLE";
+    message = `AI provider stopped because inference resources were unavailable${suffix}.`;
+  }
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
 /**
  * Read an OpenAI-compatible streaming response. Besides standard SSE deltas, tolerate two common
  * compatibility behaviours: a final event without a trailing newline, and a provider that ignores
  * `stream: true` and returns one ordinary JSON chat completion instead.
  * @param {ReadableStream<Uint8Array>} body
  * @param {(chunk: string) => void} [onDelta]
- * @param {(metadata:{finishReason:string|null})=>void} [onCompletionMetadata]
+ * @param {(metadata:{finishReason:string|null,reasoningChars?:number,reasoningTokens?:number|null})=>void} [onCompletionMetadata]
  * @returns {Promise<string>}
  */
 async function readSseChatCompletionStream(body, onDelta, onCompletionMetadata) {
@@ -353,6 +420,8 @@ async function readSseChatCompletionStream(body, onDelta, onCompletionMetadata) 
   let rawBody = "";
   let content = "";
   let finishReason = null;
+  let reasoningChars = 0;
+  let reasoningTokens = null;
   let sawSsePayload = false;
 
   const appendChoice = (json) => {
@@ -362,6 +431,13 @@ async function readSseChatCompletionStream(body, onDelta, onCompletionMetadata) 
     const choice = json?.choices?.[0];
     if (typeof choice?.finish_reason === "string" && choice.finish_reason) {
       finishReason = choice.finish_reason;
+    }
+    reasoningChars += completionContentToText(
+      choice?.delta?.reasoning_content ?? choice?.message?.reasoning_content
+    ).length;
+    const rawReasoningTokens = json?.usage?.completion_tokens_details?.reasoning_tokens;
+    if (typeof rawReasoningTokens === "number" && Number.isFinite(rawReasoningTokens)) {
+      reasoningTokens = Math.max(0, rawReasoningTokens);
     }
     const delta = extractChatCompletionChoiceContent(choice);
     if (delta) {
@@ -433,7 +509,10 @@ async function readSseChatCompletionStream(body, onDelta, onCompletionMetadata) 
   }
 
   if (typeof onCompletionMetadata === "function") {
-    onCompletionMetadata({ finishReason });
+    onCompletionMetadata({ finishReason, reasoningChars, reasoningTokens });
+  }
+  if (!content.trim()) {
+    throw createEmptyChatCompletionError({ finishReason, reasoningChars, reasoningTokens });
   }
   return content;
 }
@@ -475,6 +554,8 @@ function createRequestAbortScope(parentSignal, timeoutMs, minimumTimeoutMs = 100
  * @param {string} [params.baseUrl] Override default apiBase
  * @param {string} [params.userId] Anonymous application user identifier. Sent only to providers
  * whose documented API supports an isolation field (currently DeepSeek's `user_id`).
+ * @param {"inherit"|"disabled"|"high"|"max"} [params.thinkingPreference="disabled"]
+ * DeepSeek thinking policy. Other providers do not receive these vendor-specific fields.
  */
 async function requestChatCompletion({
   provider = "chatgpt",
@@ -492,7 +573,9 @@ async function requestChatCompletion({
   onCompletionMetadata,
   extraHeaders,
   threeBoxTurnContext,
-  userId
+  userId,
+  thinkingPreference = "disabled",
+  taskKind = ""
 }) {
   const normalizedProvider = ensureProvider(provider);
   const providerConfig = PROVIDERS[normalizedProvider];
@@ -528,8 +611,11 @@ async function requestChatCompletion({
     throw new Error("userId must contain only letters, digits, hyphens, or underscores (maximum 512 characters).");
   }
   const threeBoxContext = normalizedProvider === "threebox-builtin"
-    ? buildThreeBoxRequestContext(threeBoxTurnContext)
+    ? buildThreeBoxRequestContext(threeBoxTurnContext, { thinkingPreference, taskKind })
     : undefined;
+  const thinkingOptions = isOfficialDeepSeekEndpoint(normalizedProvider, endpointBase)
+    ? buildDeepSeekThinkingOptions(thinkingPreference)
+    : {};
   const numericDeadline = Number(turnDeadlineAt);
   let effectiveRequestTimeoutMs = requestTimeoutMs;
   let minimumRequestTimeoutMs = 1000;
@@ -571,6 +657,7 @@ async function requestChatCompletion({
         max_tokens: maxTokens,
         messages,
         stream: stream === true,
+        ...thinkingOptions,
         ...(normalizedProvider === "deepseek" && normalizedUserId ? { user_id: normalizedUserId } : {}),
         ...(threeBoxContext ? { threebox_context: threeBoxContext } : {})
       })
@@ -597,6 +684,8 @@ async function requestChatCompletion({
           errorCode = "BUILTIN_DEVICE_PERMANENTLY_BANNED";
         } else if (parsed?.error === "DEVICE_MUTED") {
           errorCode = "BUILTIN_DEVICE_MUTED";
+        } else if (typeof parsed?.error === "string" && parsed.error.startsWith("UPSTREAM_")) {
+          errorCode = parsed.error;
         }
       } catch {
         /* not JSON, ignore */
@@ -612,9 +701,6 @@ async function requestChatCompletion({
 
     if (stream === true && response.body) {
       const content = await readSseChatCompletionStream(response.body, onDelta, onCompletionMetadata);
-      if (!content.trim()) {
-        throw new Error("AI stream response content is empty.");
-      }
       return content;
     }
 
@@ -624,7 +710,16 @@ async function requestChatCompletion({
     }
     const content = extractChatCompletionChoiceContent(data?.choices?.[0]);
     if (!content.trim()) {
-      throw new Error("AI response content is empty.");
+      const choice = data?.choices?.[0];
+      const reasoningChars = completionContentToText(choice?.message?.reasoning_content).length;
+      const rawReasoningTokens = data?.usage?.completion_tokens_details?.reasoning_tokens;
+      throw createEmptyChatCompletionError({
+        finishReason: typeof choice?.finish_reason === "string" ? choice.finish_reason : null,
+        reasoningChars,
+        reasoningTokens: typeof rawReasoningTokens === "number" && Number.isFinite(rawReasoningTokens)
+          ? Math.max(0, rawReasoningTokens)
+          : null
+      });
     }
     if (typeof onCompletionMetadata === "function") {
       onCompletionMetadata({ finishReason: data?.choices?.[0]?.finish_reason || null });
@@ -855,6 +950,7 @@ async function requestSegmentedSceneJsonContent(messages, options, maxTokens) {
     const rawContent = await requestChatCompletion({
       ...options,
       maxTokens,
+      taskKind: options.taskKind || "scene_generate",
       messages: conversation,
       onDelta: (delta) => deltaForwarder.push(delta)
     });
@@ -1049,6 +1145,7 @@ async function generateSceneJsonString(prompt, options = {}) {
     content = await requestChatCompletion({
       ...options,
       maxTokens,
+      taskKind: options.taskKind || "scene_generate",
       messages,
       onCompletionMetadata: (metadata) => {
         completionMetadata = { ...completionMetadata, ...metadata };
@@ -1074,6 +1171,7 @@ async function generateSceneJsonString(prompt, options = {}) {
       content = await requestChatCompletion({
         ...options,
         maxTokens,
+        taskKind: options.taskKind || "scene_generate_compact_retry",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: buildCompactSceneRetryMessage(effectivePrompt, referenceMaterial, options) }
@@ -1157,6 +1255,7 @@ async function generateSceneJsonFromImage(input = {}, options = {}) {
   const content = await requestChatCompletion({
     ...options,
     maxTokens,
+    taskKind: options.taskKind || "scene_generate_image",
     messages: [
       {
         role: "system",
@@ -1223,6 +1322,7 @@ async function requestUpdatedSceneJsonString(prompt, currentSceneJsonString, opt
     const content = await requestChatCompletion({
       ...options,
       ...chatOpts,
+      taskKind: options.taskKind || "scene_adjust_patch",
       messages: [
         {
           role: "system",
@@ -1253,6 +1353,7 @@ async function requestUpdatedSceneJsonString(prompt, currentSceneJsonString, opt
   const content = await requestChatCompletion({
     ...options,
     ...chatOpts,
+    taskKind: options.taskKind || "scene_adjust_json",
     messages: [
       {
         role: "system",
@@ -1413,6 +1514,7 @@ async function requestUpdatedSceneEditCommands(prompt, context = {}, options = {
   const content = await requestChatCompletion({
     ...options,
     ...stripChatTransportOptions(options),
+    taskKind: options.taskKind || "scene_adjust_commands",
     onCompletionMetadata: (metadata) => {
       finishReason = metadata?.finishReason || null;
       externalCompletionMetadata?.(metadata);
@@ -1579,6 +1681,7 @@ async function requestSceneRefinementStep(userPrompt, currentSceneJsonString, op
   const content = await requestChatCompletion({
     ...options,
     ...stripChatTransportOptions(options),
+    taskKind: options.taskKind || "scene_refine",
     messages: [
       { role: "system", content: systemPrompt },
       {

@@ -24,10 +24,10 @@ import {
 /**
  * Resolves a saved provider config (tools/scene-host/threebox/js/threeBoxSettingsSchema.js's
  * `ai.providers[]`) into the transport options `requestChatCompletion` (core/ai/sceneAiService.js)
- * expects: { provider, apiKey, model, baseUrl }.
+ * expects: { provider, apiKey, model, baseUrl, thinkingPreference }.
  * @param {object} settings ThreeBox settings bundle
  * @param {string} [providerId] explicit provider id (e.g. composer model-select value); falls back to ai.defaultProviderId, then the first saved provider
- * @returns {{provider:string, apiKey:string, model?:string, baseUrl?:string}|null}
+ * @returns {{provider:string, apiKey:string, model?:string, baseUrl?:string, thinkingPreference:string}|null}
  */
 export function resolveProviderOptions(settings, providerId) {
   const providers = Array.isArray(settings?.ai?.providers) ? settings.ai.providers : [];
@@ -42,6 +42,7 @@ export function resolveProviderOptions(settings, providerId) {
     provider: provider.provider || "chatgpt",
     apiKey: provider.apiKey || "",
     model: provider.model || undefined,
+    thinkingPreference: settings?.ai?.thinkingPreference || "disabled",
     baseUrl:
       provider.provider === "custom"
         ? provider.baseUrl || undefined
