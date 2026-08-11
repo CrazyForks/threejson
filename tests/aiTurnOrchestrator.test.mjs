@@ -26,6 +26,18 @@ const CHANGED_SCENE = JSON.stringify({
   }]
 });
 
+function sseResponse(content) {
+  const body = [
+    `data: ${JSON.stringify({ choices: [{ delta: { content }, finish_reason: null }] })}\n\n`,
+    `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }] })}\n\n`,
+    "data: [DONE]\n\n"
+  ].join("");
+  return new Response(body, {
+    status: 200,
+    headers: { "content-type": "text/event-stream" }
+  });
+}
+
 test("image generation wires the same incremental draft command executor as text generation", async () => {
   const source = await readFile(
     new URL("../tools/scene-host/shared/js/aiTurnOrchestrator.js", import.meta.url),
@@ -130,6 +142,90 @@ test("runAiAdjustTurn applies automatic rounds through host live-runtime callbac
     assert.ok(requestBodies.every((body) => !body.messages[1].content.includes("#888888")));
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test("iterative command adjustment streams each model round into a separate visible channel", async () => {
+  const replies = [
+    'object.patch id=floor partial={"material":{"color":"#336699"}}\n# continue',
+    "# done"
+  ];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = mock.fn(async () => sseResponse(replies.shift() || "# done"));
+  const streamed = [];
+  try {
+    const result = await runAiAdjustTurn({
+      userPrompt: "change the floor color",
+      envelope: "change the floor color",
+      targetSceneJsonString: SCENE,
+      providerOptions: { apiKey: "test-key", provider: "deepseek" },
+      agentOptions: { maxRefineRounds: 4 },
+      updateOutputMode: "commands",
+      capabilityLookup: false,
+      onlineTextureHints: false,
+      resolveContextPayload: () => ({ objectList: [{ threeJsonId: "floor", objType: "box" }] }),
+      applyCommands: async () => ({ ok: true, sceneMutated: true }),
+      refreshContext: async () => ({
+        currentSceneJsonString: CHANGED_SCENE,
+        objectList: [{ threeJsonId: "floor", objType: "box" }]
+      }),
+      onDelta: (delta, metadata) => streamed.push({ delta, metadata })
+    });
+
+    assert.equal(result.stage, "commands");
+    assert.equal(streamed.length, 2);
+    assert.equal(streamed[0].metadata.stage, "adjust_refinement");
+    assert.equal(streamed[0].metadata.outputMode, "commands");
+    assert.equal(streamed[0].metadata.reset, true);
+    assert.equal(streamed[1].metadata.reset, true);
+    assert.notEqual(streamed[0].metadata.streamId, streamed[1].metadata.streamId);
+    assert.match(streamed[0].delta, /object\.patch/);
+    assert.equal(streamed[1].delta, "# done");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("strict JSON Patch and full JSON adjustments expose correctly typed stream metadata", async () => {
+  const cases = [
+    {
+      updateOutputMode: "json-incremental",
+      content: JSON.stringify([{ op: "replace", path: "/objectList/0/material/color", value: "#336699" }]),
+      expectedStage: "json-incremental",
+      expectedStreamStage: "adjust_json_patch",
+      expectedOutputMode: "patch"
+    },
+    {
+      updateOutputMode: "json-full",
+      content: CHANGED_SCENE,
+      expectedStage: "json-full",
+      expectedStreamStage: "adjust_full_json",
+      expectedOutputMode: "json"
+    }
+  ];
+
+  for (const entry of cases) {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock.fn(async () => sseResponse(entry.content));
+    const streamed = [];
+    try {
+      const result = await runAiAdjustTurn({
+        userPrompt: "change the floor color",
+        envelope: "change the floor color",
+        targetSceneJsonString: SCENE,
+        providerOptions: { apiKey: "test-key", provider: "deepseek" },
+        updateOutputMode: entry.updateOutputMode,
+        strictOutputMode: true,
+        onDelta: (delta, metadata) => streamed.push({ delta, metadata })
+      });
+      assert.equal(result.stage, entry.expectedStage);
+      assert.equal(streamed.map((item) => item.delta).join(""), entry.content);
+      assert.equal(streamed[0].metadata.stage, entry.expectedStreamStage);
+      assert.equal(streamed[0].metadata.outputMode, entry.expectedOutputMode);
+      assert.equal(streamed[0].metadata.reset, true);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   }
 });
 

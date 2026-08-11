@@ -145,6 +145,43 @@ test("structured envelope metadata does not create a false animation review", as
   }
 });
 
+test("runSceneAgent streams direct scene JSON through an isolated visible-output channel", async () => {
+  const scenePayload = JSON.stringify(MINIMAL_SCENE);
+  const splitAt = Math.floor(scenePayload.length / 2);
+  const fragments = [scenePayload.slice(0, splitAt), scenePayload.slice(splitAt)];
+  const sse = [
+    ...fragments.map((content) => `data: ${JSON.stringify({ choices: [{ delta: { content }, finish_reason: null }] })}\n\n`),
+    `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }] })}\n\n`,
+    "data: [DONE]\n\n"
+  ].join("");
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = mock.fn(async () => new Response(sse, {
+    status: 200,
+    headers: { "content-type": "text/event-stream" }
+  }));
+  const streamed = [];
+  try {
+    const result = await runSceneAgent(
+      { mode: "generate", prompt: "a simple box" },
+      {
+        apiKey: "test-key",
+        provider: "deepseek",
+        stream: true,
+        onDelta: (delta, metadata) => streamed.push({ delta, metadata })
+      }
+    );
+    assert.equal(result.executionMode, "direct");
+    assert.equal(streamed.map((entry) => entry.delta).join(""), scenePayload);
+    assert.equal(streamed[0].metadata.stage, "direct_scene");
+    assert.equal(streamed[0].metadata.outputMode, "json");
+    assert.equal(streamed[0].metadata.reset, true);
+    assert.equal(streamed[1].metadata.reset, false);
+    assert.equal(streamed[0].metadata.streamId, streamed[1].metadata.streamId);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("runSceneAgent fills bundled planet textures before the first direct preview", async () => {
   const scenePayload = JSON.stringify({
     threeJsonId: "earth-moon",

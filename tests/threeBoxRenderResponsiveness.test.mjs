@@ -23,6 +23,14 @@ test("ThreeBox final Agent result supersedes queued draft previews", async () =>
   assert.doesNotMatch(source.slice(closeIndex, finalRenderIndex), /await previewRenderQueue/);
 });
 
+test("ThreeBox replaces the live output buffer when Agent authoring stages change", async () => {
+  const source = await readWorkspaceFile("tools/scene-host/threebox/js/threeBoxApp.js");
+  assert.match(source, /function createOutputStreamController\(streaming\)/);
+  assert.match(source, /metadata\?\.reset === true/);
+  assert.match(source, /streamId && streamId !== activeStreamId/);
+  assert.equal((source.match(/onDelta:\s*outputStream\.onDelta/g) || []).length, 2);
+});
+
 test("ThreeBox JSON viewer opens as plain text and upgrades in idle chunks", async () => {
   const source = await readWorkspaceFile("tools/scene-host/threebox/js/threeBoxChatPanel.js");
   assert.match(source, /plainBlock = buildPlainJsonCodeBlock\(text\)/);

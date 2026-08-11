@@ -102,7 +102,7 @@ export function buildResultDigest(sceneJson) {
  * returns a complete usable scene in one generation call; `draft_refine` is reserved for scenes
  * that genuinely need incremental construction. A direct output-limit failure may still escalate
  * safely inside core/ai. Raw deltas are forwarded only for the direct generation call.
- * @param {{ userPrompt: string, providerOptions: object, onDelta?: (delta:string)=>void, onGenerationPhase?: (phase:object)=>void|Promise<void>, onSceneDraft?: (sceneJsonString:string)=>void|Promise<void>, signal?: AbortSignal, globalPromptPrefix?: string, agentOptions?: {maxRefineRounds?: number}, onAgentProgress?: (p: object)=>void, includeReferenceLinks?: boolean, locale?: string, onlineTextureHints?: boolean, generationStrategy?: "single"|"segmented"|"compact", executionMode?: "direct"|"draft_refine", refinementGoals?: string[], estimatedSegments?: number, estimatedOutputTokens?: {min:number,max:number}, maxSceneSegments?: number, maxTokens?: number }} input
+ * @param {{ userPrompt: string, providerOptions: object, onDelta?: (delta:string, metadata?:object)=>void, onGenerationPhase?: (phase:object)=>void|Promise<void>, onSceneDraft?: (sceneJsonString:string)=>void|Promise<void>, signal?: AbortSignal, globalPromptPrefix?: string, agentOptions?: {maxRefineRounds?: number}, onAgentProgress?: (p: object)=>void, includeReferenceLinks?: boolean, locale?: string, onlineTextureHints?: boolean, generationStrategy?: "single"|"segmented"|"compact", executionMode?: "direct"|"draft_refine", refinementGoals?: string[], estimatedSegments?: number, estimatedOutputTokens?: {min:number,max:number}, maxSceneSegments?: number, maxTokens?: number }} input
  */
 export async function runAiGenerateTurn({
   userPrompt,
@@ -416,6 +416,21 @@ function assertAdjustedSceneChanged(sceneJsonString, targetSceneJsonString, mess
   }
 }
 
+function createScopedOutputDelta(onDelta, metadata = {}, streamId = "output-1") {
+  if (typeof onDelta !== "function") {
+    return undefined;
+  }
+  let firstDelta = true;
+  return (delta) => {
+    onDelta(delta, {
+      ...metadata,
+      streamId,
+      reset: firstDelta
+    });
+    firstDelta = false;
+  };
+}
+
 function isAbortOrTurnTimeout(error, signal) {
   return signal?.aborted || error?.name === "AbortError" || error?.code === "AI_TURN_TIMEOUT";
 }
@@ -428,6 +443,7 @@ async function runAiAgentAdjustTurn({
   agentOptions,
   updateOutputMode,
   resolveContextPayload,
+  onDelta,
   onAgentProgress,
   locale,
   capabilityLookup,
@@ -464,6 +480,7 @@ async function runAiAgentAdjustTurn({
       {
         ...providerOptions,
         maxTokens: maxTokens ?? providerOptions?.maxTokens,
+        stream: true,
         updateMode: mode.updateMode,
         agent: { maxRefineRounds: agentOptions?.maxRefineRounds },
         resolveReferenceUrl: resolveSceneAiReferenceUrl,
@@ -475,6 +492,7 @@ async function runAiAgentAdjustTurn({
         estimatedSegments,
         locale,
         signal,
+        onDelta,
         onProgress: onAgentProgress
       }
     );
@@ -539,6 +557,7 @@ async function runAiAgentAdjustTurn({
       {
         ...providerOptions,
         maxTokens: maxTokens ?? providerOptions?.maxTokens,
+        stream: true,
         // These callbacks opt the core runner into apply-as-you-go adjustment. The model stops as
         // soon as it is satisfied via # done; the configured round count is only a safety budget.
         agent: { maxRefineRounds: agentOptions?.maxRefineRounds },
@@ -553,6 +572,7 @@ async function runAiAgentAdjustTurn({
         signal,
         applyCommands,
         refreshContext,
+        onDelta,
         onProgress: onAgentProgress
       }
     );
@@ -619,7 +639,7 @@ async function runAiAgentAdjustTurn({
  *   envelope: string,
  *   targetSceneJsonString: string,
  *   providerOptions: object,
- *   onDelta?: (delta: string) => void,
+ *   onDelta?: (delta: string, metadata?: object) => void,
  *   agentOptions?: object,
  *   updateOutputMode?: string,
  *   resolveContextPayload?: (sceneJson: object) => object,
@@ -659,6 +679,11 @@ export async function runAiAdjustTurn({
   refreshContext,
   signal
 }) {
+  let outputStreamSequence = 0;
+  const scopedOutputDelta = (metadata) => {
+    outputStreamSequence += 1;
+    return createScopedOutputDelta(onDelta, metadata, `adjust-turn-${outputStreamSequence}`);
+  };
   // strictOutputMode forces exactly the requested single stage with no cascade and no round
   // budget — a deliberate one-shot escape hatch, unrelated to the always-iterative behavior
   // below. Used by Editor's AI-edit quick controls: "auto" (strictOutputMode left off) means "let
@@ -671,7 +696,7 @@ export async function runAiAdjustTurn({
         maxTokens: maxTokens ?? providerOptions?.maxTokens,
         updateMode: "full",
         stream: true,
-        onDelta,
+        onDelta: scopedOutputDelta({ stage: "adjust_full_json", outputMode: "json" }),
         signal,
         resolveReferenceUrl: resolveSceneAiReferenceUrl,
         capabilityLookup,
@@ -692,7 +717,7 @@ export async function runAiAdjustTurn({
           updateMode: "incremental",
           includePatch: true,
           stream: true,
-          onDelta,
+          onDelta: scopedOutputDelta({ stage: "adjust_json_patch", outputMode: "patch" }),
           signal,
           resolveReferenceUrl: resolveSceneAiReferenceUrl,
           capabilityLookup,
@@ -720,7 +745,7 @@ export async function runAiAdjustTurn({
         outputMode: "commands",
         fallbackToJson: false,
         stream: true,
-        onDelta,
+        onDelta: scopedOutputDelta({ stage: "adjust_commands", outputMode: "commands" }),
         signal,
         resolveReferenceUrl: resolveSceneAiReferenceUrl,
         capabilityLookup,
@@ -771,6 +796,7 @@ export async function runAiAdjustTurn({
       agentOptions,
       updateOutputMode,
       resolveContextPayload,
+      onDelta,
       onAgentProgress,
       locale,
       capabilityLookup,
@@ -792,7 +818,6 @@ export async function runAiAdjustTurn({
       ...providerOptions,
       maxTokens: maxTokens ?? providerOptions?.maxTokens,
       stream: true,
-      onDelta,
       signal,
       resolveReferenceUrl: resolveSceneAiReferenceUrl,
       capabilityLookup,
@@ -805,7 +830,12 @@ export async function runAiAdjustTurn({
       const { sceneJsonString, patch } = await requestUpdatedSceneJsonString(
         userPrompt,
         targetSceneJsonString,
-        { ...commonFallbackOptions, updateMode: "incremental", includePatch: true }
+        {
+          ...commonFallbackOptions,
+          updateMode: "incremental",
+          includePatch: true,
+          onDelta: scopedOutputDelta({ stage: "adjust_json_patch_fallback", outputMode: "patch" })
+        }
       );
       if (normalizedSceneJsonSignature(sceneJsonString) !== normalizedSceneJsonSignature(targetSceneJsonString)) {
         return {
@@ -831,7 +861,11 @@ export async function runAiAdjustTurn({
     const sceneJsonString = await requestUpdatedSceneJsonString(
       userPrompt,
       targetSceneJsonString,
-      { ...commonFallbackOptions, updateMode: "full" }
+      {
+        ...commonFallbackOptions,
+        updateMode: "full",
+        onDelta: scopedOutputDelta({ stage: "adjust_full_json_fallback", outputMode: "json" })
+      }
     );
     if (normalizedSceneJsonSignature(sceneJsonString) === normalizedSceneJsonSignature(targetSceneJsonString)) {
       const error = new Error("AI adjustment completed without changing the scene.");

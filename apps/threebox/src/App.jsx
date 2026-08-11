@@ -348,6 +348,7 @@ export function App() {
   const [toast, setToast] = useState(null);
 
   const abortRef = useRef(null);
+  const activeOutputStreamIdRef = useRef("");
   const messagesEndRef = useRef(null);
   const composerRef = useRef(null);
   const peekHideTimer = useRef(null);
@@ -739,6 +740,19 @@ export function App() {
         updateMessage(assistantId, { sceneObj: obj, sceneJson: draftString });
       };
       const onAgentProgress = createAgentProgressUpdater(setStream, onScenePreview);
+      activeOutputStreamIdRef.current = "";
+      const onOutputDelta = (delta, metadata = {}) => {
+        const streamId = String(metadata?.streamId || "");
+        setStream((previous) => {
+          const startsNewOutput = metadata?.reset === true || (
+            streamId && streamId !== activeOutputStreamIdRef.current
+          );
+          if (streamId) {
+            activeOutputStreamIdRef.current = streamId;
+          }
+          return `${startsNewOutput ? "" : previous}${String(delta || "")}`;
+        });
+      };
       append({
         id: assistantId,
         role: "assistant",
@@ -785,7 +799,7 @@ export function App() {
             resolveContextPayload: (json) => resolveAiAdjustContextPayload(json, adjustContextSettings),
             agentOptions,
             onAgentProgress,
-            onDelta: (delta) => setStream((prev) => prev + delta),
+            onDelta: onOutputDelta,
             locale,
             signal: controller.signal
           });
@@ -828,13 +842,16 @@ export function App() {
             requiresAnimation: negotiation.requiresAnimation,
             agentOptions,
             onAgentProgress,
-            // Kept for API compatibility. The multi-call agent reports stage progress and scene
-            // previews instead of concatenating raw deltas from unrelated model calls.
-            onDelta: (delta) => setStream((prev) => prev + delta),
+            // Every visible authoring request carries its own stream id, so JSON, commands and
+            // Patch rounds replace one another instead of being concatenated into invalid text.
+            onDelta: onOutputDelta,
             onSceneDraft: onScenePreview,
             onGenerationPhase: (phase) => {
-              if (phase?.phase === "compact-retry") {
-                setStream(L("输出过长，正在简化场景并重新生成…", "Output too long — simplifying and regenerating the scene…"));
+              if (phase?.phase === "compact-retry" || phase?.phase === "segmented-recovery") {
+                activeOutputStreamIdRef.current = "";
+                setStream(phase?.phase === "segmented-recovery"
+                  ? L("输出过长，正在切换为分段生成…", "Output too long — switching to segmented generation…")
+                  : L("输出过长，正在简化场景并重新生成…", "Output too long — simplifying and regenerating the scene…"));
               } else if (phase?.phase === "processing") {
                 setStream(L("正在解析生成的 JSON 并准备场景…", "Parsing the generated JSON and preparing the scene…"));
               } else if (phase?.phase === "capability-review") {

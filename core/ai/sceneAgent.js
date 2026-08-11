@@ -345,7 +345,8 @@ async function runSceneAgentCommandsUpdate(params) {
     getStepIndex,
     setStepIndex,
     depth,
-    validateCommands
+    validateCommands,
+    createOutputStreamOptions
   } = params;
 
   const maxCommandRounds =
@@ -422,7 +423,12 @@ async function runSceneAgentCommandsUpdate(params) {
     let commandResult;
     try {
       commandResult = await requestUpdatedSceneEditCommands(requestPrompt, context, {
-        ...chatOptions,
+        ...createOutputStreamOptions(chatOptions, {
+          stage: isRepair ? "adjust_command_repair" : "adjust_commands",
+          outputMode: updateOutputMode === "commands" ? "commands" : "auto",
+          round,
+          attempt: round
+        }),
         outputMode: updateOutputMode,
         fallbackToJson: false,
         agentRound: true,
@@ -573,7 +579,8 @@ async function runSceneAgentCommandsUpdateIterative(params) {
     setStepIndex,
     depth,
     applyCommands,
-    refreshContext
+    refreshContext,
+    createOutputStreamOptions
   } = params;
 
   if (typeof applyCommands !== "function" || typeof refreshContext !== "function") {
@@ -645,7 +652,11 @@ async function runSceneAgentCommandsUpdateIterative(params) {
     let commandResult;
     try {
       commandResult = await requestUpdatedSceneEditCommands(requestPrompt, context, {
-        ...chatOptions,
+        ...createOutputStreamOptions(chatOptions, {
+          stage: "adjust_refinement",
+          outputMode: updateOutputMode === "commands" ? "commands" : "auto",
+          round: refineRound
+        }),
         outputMode: updateOutputMode,
         fallbackToJson: false,
         agentRound: true,
@@ -904,7 +915,8 @@ async function runAutomaticDraftRefinement(params) {
     setStepIndex,
     applyDraftCommands,
     maxRounds,
-    refinementGoals = []
+    refinementGoals = [],
+    createOutputStreamOptions
   } = params;
   let current = initialSceneJsonString;
   let feedback = "";
@@ -950,7 +962,11 @@ async function runAutomaticDraftRefinement(params) {
         feedback ? `Previous refinement feedback:\n${feedback}` : ""
       ].filter(Boolean).join("\n\n");
       refinement = await requestUpdatedSceneEditCommands(userPrompt, context, {
-        ...chatOptions,
+        ...createOutputStreamOptions(chatOptions, {
+          stage: "draft_refinement",
+          outputMode: "auto",
+          round
+        }),
         outputMode: "auto",
         fallbackToJson: false,
         agentRound: true,
@@ -1100,10 +1116,23 @@ async function runAutomaticDraftRefinement(params) {
  * sceneAiService.js's maybeApplyCapabilityReview, applied at this layer too.
  */
 async function runTargetedFixRound(fixPrompt, sceneJsonString, config) {
-  const { chatOptions, chatOptionsFullUpdate, applyDraftCommands, refineMaxTokens, fullRewriteMaxTokens } = config;
+  const {
+    chatOptions,
+    chatOptionsFullUpdate,
+    applyDraftCommands,
+    refineMaxTokens,
+    fullRewriteMaxTokens,
+    createOutputStreamOptions,
+    streamStage = "targeted_fix",
+    streamRound
+  } = config;
   try {
     const refinement = await requestSceneRefinementStep(fixPrompt, sceneJsonString, {
-      ...chatOptions,
+      ...createOutputStreamOptions(chatOptions, {
+        stage: streamStage,
+        outputMode: "auto",
+        round: streamRound
+      }),
       allowCommands: typeof applyDraftCommands === "function",
       maxTokens: refineMaxTokens
     });
@@ -1132,7 +1161,11 @@ async function runTargetedFixRound(fixPrompt, sceneJsonString, config) {
     }
     try {
       return await updateSceneJsonString(fixPrompt, sceneJsonString, {
-        ...chatOptionsFullUpdate,
+        ...createOutputStreamOptions(chatOptionsFullUpdate, {
+          stage: `${streamStage}_full_json_fallback`,
+          outputMode: "json",
+          round: streamRound
+        }),
         maxTokens: fullRewriteMaxTokens
       });
     } catch (fallbackError) {
@@ -1170,6 +1203,7 @@ async function requestOptionalOutline({ prompt, mode }, chatOptions, maxTokens) 
  * @param {object} [options]
  * @param {object} [options.agent]
  * @param {((p: SceneAgentProgress) => void)} [options.onProgress]
+ * @param {((delta: string, metadata?: {streamId?: string, reset?: boolean, stage?: string, outputMode?: string, round?: number, attempt?: number}) => void)} [options.onDelta]
  * @returns {Promise<{ sceneJsonString: string, steps: object[], agentUsed: boolean, tokenHint: object }>}
  */
 async function runSceneAgent(input = {}, options = {}) {
@@ -1189,8 +1223,9 @@ async function runSceneAgent(input = {}, options = {}) {
   let stepIndex = 0;
   const streamPreview = options.streamPreview === true;
   const requestedOutputFormat = options.outputFormat === "friendly" ? "friendly" : "standard";
-  // Raw character streaming is kept only for the fallback non-iterative update runner. Folding it
-  // into every nested call would garble outline, draft, refine and review responses together.
+  // Raw authoring output is opt-in per request below. Keeping it out of the shared transport bag
+  // prevents intent/outline/review calls from being concatenated with scene JSON, commands or
+  // JSON Patch while still allowing every user-visible authoring round to stream independently.
   const rawOnDelta = typeof options.onDelta === "function" ? options.onDelta : undefined;
   const chatTransport = {
     stream: options.stream === true,
@@ -1206,6 +1241,32 @@ async function runSceneAgent(input = {}, options = {}) {
         : undefined
   };
   const chatOptions = { ...options, ...chatTransport };
+  let outputStreamSequence = 0;
+  const createOutputStreamOptions = (baseOptions = {}, metadata = {}) => {
+    const baseOnDelta = typeof baseOptions.onDelta === "function" ? baseOptions.onDelta : undefined;
+    if (!rawOnDelta) {
+      return { ...baseOptions };
+    }
+    outputStreamSequence += 1;
+    const streamMetadata = {
+      ...metadata,
+      streamId: `scene-agent-${outputStreamSequence}`
+    };
+    let firstDelta = true;
+    return {
+      ...baseOptions,
+      onDelta: (delta) => {
+        if (baseOnDelta && baseOnDelta !== rawOnDelta) {
+          baseOnDelta(delta);
+        }
+        rawOnDelta(delta, {
+          ...streamMetadata,
+          reset: firstDelta
+        });
+        firstDelta = false;
+      }
+    };
+  };
   const configuredTurnTimeoutMs = Number(options.turnTimeoutMs);
   if (!(Number.isFinite(Number(chatOptions.turnDeadlineAt)) && Number(chatOptions.turnDeadlineAt) > 0)) {
     const turnTimeoutMs = Number.isFinite(configuredTurnTimeoutMs) && configuredTurnTimeoutMs > 0
@@ -1432,7 +1493,8 @@ async function runSceneAgent(input = {}, options = {}) {
       updateOutputMode,
       preset,
       outline,
-      chatOptions: canIterate ? chatOptions : { ...chatOptions, onDelta: rawOnDelta },
+      chatOptions,
+      createOutputStreamOptions,
       onProgress,
       steps,
       getStepIndex: () => commandStepIndex,
@@ -1522,8 +1584,16 @@ async function runSceneAgent(input = {}, options = {}) {
     const generatePrompt = buildInitialPrompt();
     const incrementalDraft =
       effectiveExecutionMode === "draft_refine" && (mode === "generate" || mode === "fromImage");
+    const initialOutputMode = mode === "update" && options.updateMode === "incremental"
+      ? "patch"
+      : "json";
     const generationOptions = {
-      ...chatOptionsGenerate,
+      ...createOutputStreamOptions(chatOptionsGenerate, {
+        stage: mode === "update"
+          ? initialOutputMode === "patch" ? "adjust_json_patch" : "adjust_full_json"
+          : incrementalDraft ? "initial_draft" : "direct_scene",
+        outputMode: initialOutputMode
+      }),
       maxTokens: effectiveExecutionMode === "draft_refine" ? preset.draftMaxTokens : preset.generateMaxTokens,
       // A direct cutoff switches policies immediately instead of repeating another whole final
       // scene. A structural draft is already the incremental policy, so a genuine cutoff restarts
@@ -1625,7 +1695,12 @@ async function runSceneAgent(input = {}, options = {}) {
     let repairedSceneJsonString = null;
     try {
       repairedSceneJsonString = await updateSceneJsonString(repairPrompt, sceneJsonString, {
-        ...chatOptionsFullUpdate,
+        ...createOutputStreamOptions(chatOptionsFullUpdate, {
+          stage: "scene_json_repair",
+          outputMode: "json",
+          round: repairAttempt,
+          attempt: repairAttempt
+        }),
         maxTokens: preset.repairMaxTokens
       });
     } catch (error) {
@@ -1688,7 +1763,8 @@ async function runSceneAgent(input = {}, options = {}) {
       },
       applyDraftCommands,
       maxRounds: preset.maxRefineRounds,
-      refinementGoals
+      refinementGoals,
+      createOutputStreamOptions
     });
     sceneJsonString = refinementResult.sceneJsonString;
     refinementCompleted = refinementResult.completed;
@@ -1726,7 +1802,10 @@ async function runSceneAgent(input = {}, options = {}) {
         chatOptionsFullUpdate,
         applyDraftCommands,
         refineMaxTokens: preset.repairMaxTokens ?? preset.generateMaxTokens,
-        fullRewriteMaxTokens: preset.fullRewriteMaxTokens
+        fullRewriteMaxTokens: preset.fullRewriteMaxTokens,
+        createOutputStreamOptions,
+        streamStage: "capability_fix",
+        streamRound: capAttempt
       });
       sceneJsonString = applyKnownPlanetTextureDefaults(
         sceneJsonString,
@@ -1790,7 +1869,9 @@ async function runSceneAgent(input = {}, options = {}) {
       chatOptionsFullUpdate,
       applyDraftCommands,
       refineMaxTokens: preset.layoutReviewMaxTokens ?? preset.repairMaxTokens,
-      fullRewriteMaxTokens: preset.fullRewriteMaxTokens
+      fullRewriteMaxTokens: preset.fullRewriteMaxTokens,
+      createOutputStreamOptions,
+      streamStage: "layout_fix"
     });
     validation = await validateSceneJsonWithNormalizer(sceneJsonString);
     steps.push({ kind: "layout_review", ok: validation.ok, error: validation.error });

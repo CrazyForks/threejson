@@ -416,6 +416,34 @@ async function main() {
     };
   }
 
+  /** Keeps raw model output readable when one turn changes authoring stages. SceneAgent attaches a
+   * stable streamId to every JSON/command/Patch request; a new id replaces the previous stage
+   * instead of concatenating unrelated response formats into one invalid blob. */
+  function createOutputStreamController(streaming) {
+    let text = "";
+    let activeStreamId = "";
+    return {
+      onDelta(delta, metadata = {}) {
+        const streamId = String(metadata?.streamId || "");
+        if (metadata?.reset === true || (streamId && streamId !== activeStreamId)) {
+          text = "";
+        }
+        if (streamId) {
+          activeStreamId = streamId;
+        }
+        text += String(delta || "");
+        streaming.update(text);
+      },
+      reset() {
+        text = "";
+        activeStreamId = "";
+      },
+      getText() {
+        return text;
+      }
+    };
+  }
+
   function buildAgentProcessSummary(agentResult) {
     if (!agentResult?.agentUsed || !Array.isArray(agentResult.steps)) {
       return "";
@@ -494,7 +522,7 @@ async function main() {
       api.appendToBody(textEl, streaming.el);
     }
     streaming.processing(t("threebox.chat.generating", "正在生成…"));
-    let streamBuffer = "";
+    const outputStream = createOutputStreamController(streaming);
     const agentOptions = resolveThreeBoxAgentOptions(settings);
     // One card serves both policies: direct generation paints one usable preview; genuinely
     // complex generation keeps that runtime and applies command refinements in place.
@@ -558,13 +586,10 @@ async function main() {
         userPrompt: text,
         providerOptions,
         globalPromptPrefix: settings.ai?.globalPromptPrefix,
-        onDelta: (delta) => {
-          streamBuffer += delta;
-          streaming.update(streamBuffer);
-        },
+        onDelta: outputStream.onDelta,
         onGenerationPhase: async (phase) => {
           if (phase?.phase === "compact-retry" || phase?.phase === "segmented-recovery") {
-            streamBuffer = "";
+            outputStream.reset();
             streaming.update("");
             if (typeof streaming.processing === "function") {
               streaming.processing(phase?.phase === "segmented-recovery"
@@ -718,8 +743,9 @@ async function main() {
         console.error("[threebox] generate turn failed:", error);
         api.updateAssistantError(textEl, error);
       }
-      if (streamBuffer.trim()) {
-        api.appendToBody(textEl, api.buildJsonCollapse(streamBuffer, { failed: true }));
+      const failedOutput = outputStream.getText();
+      if (failedOutput.trim()) {
+        api.appendToBody(textEl, api.buildJsonCollapse(failedOutput, { failed: true }));
       }
       appendRetryControls(api, textEl, error, () => handleGenerateTurn(text, api, {
         conversationId,
@@ -790,7 +816,7 @@ async function main() {
       api.appendToBody(textEl, streaming.el);
     }
     streaming.processing(t("threebox.chat.adjusting", "正在调整…"));
-    let streamBuffer = "";
+    const outputStream = createOutputStreamController(streaming);
     const agentOptions = resolveThreeBoxAgentOptions(settings);
     const sceneCard = createConfiguredSceneCard();
     let previewRenderQueue = Promise.resolve();
@@ -873,10 +899,7 @@ async function main() {
         updateOutputMode: settings.ai?.updateOutputMode || "commands",
         resolveContextPayload: (sceneJson) => resolveAdjustContextPayload(sceneJson, settings.ai),
         onAgentProgress: updateAgentProgress,
-        onDelta: (delta) => {
-          streamBuffer += delta;
-          streaming.update(streamBuffer);
-        },
+        onDelta: outputStream.onDelta,
         locale: getHostLocale(),
         capabilityLookup: settings.ai?.capabilityLookupEnabled !== false,
         onlineTextureHints: settings.ai?.onlineTextureHints !== false,
@@ -1000,8 +1023,9 @@ async function main() {
         console.error("[threebox] adjust turn failed:", error);
         api.updateAssistantError(textEl, error);
       }
-      if (streamBuffer.trim()) {
-        api.appendToBody(textEl, api.buildJsonCollapse(streamBuffer, { failed: true }));
+      const failedOutput = outputStream.getText();
+      if (failedOutput.trim()) {
+        api.appendToBody(textEl, api.buildJsonCollapse(failedOutput, { failed: true }));
       }
       appendRetryControls(api, textEl, error, () => handleAdjustTurn(text, api, {
         conversationId,
