@@ -11,16 +11,18 @@ ThreeJSON 是一个 JSON 驱动的 Three.js 场景运行时。你把场景、相
 ### npm 项目
 
 ```bash
-npm install threejson three
+npm install threejson three @tweenjs/tween.js
 ```
 
-ThreeJSON 的核心依赖是 `three`。部分能力会按需使用额外依赖：
+普通 JSON 运行时不需要安装可选能力包。仅安装场景实际使用的部分：
 
-```bash
-npm install @tweenjs/tween.js html2canvas-pro fflate gifuct-js three-bvh-csg troika-three-text
-```
-
-这些包不是每个最小场景都必须用到。使用动画、截图、压缩包、GIF 纹理、CSG、文本等能力时再安装即可。
+| 能力 | 安装 |
+|---|---|
+| `.tjz` 归档 | `fflate` |
+| GIF 纹理 | `gifuct-js` |
+| HTML `infoPanel` 纹理 | `html2canvas-pro` |
+| CSG（`joins`、`inters`、`holes`） | `three-bvh-csg three-mesh-bvh` |
+| SDF 场景文字 | `troika-three-text` |
 
 如果你的 JSON 会引用项目自带资源，可以安装可选资源包：
 
@@ -39,14 +41,15 @@ ThreeJSON 默认也能通过 CDN 访问 `@threejson/assets`，但生产项目建
 {
   "imports": {
     "three": "https://esm.sh/three@0.184.0",
-    "threejson": "https://esm.sh/threejson@0.1.0-alpha.4",
-    "threejson/core": "https://esm.sh/threejson@0.1.0-alpha.4/core"
+    "three/examples/jsm/": "https://esm.sh/three@0.184.0/examples/jsm/",
+    "@tweenjs/tween.js": "https://esm.sh/@tweenjs/tween.js@25.0.0",
+    "threejson/runtime": "https://esm.sh/threejson@0.1.0-alpha.9/runtime"
   }
 }
 </script>
 ```
 
-不要在业务项目中引用仓库内部路径，例如 `../core/index.js`。用户侧应使用 `threejson`、`threejson/core` 这样的公开入口。
+普通场景加载使用 `threejson/runtime`。只有需要内置业务 domain 时才增加聚合入口 `threejson`，其他能力使用对应的公开子路径。不要在业务项目中引用仓库内部路径，例如 `../core/index.js`。
 
 > 注意：浏览器模块、纹理、模型通常不能可靠地通过 `file://` 加载。请用本地 HTTP 服务打开页面，例如 Vite、Live Server、`npx serve`。
 
@@ -133,7 +136,7 @@ const sceneJson = {
   <canvas id="stage"></canvas>
 
   <script type="module">
-    import { createJsonScene } from "threejson";
+    import { createJsonScene } from "threejson/runtime";
 
     const sceneJson = {
       version: "next",
@@ -205,7 +208,7 @@ npm run dev
 
 ```jsx
 import { useEffect, useRef } from "react";
-import { createJsonScene } from "threejson";
+import { createJsonScene } from "threejson/runtime";
 
 const sceneJson = {
   version: "next",
@@ -280,7 +283,7 @@ npm run dev
 
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from "vue";
-import { createJsonScene } from "threejson";
+import { createJsonScene } from "threejson/runtime";
 
 const canvasRef = ref(null);
 let runtime = null;
@@ -344,7 +347,7 @@ npm install threejson three
 renderer 侧：
 
 ```js
-import { createJsonScene } from "threejson";
+import { createJsonScene } from "threejson/runtime";
 
 const runtime = await createJsonScene(sceneJson, {
   canvas: document.querySelector("#stage"),
@@ -377,7 +380,7 @@ await createJsonScene(sceneJson, {
 也可以全局设置：
 
 ```js
-import { setAssetsBaseUrl, setAssetsBaseMode } from "threejson/core";
+import { setAssetsBaseUrl, setAssetsBaseMode } from "threejson/assets";
 
 setAssetsBaseUrl("/assets");
 setAssetsBaseMode("base-first");

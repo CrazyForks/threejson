@@ -10,7 +10,7 @@
  * package — a standalone host-kit consumer has no such page to navigate to. Apps that want an
  * "exit" destination set their own general.exitNavigateUrl.
  */
-import { BOX_EDGE_HELPER_DEFAULT_COLOR } from "threejson/core";
+import { BOX_EDGE_HELPER_DEFAULT_COLOR } from "threejson/visual-defaults";
 import { HIGHLIGHT_ALARM_RED, HIGHLIGHT_LOCATE_AMBER } from "threejson/domains/sceneHighlight";
 import { BUILTIN_PROVIDER_TYPE, DEFAULT_BUILTIN_BACKEND_URL } from "./builtinAiProvider.js";
 import { sceneHostAssetUrl } from "./sceneHostPaths.js";

@@ -18,7 +18,7 @@
 import {
   buildFriendlyScenePayloadFromCanonical,
   normalizeScenePayload
-} from "threejson";
+} from "threejson/scene-payload";
 
 function clone(value) {
   return typeof structuredClone === "function"

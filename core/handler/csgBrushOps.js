@@ -2,14 +2,23 @@
  * Mesh-level CSG: build Brush from Object3D world matrices via three-bvh-csg and evaluate boolean ops.
  */
 import * as THREE from "three";
-import {
+import * as CSG from "three-bvh-csg";
+import { registerCsgBrushOpsImplementation } from "./csgCapability.js";
+
+const {
   ADDITION,
   Brush,
   DIFFERENCE,
   Evaluator,
   INTERSECTION,
   SUBTRACTION
-} from "three-bvh-csg";
+} = CSG;
+
+if (typeof Evaluator !== "function" || typeof Brush !== "function") {
+  throw new Error(
+    "ThreeJSON CSG requires optional peers: npm install three-bvh-csg three-mesh-bvh"
+  );
+}
 
 const meshEvaluator = new Evaluator();
 
@@ -55,3 +64,5 @@ export function evaluateMeshBoolean(masterMesh, slaveMesh, operation = "union") 
   const slaveBrush = createBrushFromMesh(slaveMesh, { material: masterMesh.material });
   return meshEvaluator.evaluate(masterBrush, slaveBrush, op);
 }
+
+registerCsgBrushOpsImplementation({ createBrushFromMesh, evaluateMeshBoolean });

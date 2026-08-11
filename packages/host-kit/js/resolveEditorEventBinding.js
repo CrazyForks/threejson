@@ -2,7 +2,7 @@
  * Editor event binding settings → createJsonScene bindSceneEvents flag.
  */
 
-import { resolveBindSceneEvents } from "threejson/core";
+import { resolveBindSceneEvents } from "threejson/events";
 
 const PREVIEW_MODES = new Set(["followJson", "alwaysOn", "alwaysOff"]);
 const EDITOR_CANVAS_MODES = new Set(["alwaysOff", "alwaysOn", "followJson"]);

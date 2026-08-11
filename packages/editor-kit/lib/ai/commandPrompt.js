@@ -1,9 +1,11 @@
 import {
   createCommandRegistry,
-  executeCommand,
+  executeCommand
+} from "threejson/commands";
+import {
   buildCommandIntentHints,
   buildSceneCommandUpdateUserMessage
-} from "threejson/core";
+} from "threejson/ai";
 import {
   buildObjectSpatialCardsFromScene,
   buildPlacementHints,

@@ -15,6 +15,12 @@
   "type": "module",
   "exports": {
     ".": "./src/index.js",
+    "./conversations": "./src/useConversations.js",
+    "./i18n": "./src/i18n.js",
+    "./player-settings": "./src/usePlayerSettings.js",
+    "./playlist": "./src/usePlaylist.js",
+    "./scene-player": "./src/useScenePlayer.js",
+    "./viewport": "./src/SceneViewport.js",
     "./package.json": "./package.json",
     "./src/*.js": "./src/*.js"
   },
@@ -29,6 +35,17 @@
     "react": ">=18",
     "three": ">=0.179.0",
     "threejson": "^0.1.0-alpha.9"
+  },
+  "peerDependenciesMeta": {
+    "@threejson/player-kit": {
+      "optional": true
+    },
+    "three": {
+      "optional": true
+    },
+    "threejson": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@threejson/host-kit": "file:../host-kit",

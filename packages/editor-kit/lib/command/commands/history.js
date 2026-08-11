@@ -1,4 +1,4 @@
-import { buildCommandResult } from "threejson/core";
+import { buildCommandResult } from "threejson/commands";
 
 /**
  * @param {import("../types.js").EditorApi} editorApi

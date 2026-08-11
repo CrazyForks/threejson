@@ -1,4 +1,4 @@
-import { buildCommandResult } from "threejson/core";
+import { buildCommandResult } from "threejson/commands";
 
 function isObjectRecord(value) {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));

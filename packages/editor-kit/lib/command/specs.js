@@ -1,4 +1,4 @@
-import { COMMAND_API_VERSION } from "threejson/core";
+import { COMMAND_API_VERSION } from "threejson/commands";
 
 /** @type {import("../../../core/command/types.js").CommandSpec[]} */
 export const EDITOR_COMMAND_SPECS = [

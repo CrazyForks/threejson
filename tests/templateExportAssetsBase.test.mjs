@@ -3,7 +3,7 @@ import { test } from "node:test";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_CDN_ASSETS_BASE, ASSETS_PACKAGE_VERSION } from "threejson/core";
+import { DEFAULT_CDN_ASSETS_BASE, ASSETS_PACKAGE_VERSION } from "threejson/assets";
 import {
   buildHtmlTemplate,
   buildReactFiles,

@@ -1,4 +1,4 @@
-import { strFromU8, unzipSync } from "fflate";
+import * as fflate from "fflate";
 import {
   isZipMagic,
   normalizeArchivePath,
@@ -9,6 +9,12 @@ import {
   resolveArchiveEntryPath
 } from "./tjzManifest.js";
 import { resolveArchiveEntryKind } from "../util/archiveEntryKind.js";
+
+const { strFromU8, unzipSync } = fflate;
+
+if (typeof strFromU8 !== "function" || typeof unzipSync !== "function") {
+  throw new Error("ThreeJSON .tjz loading requires the optional peer: npm install fflate");
+}
 
 function unzipToFileMap(bytes) {
   const unzipped = unzipSync(bytes);

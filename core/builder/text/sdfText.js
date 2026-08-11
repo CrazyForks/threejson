@@ -2,7 +2,7 @@
  * objType:text mode=sdf — troika-three-text。
  */
 import * as THREE from "three";
-import { Text, configureTextBuilder, preloadFont } from "troika-three-text";
+import * as TroikaText from "troika-three-text";
 
 import { trackDisposableResource } from "../../handler/trackedResourceRegistry.js";
 import { registerObject } from "../../handler/objectRegistry.js";
@@ -17,6 +17,16 @@ import {
   wrapTextForBillboard
 } from "./textStyleShared.js";
 import { resolveTextFontConfig } from "./fontResolver.js";
+
+const { Text, configureTextBuilder, preloadFont } = TroikaText;
+
+if (
+  typeof Text !== "function"
+  || typeof configureTextBuilder !== "function"
+  || typeof preloadFont !== "function"
+) {
+  throw new Error("ThreeJSON SDF text requires the optional peer: npm install troika-three-text");
+}
 
 let configuredUnicodeFontsUrl = null;
 

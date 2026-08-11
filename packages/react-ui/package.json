@@ -9,6 +9,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.js",
+    "./mesh-export": "./src/MeshExportDialog.js",
+    "./scene-tree": "./src/SceneTreePanel.js",
     "./package.json": "./package.json",
     "./src/*.js": "./src/*.js",
     "./styles.css": "./src/styles.css"
@@ -17,8 +19,7 @@
   "peerDependencies": {
     "@threejson/host-kit": "^0.1.0-alpha.1",
     "@threejson/react": "^0.1.0-alpha.1",
-    "react": ">=18",
-    "threejson": "^0.1.0-alpha.9"
+    "react": ">=18"
   },
   "devDependencies": {
     "@threejson/host-kit": "file:../host-kit",

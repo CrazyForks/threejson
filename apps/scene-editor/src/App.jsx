@@ -14,8 +14,8 @@
  * incrementally by phase; see README.md's Scope section for current status per phase.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useScenePlayer } from "@threejson/react";
-import { SceneTreePanel } from "@threejson/react-ui";
+import { useScenePlayer } from "@threejson/react/scene-player";
+import { SceneTreePanel } from "@threejson/react-ui/scene-tree";
 import { resolveSceneHostUrl } from "@threejson/host-kit/js/sceneHostPaths.js";
 import { findObjectInScene } from "@threejson/host-kit/js/sceneTreeModel.js";
 import { EDITOR_COMMAND_SPECS } from "@threejson/editor-kit/command";
@@ -39,7 +39,7 @@ import { useEditorGridHelper } from "./lib/useEditorGridHelper.js";
 import { useViewPreserve } from "./lib/useViewPreserve.js";
 import { useUiFeedback } from "./lib/useUiFeedback.js";
 import { useEditorKeyboardShortcuts } from "./lib/useEditorKeyboardShortcuts.js";
-import { MeshExportDialog } from "@threejson/react-ui";
+import { MeshExportDialog } from "@threejson/react-ui/mesh-export";
 import { downloadBlob } from "@threejson/host-kit/js/meshExport.js";
 import { exportSceneAsGlb, exportSelectedObjectAsGlb } from "./lib/editorMeshExport.js";
 import { exportNativeSceneJson } from "./lib/editorNativeJsonExport.js";

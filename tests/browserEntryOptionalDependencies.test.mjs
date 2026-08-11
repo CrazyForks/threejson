@@ -8,8 +8,10 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 
 function collectStaticModuleReferences(source) {
   const code = source
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/^[ \t]*\/\/.*$/gm, "");
+    // Remove whole-line comments first: text such as `apps/*` inside a `//` comment must not be
+    // mistaken for the beginning of a block comment that hides subsequent exports.
+    .replace(/^[ \t]*\/\/.*$/gm, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "");
   const references = [];
   const patterns = [
     /^[ \t]*import\s+(?:[^"'()]*?\s+from\s*)?["']([^"']+)["']/gm,
@@ -20,6 +22,11 @@ function collectStaticModuleReferences(source) {
   }
   return references;
 }
+
+test("static entry scanner is not confused by block-comment tokens inside line comments", () => {
+  const source = `// apps/* are consumers, not runtime dependencies\nexport * from "./visible.js";`;
+  assert.deepEqual(collectStaticModuleReferences(source), ["./visible.js"]);
+});
 
 function resolveLocalModule(importer, specifier) {
   if (!specifier.startsWith(".")) return null;
@@ -85,6 +92,90 @@ test("ordinary browser entries keep optional fflate outside their static depende
       [],
       `${path.relative(REPO_ROOT, demo)} is missing mappings for static browser dependencies`
     );
+  }
+});
+
+test("minimal runtime entry has no static optional-capability dependency", () => {
+  const packageJson = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf8"));
+  assert.equal(packageJson.exports?.["./runtime"], "./core/runtime.js");
+
+  const entry = path.join(REPO_ROOT, "core", "runtime.js");
+  const bareSpecifiers = collectTransitiveBareSpecifiers(entry);
+  for (const optional of [
+    "fflate",
+    "gifuct-js",
+    "html2canvas-pro",
+    "three-bvh-csg",
+    "three-mesh-bvh",
+    "troika-three-text"
+  ]) {
+    assert.equal(bareSpecifiers.has(optional), false, `threejson/runtime must keep ${optional} lazy`);
+  }
+
+  const demo = path.join(
+    REPO_ROOT,
+    "examples",
+    "html-demo",
+    "track-00-runtime",
+    "00-01-minimal-mesh.html"
+  );
+  const imports = readImportMap(demo);
+  const missing = [...bareSpecifiers].filter((specifier) => !importMapCovers(imports, specifier)).sort();
+  assert.deepEqual(missing, []);
+  assert.equal(imports.fflate, undefined);
+  assert.equal(imports["three-bvh-csg"], undefined);
+  assert.equal(imports["html2canvas-pro"], undefined);
+});
+
+test("optional runtime packages are optional peers, not default dependencies", () => {
+  const packageJson = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf8"));
+  for (const name of [
+    "fflate",
+    "gifuct-js",
+    "html2canvas-pro",
+    "three-bvh-csg",
+    "three-mesh-bvh",
+    "troika-three-text"
+  ]) {
+    assert.equal(packageJson.dependencies?.[name], undefined, `${name} must not install for every consumer`);
+    assert.ok(packageJson.peerDependencies?.[name], `${name} needs an explicit optional peer range`);
+    assert.equal(packageJson.peerDependenciesMeta?.[name]?.optional, true);
+    assert.ok(packageJson.devDependencies?.[name], `${name} remains installed for repository tests`);
+  }
+});
+
+test("optional peers use bundler-safe static namespace imports", () => {
+  const optionalPeers = new Set([
+    "fflate",
+    "gifuct-js",
+    "html2canvas-pro",
+    "three-bvh-csg",
+    "three-mesh-bvh",
+    "troika-three-text"
+  ]);
+  const pending = [path.join(REPO_ROOT, "core")];
+  while (pending.length) {
+    const entry = pending.pop();
+    for (const item of fs.readdirSync(entry, { withFileTypes: true })) {
+      const target = path.join(entry, item.name);
+      if (item.isDirectory()) {
+        pending.push(target);
+        continue;
+      }
+      if (!item.isFile() || !item.name.endsWith(".js")) continue;
+      const source = fs.readFileSync(target, "utf8");
+      const imports = source.matchAll(
+        /^[ \t]*import\s+([^;]+?)\s+from\s+["']([^"']+)["']\s*;/gm
+      );
+      for (const match of imports) {
+        if (!optionalPeers.has(match[2])) continue;
+        assert.match(
+          match[1].trim(),
+          /^\*\s+as\s+/,
+          `${path.relative(REPO_ROOT, target)} must use a namespace import for optional peer ${match[2]} so a bundler's missing-peer stub can link`
+        );
+      }
+    }
   }
 });
 

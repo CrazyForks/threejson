@@ -26,6 +26,7 @@
  * original's `showMessage`/`setLoadingMessage`/`syncTransportBar`/`updatePlayerTopBarSceneTitle`
  * equivalents. See the `onEvent` types listed below.
  */
+import "threejson/builtins/register";
 import {
   bindProgressElement,
   bindThreeJsonSceneAudioUnlock,
@@ -45,7 +46,7 @@ import {
   setThreeJsonSceneAudioPlaybackPolicy,
   teardownThreeJsonSceneAudioFromRuntime,
   trackDisposableResource
-} from "threejson";
+} from "threejson/player";
 import { createPlayerSysConfig } from "@threejson/host-kit/js/createPlayerSysConfig.js";
 import { buildPlayerScenePayload } from "@threejson/host-kit/js/buildPlayerRuntimeConfig.js";
 import { sceneHostAssetUrl, resolveSceneHostUrl } from "@threejson/host-kit/js/sceneHostPaths.js";

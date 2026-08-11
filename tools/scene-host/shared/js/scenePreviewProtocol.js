@@ -1,10 +1,4 @@
-/**
- * Explicit postMessage protocol between the legacy scene-host editor and player.
- *
- * This module deliberately has its own origin policy. React apps maintain an independent policy
- * under apps/* so neither product line reaches into the other's source tree while the legacy host
- * remains the deployment-validation baseline.
- */
+/** Secure postMessage protocol shared by the legacy scene-host editor and player. */
 
 export const SCENE_PREVIEW_CHANNEL = "threejson:scene-preview";
 export const SCENE_PREVIEW_VERSION = 1;
@@ -18,8 +12,6 @@ const PRODUCTION_APPLICATION_ORIGINS = Object.freeze([
   "https://shower.threejson.org"
 ]);
 
-// These are intentionally explicit development endpoints, not an implicit current-page fallback.
-// The legacy host is commonly served from the repository root by a static server on port 8080.
 const DEVELOPMENT_APPLICATION_ORIGINS = Object.freeze([
   "http://localhost:8080",
   "http://127.0.0.1:8080",
@@ -33,74 +25,100 @@ const DEVELOPMENT_APPLICATION_ORIGINS = Object.freeze([
   "http://localhost:5183"
 ]);
 
-/** All browser origins this legacy protocol may exchange messages with. */
+/** Stable built-in peers. The current same-origin host and configured peers are added at runtime. */
 export const SCENE_PREVIEW_ALLOWED_ORIGINS = Object.freeze([
   ...PRODUCTION_APPLICATION_ORIGINS,
   ...DEVELOPMENT_APPLICATION_ORIGINS
 ]);
 
-function isOrigin(value) {
+const configuredOrigins = new Set();
+
+function normalizeOrigin(value, base) {
   if (typeof value !== "string" || !value.trim()) {
-    return false;
+    return null;
   }
   try {
-    return new URL(value).origin === value;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * @param {string} origin
- * @param {readonly string[]} [allowedOrigins]
- * @returns {boolean}
- */
-export function isScenePreviewAllowedOrigin(origin, allowedOrigins = SCENE_PREVIEW_ALLOWED_ORIGINS) {
-  return isOrigin(origin) && Array.isArray(allowedOrigins) && allowedOrigins.includes(origin);
-}
-
-/**
- * Resolve a peer URL to an allowlisted origin. The caller must still pass that origin explicitly
- * to `postScenePreviewMessage`; there is intentionally no `window.location.origin` default.
- *
- * @param {string|URL} urlLike
- * @param {string} [base]
- * @param {readonly string[]} [allowedOrigins]
- * @returns {string|null}
- */
-export function resolveScenePreviewPeerOrigin(
-  urlLike,
-  base = typeof window !== "undefined" ? window.location.href : undefined,
-  allowedOrigins = SCENE_PREVIEW_ALLOWED_ORIGINS
-) {
-  try {
-    const origin = new URL(urlLike, base).origin;
-    return isScenePreviewAllowedOrigin(origin, allowedOrigins) ? origin : null;
+    return new URL(value, base).origin;
   } catch {
     return null;
   }
 }
 
+function browserOrigin(locationLike = typeof window !== "undefined" ? window.location : null) {
+  return normalizeOrigin(locationLike?.href || locationLike?.origin || "");
+}
+
+function uniqueOrigins(values) {
+  const origins = new Set();
+  for (const value of values || []) {
+    const origin = normalizeOrigin(value);
+    if (origin) origins.add(origin);
+  }
+  return Array.from(origins);
+}
+
 /**
- * @param {MessageEvent} event
- * @param {readonly string[]} [allowedOrigins]
- * @returns {boolean}
+ * Replace the process-local extra allowlist. A self-hosted deployment may call this once before
+ * opening a cross-origin player. Ordinary same-origin deployments need no configuration.
  */
-export function isScenePreviewMessageEvent(event, allowedOrigins = SCENE_PREVIEW_ALLOWED_ORIGINS) {
+export function configureScenePreviewAllowedOrigins(origins = []) {
+  configuredOrigins.clear();
+  for (const origin of uniqueOrigins(origins)) configuredOrigins.add(origin);
+  return getScenePreviewAllowedOrigins();
+}
+
+/** Resolve built-in, configured, current same-origin, and call-site-specific peers. */
+export function getScenePreviewAllowedOrigins(
+  additionalOrigins = [],
+  locationLike = typeof window !== "undefined" ? window.location : null
+) {
+  return uniqueOrigins([
+    ...SCENE_PREVIEW_ALLOWED_ORIGINS,
+    ...configuredOrigins,
+    browserOrigin(locationLike),
+    ...additionalOrigins
+  ]);
+}
+
+export function isScenePreviewAllowedOrigin(origin, allowedOrigins) {
+  const normalized = normalizeOrigin(origin);
+  if (!normalized || normalized !== origin) {
+    return false;
+  }
+  const effective = Array.isArray(allowedOrigins)
+    ? uniqueOrigins(allowedOrigins)
+    : getScenePreviewAllowedOrigins();
+  return effective.includes(normalized);
+}
+
+/** Resolve a peer URL. Same-origin works on every valid host/port; cross-origin peers are explicit. */
+export function resolveScenePreviewPeerOrigin(
+  urlLike,
+  base = typeof window !== "undefined" ? window.location.href : undefined,
+  allowedOrigins
+) {
+  try {
+    const origin = new URL(urlLike, base).origin;
+    const baseOrigin = normalizeOrigin(base || "");
+    const effective = Array.isArray(allowedOrigins)
+      ? allowedOrigins
+      : getScenePreviewAllowedOrigins(baseOrigin ? [baseOrigin] : []);
+    return isScenePreviewAllowedOrigin(origin, effective) ? origin : null;
+  } catch {
+    return null;
+  }
+}
+
+export function isScenePreviewMessageEvent(event, allowedOrigins) {
   if (!event || typeof event.data !== "object" || event.data === null) {
     return false;
   }
   if (!isScenePreviewAllowedOrigin(event.origin, allowedOrigins)) {
     return false;
   }
-  const data = event.data;
-  return data.channel === SCENE_PREVIEW_CHANNEL && data.version === SCENE_PREVIEW_VERSION;
+  return isScenePreviewMessage(event.data);
 }
 
-/**
- * @param {object} data
- * @returns {boolean}
- */
 export function isScenePreviewMessage(data) {
   return Boolean(
     data &&
@@ -110,17 +128,11 @@ export function isScenePreviewMessage(data) {
   );
 }
 
-/**
- * @param {Window|null|undefined} target
- * @param {object} message
- * @param {string} targetOrigin Explicit, allowlisted peer origin.
- * @param {readonly string[]} [allowedOrigins]
- */
 export function postScenePreviewMessage(
   target,
   message,
-  targetOrigin,
-  allowedOrigins = SCENE_PREVIEW_ALLOWED_ORIGINS
+  targetOrigin = browserOrigin(),
+  allowedOrigins
 ) {
   if (!target || target.closed || !isScenePreviewAllowedOrigin(targetOrigin, allowedOrigins)) {
     return false;
@@ -137,16 +149,27 @@ export function postScenePreviewMessage(
 }
 
 /**
- * Read the explicit opener origin carried by a preview popup URL. This is not a trust decision by
- * itself; the receiver also verifies `event.origin` and `event.source` for every payload.
+ * Read the opener origin carried by a preview URL. Besides the normal allowlist, the browser's
+ * referrer origin is accepted: it is the actual page that opened this popup, and callers still
+ * verify every message's event.source against window.opener.
  */
-export function resolveScenePreviewOpenerOrigin(locationLike = window.location) {
+export function resolveScenePreviewOpenerOrigin(
+  locationLike = typeof window !== "undefined" ? window.location : { search: "" },
+  allowedOrigins,
+  referrer = typeof document !== "undefined" ? document.referrer : ""
+) {
   const params = new URLSearchParams(locationLike.search || "");
   const origin = params.get("openerOrigin") || "";
-  return isScenePreviewAllowedOrigin(origin) ? origin : null;
+  const referrerOrigin = normalizeOrigin(referrer);
+  const effective = Array.isArray(allowedOrigins)
+    ? allowedOrigins
+    : getScenePreviewAllowedOrigins(referrerOrigin ? [referrerOrigin] : [], locationLike);
+  return isScenePreviewAllowedOrigin(origin, effective) ? origin : null;
 }
 
-export function isEditorPreviewUrl(locationLike = window.location) {
+export function isEditorPreviewUrl(
+  locationLike = typeof window !== "undefined" ? window.location : { search: "" }
+) {
   const params = new URLSearchParams(locationLike.search || "");
   return params.get("editorPreview") === "1";
 }

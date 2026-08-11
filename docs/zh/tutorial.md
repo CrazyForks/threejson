@@ -127,4 +127,4 @@
 2. 在 `examples/html-demo/track-XX-*/` 增加 HTML（可复制 [00-03-friendly-full-scene 模板](../../examples/html-demo/track-00-runtime/00-03-friendly-full-scene.html)）。
 3. 在 [`demo-catalog.zh.json`](../../examples/html-demo/demo-catalog.zh.json) 与 [`demo-catalog.en.json`](../../examples/html-demo/demo-catalog.en.json) 增加条目（各语言各维护一份完整 catalog；`demo.html` 按 locale 加载其一），并更新本文档课表。可用 `npm run validate:demo-catalog` 校验 zh/en 结构一致。
 4. catalog 的 `path` 必须指向 `track-*` 或根目录整合页。
-5. 若新课使用 SDF 场景文字（`objType: text` 默认 `mode: "sdf"`），HTML import map 需保留 `troika-three-text` + `fflate`（参考 [Track 7](./tutorial.md#track-7--场景文字objtype-text)）；显式使用 `threejson/archive` 的页面也需映射 `fflate`，普通场景页面无需批量加入。
+5. 若新课使用 SDF 场景文字（`objType: text` 默认 `mode: "sdf"`），HTML import map 只需保留 `troika-three-text`（参考 [Track 7](./tutorial.md#track-7--场景文字objtype-text)）；只有显式使用 `threejson/archive` 的页面才需另外映射 `fflate`。

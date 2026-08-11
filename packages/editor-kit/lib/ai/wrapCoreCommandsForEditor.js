@@ -1,4 +1,4 @@
-import { COMMAND_API_VERSION } from "threejson/core";
+import { COMMAND_API_VERSION } from "threejson/commands";
 
 /**
  * Wrap parsed core commands as a single editor.exec command for the editor registry.

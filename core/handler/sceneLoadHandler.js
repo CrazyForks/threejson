@@ -107,6 +107,10 @@ import { applyAssetGatewayToPayload } from "../util/assetGateway.js";
 import { configureInfoPanelForDeploy } from "../builder/infoPanelBuilder.js";
 import { configureTextureDefaultsForDeploy } from "../util/textureSampling.js";
 import {
+  assertCsgBrushOpsReadyForPayload,
+  ensureCsgBrushOpsForPayload
+} from "./csgCapability.js";
+import {
   collectRequiredNativeGeometries,
   ensureNativeGeometriesRegistered
 } from "../util/nativeGeometryRegistry.js";
@@ -1391,6 +1395,7 @@ function resolveRuntimeLoadOptions(normalized, callerOptions = {}) {
 }
 
 async function createJsonScene(payload, options = {}) {
+  await ensureCsgBrushOpsForPayload(payload);
   const restoreAssetsBase = applyAssetsBaseForLoad(payload, options);
   const css3dIntegration = integrateCss3dIntoSceneLoad(options);
   const eventIntegration = integrateEventMechanismIntoSceneLoad(css3dIntegration.loadOptions);
@@ -1553,6 +1558,7 @@ async function deployObjectRecordIntoRuntime(target, record, options = {}) {
   if (!isObjectRecordEntry(record)) {
     throw new Error("deployObjectRecordIntoRuntime: expected object record with objType");
   }
+  await ensureCsgBrushOpsForPayload(record);
   const { deployJsonObjectAsync } = await getObjectLoadHandler();
   if (resolveArchiveObjectEntryMode(options) === "replace") {
     clearTargetForObjectArchiveEntry(target);
@@ -1587,6 +1593,7 @@ async function createJsonSceneFromObjectRecord(record, options = {}) {
   if (!isObjectRecordEntry(record)) {
     throw new Error("createJsonSceneFromObjectRecord: expected object record with objType");
   }
+  await ensureCsgBrushOpsForPayload(record);
   const restoreAssetsBase = applyAssetsBaseForLoad({}, options);
   try {
   const { bus } = resolveLifecycleHooks(options);
@@ -1681,6 +1688,7 @@ async function createJsonSceneFromArchive(input, options = {}) {
  * @returns {object}
  */
 function createJsonSceneSimple(payload, options = {}) {
+  assertCsgBrushOpsReadyForPayload(payload);
   const { bus } = resolveLifecycleHooks(options);
   bindPluginHostToLifecycleBus(options, bus);
   const runtimeCtx = createRuntimeContext();
@@ -1737,6 +1745,7 @@ function createJsonSceneSimple(payload, options = {}) {
  * @param {{ resetScene?: boolean, context?: object }} [options]
  */
 async function deployJsonScene(target, payload, options = {}) {
+  await ensureCsgBrushOpsForPayload(payload);
   // Deploying into an existing target (no new Scene): only cancel *this* target's
   // own in-flight scheduled deploy, never a sibling canvas's.
   cancelActiveDeployScheduler(target);
@@ -1819,6 +1828,7 @@ async function createJsonSceneFromInputFit(input, options = {}) {
  * @returns {object}
  */
 function deployJsonSceneSimple(target, payload, options = {}) {
+  assertCsgBrushOpsReadyForPayload(payload);
   cancelActiveDeployScheduler(target);
   const normalized = normalizeScenePayloadWithRuntimeDefaults(payload, options);
   warnIntroSkippedOnSyncPath(normalized?.sceneConfig?.intro, "deployJsonSceneSimple");

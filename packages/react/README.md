@@ -12,10 +12,17 @@ npm install @threejson/react @threejson/host-kit @threejson/player-kit threejson
 
 All of those except `@threejson/react` itself are peer dependencies.
 
+The package root is the compatibility aggregate. Apps that need only one binding should use a capability subpath so unrelated player, playlist, settings, or conversation modules do not enter the static graph:
+
+```jsx
+import { SceneViewport } from "@threejson/react/viewport";
+import { useHostI18n } from "@threejson/react/i18n";
+```
+
 ## Quick start
 
 ```jsx
-import { SceneViewport } from "@threejson/react";
+import { SceneViewport } from "@threejson/react/viewport";
 
 export function App() {
   return <SceneViewport src="json/portShow.json" style={{ height: "100vh" }} />;

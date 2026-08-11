@@ -5,8 +5,10 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import {
   SCENE_PREVIEW_ALLOWED_ORIGINS,
+  configureScenePreviewAllowedOrigins,
   isScenePreviewAllowedOrigin,
   postScenePreviewMessage,
+  resolveScenePreviewOpenerOrigin,
   resolveScenePreviewPeerOrigin
 } from "../tools/scene-host/shared/js/scenePreviewProtocol.js";
 
@@ -69,7 +71,7 @@ test("each React product carries independent Cloudflare deployment hygiene", () 
   }
 });
 
-test("legacy preview protocol has an explicit allowlist and never falls back to its own origin", () => {
+test("legacy preview protocol accepts same-origin hosts and only explicit cross-origin peers", () => {
   for (const origin of REQUIRED_PRODUCTION_ORIGINS) {
     assert.equal(isScenePreviewAllowedOrigin(origin), true, origin);
   }
@@ -82,15 +84,49 @@ test("legacy preview protocol has an explicit allowlist and never falls back to 
     resolveScenePreviewPeerOrigin("https://untrusted.example/", "https://threejson.org/"),
     null
   );
+  assert.equal(
+    resolveScenePreviewPeerOrigin("/player/", "http://localhost:5173/editor/"),
+    "http://localhost:5173"
+  );
+  assert.equal(
+    resolveScenePreviewPeerOrigin(
+      "https://self-hosted-player.example/",
+      "https://self-hosted-editor.example/",
+      ["https://self-hosted-player.example"]
+    ),
+    "https://self-hosted-player.example"
+  );
+  assert.equal(
+    resolveScenePreviewOpenerOrigin(
+      { search: "?openerOrigin=https%3A%2F%2Fself-hosted-editor.example" },
+      undefined,
+      "https://self-hosted-editor.example/editor/"
+    ),
+    "https://self-hosted-editor.example"
+  );
 
   const sent = [];
   const target = { closed: false, postMessage: (...args) => sent.push(args) };
   assert.equal(postScenePreviewMessage(target, { action: "load" }), false);
   assert.equal(postScenePreviewMessage(target, { action: "load" }, "https://untrusted.example"), false);
   assert.equal(postScenePreviewMessage(target, { action: "load" }, "https://player.threejson.org"), true);
-  assert.equal(sent.length, 1);
+  assert.equal(
+    postScenePreviewMessage(
+      target,
+      { action: "load" },
+      "https://self-hosted-player.example",
+      ["https://self-hosted-player.example"]
+    ),
+    true
+  );
+  assert.equal(sent.length, 2);
   assert.equal(sent[0][1], "https://player.threejson.org");
+  assert.equal(sent[1][1], "https://self-hosted-player.example");
   assert.ok(SCENE_PREVIEW_ALLOWED_ORIGINS.includes("https://player.threejson.org"));
+
+  configureScenePreviewAllowedOrigins(["https://configured-preview.example/path"]);
+  assert.equal(isScenePreviewAllowedOrigin("https://configured-preview.example"), true);
+  configureScenePreviewAllowedOrigins([]);
 });
 
 test("React applications keep their own explicit handshake sources", () => {

@@ -3,7 +3,6 @@
  * Carrier `panelBoxType`: box | sprite | plane; content `type`: text | html | img.
  */
 import * as THREE from 'three';
-import html2canvas from 'html2canvas-pro';
 
 import { applyOpacityToColor, applyOpacityToImageTexture, createStrTextureMultiline } from '../util/textureUtils.js';
 import { resolvePublicAssetUrl } from '../util/assetsBase.js';
@@ -528,7 +527,17 @@ function renderHtmlTexture(infoPanel) {
 	const loadId = `infoPanelHtml:${guid()}`;
 	loadingManager.itemStart(loadId);
 
-	return runHtmlTextureJob(() => html2canvas(parentDiv, html2canvasOptions).then((canvas) => {
+	return runHtmlTextureJob(async () => {
+		// Keep this literal dynamic import visible to bundlers so an installed optional peer is
+		// emitted as a lazy chunk instead of surviving in production as an unresolved bare import.
+		const html2canvasModule = await import("html2canvas-pro");
+		const html2canvas = html2canvasModule.default || html2canvasModule;
+		if (typeof html2canvas !== "function") {
+			throw new Error(
+				"ThreeJSON HTML infoPanel requires the optional peer: npm install html2canvas-pro"
+			);
+		}
+		const canvas = await html2canvas(parentDiv, html2canvasOptions);
 		const texture = trackDisposableResource(new THREE.CanvasTexture(canvas));
 		const width = canvas.width || infoPanel.panelWidth;
 		const height = canvas.height || infoPanel.panelHeight;
@@ -540,7 +549,7 @@ function renderHtmlTexture(infoPanel) {
 		applyContentScaleToPanel(infoPanel);
 		setInfoPanelTexture(infoPanel, texture);
 		return texture;
-	})).finally(() => {
+	}).finally(() => {
 		loadingManager.itemEnd(loadId);
 		if (parentDiv.parentNode) {
 			parentDiv.parentNode.removeChild(parentDiv);

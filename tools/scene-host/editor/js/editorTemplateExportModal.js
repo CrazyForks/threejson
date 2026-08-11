@@ -146,7 +146,7 @@ export function createEditorTemplateExportModal(host) {
         if (type === "html") {
           addTextFile(entries, "index.html", html);
         } else {
-          addTextFile(entries, "package.json", buildPackageJson(type));
+          addTextFile(entries, "package.json", buildPackageJson(type, { sceneJsonText }));
           const files = buildTemplateFiles(type);
           for (const [path, text] of Object.entries(files)) {
             addTextFile(entries, path, text);

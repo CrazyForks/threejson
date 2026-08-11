@@ -1,6 +1,7 @@
 /**
  * Lazy-load optional browser ESM dependencies (`import()`, not Node).
- * Used for sdf text, html2canvas, CSG, etc.; throws on failure for upstream fallback.
+ * Used for host-supplied capability specifiers; throws on failure for upstream fallback.
+ * Package-owned optional peers use literal dynamic imports so bundlers can emit lazy chunks.
  */
 
 /** @type {Map<string, Promise<unknown>>} */

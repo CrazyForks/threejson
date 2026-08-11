@@ -16,7 +16,7 @@ npm install @threejson/react-ui @threejson/react @threejson/host-kit threejson r
 ## Usage
 
 ```jsx
-import { MeshExportDialog } from "@threejson/react-ui";
+import { MeshExportDialog } from "@threejson/react-ui/mesh-export";
 import "@threejson/react-ui/styles.css"; // optional dark default
 
 <MeshExportDialog
@@ -24,6 +24,8 @@ import "@threejson/react-ui/styles.css"; // optional dark default
   onClose={() => setOpen(false)}
 />
 ```
+
+Use `@threejson/react-ui/scene-tree` for `SceneTreePanel`. The package root remains an aggregate compatibility entry.
 
 ## Localisation
 

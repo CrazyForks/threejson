@@ -5,10 +5,21 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const SOURCE_EXTENSIONS = new Set([".js", ".mjs", ".ts", ".html", ".css"]);
+const SOURCE_EXTENSIONS = new Set([
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+  ".ts",
+  ".tsx",
+  ".mts",
+  ".cts",
+  ".html",
+  ".css"
+]);
 const SCENE_HOST_APPS = new Set(["editor", "player", "shower", "threebox"]);
 
-const SKIP_DIRS = new Set(["node_modules", "dist", "build", ".vite"]);
+const SKIP_DIRS = new Set(["node_modules", "dist", "build", ".vite", ".wrangler", "coverage"]);
 
 function walkFiles(root) {
   const files = [];
@@ -25,8 +36,9 @@ function collectModuleReferences(file) {
   const source = fs.readFileSync(file, "utf8");
   const references = [];
   const patterns = [
-    /(?:from\s*|import\s*\()\s*["']([^"']+)["']/g,
-    /(?:src|href)\s*=\s*["']([^"']+\.(?:js|mjs|ts|css))(?:[?#][^"']*)?["']/g,
+    /(?:^|[;\n])\s*(?:import|export)\s+(?:type\s+)?(?:[^"'();]*?\s+from\s*)?["']([^"']+)["']/gm,
+    /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g,
+    /(?:src|href)\s*=\s*["']([^"']+\.(?:js|jsx|mjs|cjs|ts|tsx|mts|cts|css))(?:[?#][^"']*)?["']/g,
     /@import\s+(?:url\()?\s*["']([^"']+)["']/g
   ];
   for (const pattern of patterns) {
@@ -44,8 +56,10 @@ function relative(file) {
   return path.relative(REPO_ROOT, file).replaceAll("\\", "/");
 }
 
-test("core never reverse-imports domains, extensions, or host tools", () => {
-  const forbiddenRoots = ["domains", "extensions", "tools"].map((dir) => path.join(REPO_ROOT, dir) + path.sep);
+test("core never reverse-imports domains, extensions, packages, apps, or host tools", () => {
+  const forbiddenRoots = ["domains", "extensions", "packages", "apps", "tools"].map(
+    (dir) => path.join(REPO_ROOT, dir) + path.sep
+  );
   const violations = [];
   for (const file of walkFiles(path.join(REPO_ROOT, "core"))) {
     for (const reference of collectModuleReferences(file)) {
@@ -56,6 +70,86 @@ test("core never reverse-imports domains, extensions, or host tools", () => {
     }
   }
   assert.deepEqual(violations, []);
+});
+
+test("architecture scans include React and TypeScript source extensions", () => {
+  const appFiles = walkFiles(path.join(REPO_ROOT, "apps"));
+  assert.ok(appFiles.some((file) => file.endsWith("App.jsx")), "apps/*.jsx must be part of boundary scans");
+  assert.ok(SOURCE_EXTENSIONS.has(".tsx"), "future TSX app sources must remain covered");
+});
+
+test("lightweight host-kit helpers never import aggregate ThreeJSON entries", () => {
+  const lightModules = [
+    "buildSceneHostRuntimeConfig.js",
+    "mergeSceneHelpers.js",
+    "sceneHostPaths.js",
+    "templateExportBuilders.js"
+  ];
+  const violations = [];
+  for (const name of lightModules) {
+    const file = path.join(REPO_ROOT, "packages", "host-kit", "js", name);
+    for (const reference of collectModuleReferences(file)) {
+      if (reference === "threejson" || reference === "threejson/core") {
+        violations.push(`${relative(file)} -> ${reference}`);
+      }
+    }
+  }
+  assert.deepEqual(violations, []);
+});
+
+test("applications consume React packages through capability subpaths", () => {
+  const violations = [];
+  for (const file of walkFiles(path.join(REPO_ROOT, "apps"))) {
+    for (const reference of collectModuleReferences(file)) {
+      if (reference === "@threejson/react" || reference === "@threejson/react-ui") {
+        violations.push(`${relative(file)} -> ${reference}`);
+      }
+    }
+  }
+  assert.deepEqual(violations, []);
+});
+
+test("React packages publish stable capability subpaths", () => {
+  const reactManifest = JSON.parse(
+    fs.readFileSync(path.join(REPO_ROOT, "packages", "react", "package.json"), "utf8")
+  );
+  const uiManifest = JSON.parse(
+    fs.readFileSync(path.join(REPO_ROOT, "packages", "react-ui", "package.json"), "utf8")
+  );
+  for (const subpath of [
+    "./conversations",
+    "./i18n",
+    "./player-settings",
+    "./playlist",
+    "./scene-player",
+    "./viewport"
+  ]) {
+    assert.ok(reactManifest.exports?.[subpath], subpath);
+  }
+  assert.ok(uiManifest.exports?.["./mesh-export"]);
+  assert.ok(uiManifest.exports?.["./scene-tree"]);
+});
+
+test("packages do not statically import aggregate ThreeJSON entries", () => {
+  const violations = [];
+  const staticImportPattern =
+    /(?:^|[;\n])\s*(?:import|export)\s+(?:type\s+)?(?:[^"'();]*?\s+from\s*)?["']([^"']+)["']/gm;
+  for (const file of walkFiles(path.join(REPO_ROOT, "packages"))) {
+    const source = fs.readFileSync(file, "utf8");
+    for (const match of source.matchAll(staticImportPattern)) {
+      if (match[1] === "threejson" || match[1] === "threejson/core") {
+        violations.push(`${relative(file)} -> ${match[1]}`);
+      }
+    }
+  }
+  assert.deepEqual(violations, []);
+});
+
+test("optional dynamic-runtime stores are not created by every RuntimeContext", () => {
+  const source = fs.readFileSync(path.join(REPO_ROOT, "core", "runtime", "runtimeContext.js"), "utf8");
+  assert.doesNotMatch(source, /from\s+["']\.\/runtimeEntityRegistry\.js["']/);
+  assert.doesNotMatch(source, /from\s+["']\.\/frameCommitScheduler\.js["']/);
+  assert.doesNotMatch(source, /ctx\.(?:entityRegistry|frameCommitScheduler)\s*=/);
 });
 
 test("domains never import host tools", () => {
@@ -182,10 +276,9 @@ test("apps/* do not import tools/scene-host (ThreeBox source) via any specifier"
   assert.deepEqual(violations, []);
 });
 
-test("tools/scene-host does not yet depend on packages/* (phase 1: additive only, no behavior change)", () => {
-  // Once tools/scene-host is deliberately migrated to import from packages/* (a later, opt-in
-  // phase), this test should be removed/updated — for now it guards against that coupling being
-  // introduced accidentally while packages/* is still new and unpublished.
+test("legacy tools/scene-host remains deployable without packages/*", () => {
+  // The legacy host is the production baseline. Shared behavior may evolve, but it must not start
+  // depending on workspace packages until that migration is explicitly completed.
   const packagesRoot = path.join(REPO_ROOT, "packages") + path.sep;
   const sceneHostRoot = path.join(REPO_ROOT, "tools", "scene-host");
   if (!fs.existsSync(sceneHostRoot)) return;

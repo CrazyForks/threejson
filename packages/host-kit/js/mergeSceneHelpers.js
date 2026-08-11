@@ -1,4 +1,4 @@
-import { hasValue } from "threejson";
+import { hasValue } from "threejson/runtime-config";
 
 /** Mirrors tools/old_version/scene-editor.html mergeSceneHelpersFromSysConfig */
 export function mergeSceneHelpersFromSysConfig(existingHelpers, sysConfig) {

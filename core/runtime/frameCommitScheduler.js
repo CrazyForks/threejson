@@ -5,6 +5,8 @@
  * renderer. A host may enqueue one `batch.commit()` per logical layer and make rendering
  * demand-driven separately.
  */
+import { resolveRuntimeContext } from "./runtimeContext.js";
+
 function defaultRequestFrame(callback) {
   if (typeof globalThis.requestAnimationFrame === "function") {
     return globalThis.requestAnimationFrame(callback);
@@ -110,4 +112,13 @@ export function createFrameCommitScheduler(options = {}) {
       return disposed;
     }
   };
+}
+
+/** Lazily attach a scheduler only to runtimes that use batched frame commits. */
+export function getFrameCommitScheduler(runtimeScope, options) {
+  const runtimeContext = resolveRuntimeContext(runtimeScope);
+  if (!runtimeContext.frameCommitScheduler) {
+    runtimeContext.frameCommitScheduler = createFrameCommitScheduler(options);
+  }
+  return runtimeContext.frameCommitScheduler;
 }

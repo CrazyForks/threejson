@@ -11,7 +11,8 @@
  * (SceneCard.jsx), exactly as the original does — there is no shared viewport.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useHostI18n, useConversations } from "@threejson/react";
+import { useHostI18n } from "@threejson/react/i18n";
+import { useConversations } from "@threejson/react/conversations";
 import {
   runAiGenerateTurn,
   runAiAdjustTurn,

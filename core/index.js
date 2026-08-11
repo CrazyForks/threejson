@@ -110,7 +110,7 @@ export * from "./handler/infoPanelRuntime.js";
 export * from "./handler/objectObjType.js";
 export * from "./handler/objectDomain.js";
 export * from "./handler/modelHandler.js";
-export * from "./handler/csgBrushOps.js";
+export * from "./handler/csgCapability.js";
 export * from "./handler/boxModelListCoalescer.js";
 export * from "./handler/holeSceneOps.js";
 export * from "./handler/objectDescriptorAttach.js";

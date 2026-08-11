@@ -3,7 +3,7 @@ import { test } from "node:test";
 // Expected asset URLs are built from the single pinned source (core/util/assetsBase.js, itself
 // checked against the installed @threejson/assets devDependency by tests/assetsBase.test.mjs)
 // rather than repeating the version literal here — a version bump then needs no edits in this file.
-import { DEFAULT_CDN_ASSETS_BASE } from "threejson/core";
+import { DEFAULT_CDN_ASSETS_BASE } from "threejson/assets";
 
 // Imports every packages/host-kit module through its published-style specifier
 // ("@threejson/host-kit/js/*.js") rather than a relative path into packages/host-kit/, so this
@@ -56,7 +56,7 @@ test("playerSettingsStore and scenePresetsStore import cleanly (threejson/domain
   assert.equal(typeof presetsStore.loadPresetSceneEntries, "function");
 });
 
-test("hostedContainerDoor and resolveEditorEventBinding import via threejson/domains/door + threejson/core", async () => {
+test("hostedContainerDoor and resolveEditorEventBinding use capability-scoped ThreeJSON entries", async () => {
   const door = await import("@threejson/host-kit/js/hostedContainerDoor.js");
   assert.equal(typeof door.findCabinetRoot, "function");
   assert.equal(typeof door.findUpsRoot, "function");
@@ -64,7 +64,7 @@ test("hostedContainerDoor and resolveEditorEventBinding import via threejson/dom
   assert.equal(typeof eventBinding.resolveEditorCanvasBindSceneEvents, "function");
 });
 
-test("platform/textureSink imports createDirectorySink/createUploadSink/createZipDownloadSink via threejson/core", async () => {
+test("platform/textureSink imports the capability-scoped texture sink entry", async () => {
   const mod = await import("@threejson/host-kit/js/platform/textureSink.js");
   assert.equal(typeof mod.createTextureSink, "function");
 });

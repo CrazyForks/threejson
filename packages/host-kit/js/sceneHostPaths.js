@@ -18,7 +18,7 @@
  * path only exists inside the ThreeJSON monorepo's own examples/ folder, never in a published
  * package, so there is no portable target to rewrite it to.
  */
-import { DEFAULT_CDN_ASSETS_BASE } from "threejson/core";
+import { DEFAULT_CDN_ASSETS_BASE } from "threejson/assets";
 
 let hostAssetsBase = DEFAULT_CDN_ASSETS_BASE;
 

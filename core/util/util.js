@@ -6,6 +6,7 @@ import { sanitizeWorldInfoForExport } from './descriptorExportSanitize.js';
 import { mergeWorldInfoModelListByIdentity } from './persistListMerge.js';
 import { mergeDomainModelList } from './persistWorldInfoMerge.js';
 import { INFO_PANEL_DEFAULT_OPACITY } from '../theme/runtimeVisualDefaults.js';
+import { hasValue, listOr, valueOr } from './value.js';
 
 /**
  * Common `objJson.objType` values excluded from adaptive bounding boxes (lights, panels, etc.).
@@ -221,35 +222,6 @@ function fitPerspectiveCameraToContentBoundsTHREE(camera, controls, bounds, opti
 /**
  * General utilities: safe value access, list defaults, and info-panel JSON fragments.
  */
-
-/**
- * Whether value is defined (not undefined and not null).
- * @param {*} value
- * @returns {boolean}
- */
-function hasValue(value) {
-  return value !== undefined && value !== null;
-}
-
-/**
- * Return value when defined, otherwise defaultValue.
- * @param {*} value
- * @param {*} defaultValue
- * @returns {*}
- */
-function valueOr(value, defaultValue) {
-  return hasValue(value) ? value : defaultValue;
-}
-
-/**
- * Return value when it is an array, otherwise defaultValue (empty array by default).
- * @param {*} value
- * @param {Array} [defaultValue=[]]
- * @returns {Array}
- */
-function listOr(value, defaultValue = []) {
-  return Array.isArray(value) ? value : defaultValue;
-}
 
 /**
  * Parse a path string into file info (file name, directory, extension).

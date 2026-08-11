@@ -75,7 +75,8 @@ export function createRunScenePreviewController(host) {
         bindSceneEvents: options.bindSceneEvents ?? resolveBindFlag(payload),
         label
       },
-      targetOrigin
+      targetOrigin,
+      [targetOrigin]
     );
   }
 
@@ -88,7 +89,7 @@ export function createRunScenePreviewController(host) {
       }, READY_TIMEOUT_MS);
 
       readyListener = (event) => {
-        if (!isScenePreviewMessageEvent(event) || event.origin !== expectedOrigin) {
+        if (!isScenePreviewMessageEvent(event, [expectedOrigin]) || event.origin !== expectedOrigin) {
           return;
         }
         if (event.source !== win) {
@@ -171,7 +172,9 @@ export function createRunScenePreviewController(host) {
 
     const playerUrl = resolvePlayerUrl();
     const url = new URL(playerUrl, window.location.href);
-    const playerOrigin = resolveScenePreviewPeerOrigin(url.href);
+    // A custom player URL is an explicit user setting, so its exact origin is an allowed peer for
+    // this preview session. It is never widened to "*" or to an arbitrary event origin.
+    const playerOrigin = resolveScenePreviewPeerOrigin(url.href, window.location.href, [url.origin]);
     const openerOrigin = resolveScenePreviewPeerOrigin(window.location.origin);
     if (!playerOrigin || !openerOrigin) {
       host.showMessage?.("编辑器或播放器地址不在允许通信的来源白名单中。", "error");

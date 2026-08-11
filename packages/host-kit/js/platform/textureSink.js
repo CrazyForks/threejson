@@ -1,4 +1,4 @@
-import { createDirectorySink, createUploadSink, createZipDownloadSink } from "threejson/core";
+import { createDirectorySink, createUploadSink, createZipDownloadSink } from "threejson/texture-sink";
 import { DESKTOP_CAPABILITIES } from "./hostPlatform.js";
 
 export function createDesktopTextureSink(platform) {

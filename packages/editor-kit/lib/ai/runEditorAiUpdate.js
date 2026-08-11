@@ -1,4 +1,4 @@
-import { requestUpdatedSceneEditCommands, runSceneAgent } from "threejson/core";
+import { requestUpdatedSceneEditCommands, runSceneAgent } from "threejson/ai";
 import {
   requestUpdatedSceneJsonString,
   attachAssemblyParentWarnings,

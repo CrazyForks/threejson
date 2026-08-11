@@ -19,6 +19,7 @@ import {
 } from "../builder/sceneHelperBuilder.js";
 import { normalizeIntroConfig } from "../runtime/sceneIntroConfig.js";
 import { resolvePosition, resolveRotation, resolveScale } from "../util/vectorValue.js";
+import { isCanonicalScenePayload } from "./scenePayloadShape.js";
 import {
   JSON_ORIGIN_CONFIG,
   JSON_ORIGIN_LIST,
@@ -1536,14 +1537,6 @@ function buildNormalizedScenePayload(sourcePayload, canonicalPayload, defaultMod
     canvasWidth: compatPayload.canvasWidth ?? compatPayload.sceneConfig.canvasWidth,
     canvasHeight: compatPayload.canvasHeight ?? compatPayload.sceneConfig.canvasHeight
   };
-}
-
-function isCanonicalScenePayload(payload = {}) {
-  return Array.isArray(payload?.objectList)
-    && !hasOwn(payload, "sceneConfig")
-    && !hasOwn(payload, "worldInfo")
-    && !hasOwn(payload, "friendlyMap")
-    && !hasOwn(payload, "modelList");
 }
 
 function hasSceneConfigPrimaryRuntime(payload = {}) {

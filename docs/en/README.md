@@ -31,8 +31,10 @@ The default entry page at the repo root is [`../index.html`](../../index.html), 
 The repository already provides a root [`../package.json`](../../package.json) and the package name is **`threejson`**. When installing it into your own application, also install the peer dependencies so your bundler can resolve imports such as `three` from `node_modules`:
 
 ```bash
-npm install threejson three @tweenjs/tween.js html2canvas-pro
+npm install threejson three @tweenjs/tween.js
 ```
+
+Install `html2canvas-pro`, `gifuct-js`, `fflate`, `three-bvh-csg` + `three-mesh-bvh`, or `troika-three-text` only for the corresponding HTML-panel, GIF, archive, CSG, or SDF-text capability.
 
 Prefer importing from the package root:
 
@@ -105,7 +107,7 @@ sceneRuntime.start();
 ### Other Notes
 
 - Serve pages over a local static server instead of opening them with `file://`. ES modules, textures, and OBJ / GLTF loading usually require HTTP.
-- The engine uses bare module specifiers such as `three`, `@tweenjs/tween.js`, and `html2canvas-pro`. Without a bundler, add an `importmap` that maps them to a CDN. With Vite or Webpack, they will be resolved from `node_modules`.
+- The minimal runtime uses bare module specifiers such as `three` and `@tweenjs/tween.js`. Optional capability modules such as `html2canvas-pro` need an import-map entry only when that capability is used. With Vite or Webpack, installed packages are resolved from `node_modules`.
 - Texture paths can use project-root paths such as `/assets/textures/...`. Pages inside `examples/html-demo/` usually import engine modules from `../../core/...`.
 - **With `npm install threejson`**: built-in domains and `/assets/...` paths in JSON try the active base first and fall back to jsDelivr [`@threejson/assets`](https://www.npmjs.com/package/@threejson/assets) (see [Static assets in `api.md`](./api.md#static-assets-coreutilassetsbasejs)). Cloned-repo demos can still use `assetsBase: "/assets"` or `setAssetsBaseUrl("/assets")` for the local mount.
 - `rotationX`, `rotationY`, and `rotationZ` use radians, not degrees.

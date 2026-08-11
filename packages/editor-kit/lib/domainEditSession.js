@@ -10,9 +10,7 @@ import {
   getDomain,
   isKnownDomainHandler,
   setUserDataObjJson,
-  snapshotBoxModelTransformFromObject3D
-} from "threejson/core";
-import {
+  snapshotBoxModelTransformFromObject3D,
   collectDomainExportCaveats,
   DOMAIN_EDIT_STATES,
   domainChildTransformsChanged,

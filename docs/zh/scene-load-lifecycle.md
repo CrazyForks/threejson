@@ -44,7 +44,7 @@
 
 同步路径（`createJsonSceneSimple`、`deployJsonSceneSimple`）在同步 deploy 前 `void preloadSceneTextFonts(...)`（fire-and-forget）。
 
-**宿主 import map**：裸 ESM 页面若加载 SDF 文字，需在 import map 中配置 `troika-three-text` + `fflate`；见 [quick-start.md](./quick-start.md) / [en/quick-start.md](../en/quick-start.md)。
+**宿主 import map**：裸 ESM 页面若加载 SDF 文字，只需为该能力配置 `troika-three-text`；`fflate` 与文字无关，仅供 `.tjz` 归档 API 使用。见 [quick-start.md](./quick-start.md) / [en/quick-start.md](../en/quick-start.md)。
 
 ### 示例
 
@@ -116,7 +116,7 @@ Inside `deployIntoTarget` (async `createJsonScene` / `deployJsonScene`), after r
 
 Sync paths (`createJsonSceneSimple`, `deployJsonSceneSimple`) call `void preloadSceneTextFonts(...)` (fire-and-forget) before synchronous deploy.
 
-**Host import map**: bare-ESM pages that load SDF text need `troika-three-text` + `fflate` in the import map; see [quick-start.md](./quick-start.md) / [en/quick-start.md](../en/quick-start.md).
+**Host import map**: bare-ESM pages that load SDF text need only `troika-three-text`; `fflate` is unrelated and is used only by `.tjz` archive APIs. See [quick-start.md](./quick-start.md) / [en/quick-start.md](../en/quick-start.md).
 
 ### Example
 

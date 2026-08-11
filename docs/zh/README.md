@@ -31,8 +31,10 @@ ThreeJSON 是一个基于 Three.js 的 Web3D JSON 运行时。调用者不需要
 仓库已经提供了根目录 [`../package.json`](../../package.json)，包名为 **`threejson`**。如果要在自己的应用中安装它，请同时安装 peer 依赖，以便打包器能从 `node_modules` 正确解析诸如 `three` 之类的导入：
 
 ```bash
-npm install threejson three @tweenjs/tween.js html2canvas-pro
+npm install threejson three @tweenjs/tween.js
 ```
+
+`html2canvas-pro`、`gifuct-js`、`fflate`、`three-bvh-csg` + `three-mesh-bvh`、`troika-three-text` 分别只在使用 HTML 面板、GIF、归档、CSG、SDF 文字能力时安装。
 
 推荐从包根导入：
 
@@ -102,7 +104,7 @@ sceneRuntime.start();
 ### 其他说明
 
 - 请通过本地静态服务器访问页面，不建议直接用 `file://` 打开。ES Module、纹理以及 OBJ / GLTF 加载通常都需要 HTTP 环境。
-- 引擎使用 `three`、`@tweenjs/tween.js`、`html2canvas-pro` 等裸模块名；如果不使用打包器，需要手动配置 import map 指向 CDN。使用 Vite 或 Webpack 时，这些依赖会从 `node_modules` 解析。
+- 最小运行时使用 `three`、`@tweenjs/tween.js` 等裸模块名；`html2canvas-pro` 等可选能力模块仅在实际使用时才需要 import map。使用 Vite 或 Webpack 时，已安装的包会从 `node_modules` 解析。
 - 纹理路径可以直接使用项目根路径，比如 `/assets/textures/...`。`examples/html-demo/` 下的页面通常从 `../../core/...` 导入引擎模块。
 - 安装 `threejson` 后，JSON 中的 `/assets/...` 路径默认先尝试当前 base，失败后回退到 jsDelivr [`@threejson/assets`](https://www.npmjs.com/package/@threejson/assets)；克隆仓库的演示页面仍可使用 `assetsBase: "/assets"` 或 `setAssetsBaseUrl("/assets")` 指向本地资源。
 - `rotationX`、`rotationY` 和 `rotationZ` 的单位是弧度，不是角度。

@@ -1,7 +1,11 @@
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import * as THREE from "three";
-import { sceneHighlight, trackDisposableResource } from "threejson";
-import { HIGHLIGHT_ALARM_RED, HIGHLIGHT_LOCATE_AMBER } from "threejson/domains/sceneHighlight";
+import { trackDisposableResource } from "threejson/resources";
+import {
+  createPageHighlightSetup,
+  HIGHLIGHT_ALARM_RED,
+  HIGHLIGHT_LOCATE_AMBER
+} from "threejson/domains/sceneHighlight";
 
 export function getPlayerHighlightChannelOptions(playerSettings) {
   const ch = playerSettings?.highlight?.channels || {};
@@ -72,7 +76,7 @@ export function createPlayerHighlightController() {
     }
     composer = new EffectComposer(renderer);
     trackDisposableResource(composer);
-    highlightPageSetup = sceneHighlight.createPageHighlightSetup(scene, camera, {
+    highlightPageSetup = createPageHighlightSetup(scene, camera, {
       composer,
       renderer,
       channelOptions: channelOptions || getPlayerHighlightChannelOptions(null)

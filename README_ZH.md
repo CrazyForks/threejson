@@ -65,14 +65,24 @@ npm ci && npm test
 - **Three.js**：`>= 0.179.0`（推荐 **0.184.x**，开发与测试主版本）。版本矩阵见 [`docs/zh/three-compat.md`](docs/zh/three-compat.md)。
 
 ```bash
-npm install threejson three @tweenjs/tween.js html2canvas-pro
+npm install threejson three @tweenjs/tween.js
 ```
 
-若材质使用 **`textureKind: "gif"`**，运行时会 `import("gifuct-js")`；由打包器从 **`node_modules`**（本包已声明 `gifuct-js` 依赖，通常随 `threejson` 一并安装）解析即可。
+最小场景运行时不强制依赖归档、GIF、HTML 栅格化、CSG 或 SDF 文字包。仅在场景使用对应能力时安装可选 peer：
 
-若场景含 **`objType: "text"`** 且 **`mode: "sdf"`**（默认），运行时会懒加载 **`troika-three-text`**（本包 `dependencies`，打包器通常自动解析）；仅用 `texture` / `mesh` 模式或无文字对象时无需额外配置。
+- `.tjz` 归档：`fflate`
+- GIF 纹理：`gifuct-js`
+- HTML `infoPanel` 纹理：`html2canvas-pro`
+- CSG（`joins`、`inters` 或 `holes`）：`three-bvh-csg three-mesh-bvh`
+- SDF 场景文字：`troika-three-text`
 
-示例：
+普通 JSON 场景优先使用窄入口：
+
+```js
+import { createJsonScene } from "threejson/runtime";
+```
+
+只有需要内置业务 domain 或兼容 API 全集时，才使用聚合入口：
 
 ```js
 import { createSceneRuntime, deployMesh, door } from "threejson";
@@ -89,7 +99,8 @@ npm 安装后，内置 domain 与场景 JSON 中的 `/assets/...` 路径默认�
 **切换为本地静态目录**（克隆仓库、自托管时）：
 
 ```js
-import { createJsonScene, LOCAL_ASSETS_BASE, setAssetsBaseUrl } from "threejson/core";
+import { createJsonScene } from "threejson/runtime";
+import { LOCAL_ASSETS_BASE, setAssetsBaseUrl } from "threejson/assets";
 
 setAssetsBaseUrl(LOCAL_ASSETS_BASE); // "/assets"
 
@@ -109,7 +120,7 @@ await createJsonScene(payload, {
 
 ## 不使用 npm（克隆仓库 + 静态服务器）
 
-克隆该仓库后，通过 HTTP 提供静态服务（例如使用 Live Server）。在 import map 中映射 **`threejson`** → [`builtins/full.js`](builtins/full.js)、**`threejson/core`** → [`core/index.js`](core/index.js)（或 [`index.js`](index.js)），即可在 HTML 里写 `import { createJsonScene } from "threejson"`，与 npm 一致。详见 [`examples/html-demo/README.md`](examples/html-demo/README.md)。另可选用相对路径 `core/index.js` + `builtins/register.js`（见该目录下的 `00-05-import-paths.html`）。为 `three`、`@tweenjs/tween.js`、`html2canvas-pro` 配置 [import map](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script/type/importmap)。**按需**补充：**`gifuct-js`**（`textureKind: "gif"`）、**`troika-three-text`** + **`fflate`**（SDF 场景文字）；详见 [`docs/zh/quick-start.md`](docs/zh/quick-start.md)。
+克隆该仓库后，通过 HTTP 提供静态服务（例如使用 Live Server）。普通 JSON 场景在 import map 中映射 **`threejson/runtime`** → [`core/runtime.js`](core/runtime.js)，并映射 `three`、`three/examples/jsm/` 与 `@tweenjs/tween.js` 即可。只有需要内置业务 domain 时才映射聚合入口 **`threejson`** → [`builtins/full.js`](builtins/full.js)。其他能力依赖按需映射；尤其 SDF 文字只需要 `troika-three-text`，不需要 `fflate`。详见 [`examples/html-demo/README.md`](examples/html-demo/README.md) 与 [`docs/zh/quick-start.md`](docs/zh/quick-start.md)。
 
 ## 本地快速预览
 

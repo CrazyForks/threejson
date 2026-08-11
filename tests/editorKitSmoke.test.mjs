@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 // Imports every packages/editor-kit entry through its published-style specifier
 // ("@threejson/editor-kit/*"), proving the workspace links + exports map + the split routing of
-// core imports (12 symbols via threejson/core, 18 editor-internal via threejson/edit)
+// capability-scoped imports plus editor-only helpers via threejson/edit
 // all resolve end to end. These modules are framework-agnostic no-DOM logic, so this covers module
 // resolution and the public API shape rather than a live editor session.
 
@@ -22,7 +22,7 @@ test("editor command specs carry the current command API version", async () => {
   // public re-export regressed, importing this module would have thrown above.
 });
 
-test("editor AI update flow resolves (routes through threejson/core + threejson/edit)", async () => {
+test("editor AI update flow resolves through capability entries + threejson/edit", async () => {
   const ai = await import("@threejson/editor-kit/ai");
   assert.equal(typeof ai.runEditorAiUpdate, "function");
   assert.equal(typeof ai.buildEditorUpdatePrompt, "function");
@@ -48,7 +48,7 @@ test("domainEditSession resolves and exposes the domain-edit state machinery", a
   assert.equal(typeof des.undoDomainChildEditFromPersistSource, "function");
 });
 
-test("threejson/edit exposes exactly the 18 editor-internal symbols editor-kit needs", async () => {
+test("threejson/edit exposes the editor-internal symbols editor-kit needs", async () => {
   const es = await import("threejson/edit");
   const expected = [
     "DOMAIN_EDIT_STATES", "collectDomainExportCaveats", "domainChildTransformsChanged",
@@ -56,17 +56,19 @@ test("threejson/edit exposes exactly the 18 editor-internal symbols editor-kit n
     "resolveDomainDeployRootAncestor", "setDomainChildTransformBaseline", "setDomainEditState",
     "setPersistSource", "snapshotDomainChildTransforms", "attachAssemblyParentWarnings",
     "batchResultsHaveSceneMutation", "commandListHasMutatingOp", "formatObjectGetFeedbackFromBatch",
-    "requestUpdatedSceneJsonString", "cloneJson", "exportWysiwygDeployRootFromObject3D"
+    "requestUpdatedSceneJsonString", "cloneJson", "exportWysiwygDeployRootFromObject3D",
+    "getDomain", "isKnownDomainHandler", "setUserDataObjJson",
+    "snapshotBoxModelTransformFromObject3D"
   ];
   for (const sym of expected) {
     assert.ok(sym in es, `threejson/edit is missing ${sym}`);
   }
-  assert.equal(Object.keys(es).length, expected.length, "edit surface changed size unexpectedly");
+  assert.equal(Object.keys(es).length, expected.length, "edit capability surface changed unexpectedly");
 });
 
 test("material.patch edits one field without disturbing the others", async () => {
   const THREE = await import("three");
-  const { createCommandContext, executeCommand } = await import("threejson/core");
+  const { createCommandContext, executeCommand } = await import("threejson/commands");
 
   // The inspector's material panel dispatches material.patch with a single-field partial per edit,
   // precisely so changing colour cannot clobber roughness. This pins that the command merges the

@@ -5,7 +5,7 @@
  * `setByPath` writes a single dotted path and persists immediately, so each control here is a
  * one-liner rather than a form-state reducer.
  */
-import { useHostI18n } from "@threejson/react";
+import { useHostI18n } from "@threejson/react/i18n";
 
 export function SettingsDialog({ api, onClose }) {
   const { t } = useHostI18n();

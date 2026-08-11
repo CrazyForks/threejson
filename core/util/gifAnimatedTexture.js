@@ -1,6 +1,6 @@
 /**
  * `textureKind: "gif"`: gifuct-js decode + CanvasTexture, rAF-driven needsUpdate.
- * The browser must resolve bare specifier `gifuct-js` via import map (aligned with package.json dependency version).
+ * The browser must resolve the optional peer `gifuct-js` when this capability is used.
  */
 import * as THREE from "three";
 import { log } from "./logger.js";

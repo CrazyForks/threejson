@@ -12,8 +12,9 @@
  * three-view, scene-tree tab, and theme switching are not reimplemented yet.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useScenePlayer, useHostI18n } from "@threejson/react";
-import { MeshExportDialog } from "@threejson/react-ui";
+import { useScenePlayer } from "@threejson/react/scene-player";
+import { useHostI18n } from "@threejson/react/i18n";
+import { MeshExportDialog } from "@threejson/react-ui/mesh-export";
 import { resolveSceneHostUrl } from "@threejson/host-kit/js/sceneHostPaths.js";
 import {
   buildHtmlTemplate,

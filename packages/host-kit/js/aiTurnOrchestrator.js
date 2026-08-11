@@ -25,12 +25,14 @@ import {
   buildSceneScaleProfile,
   matchIntentSignals,
   requestUpdatedSceneEditCommands,
-  updateSceneJsonString as requestUpdatedSceneJsonString,
+  updateSceneJsonString as requestUpdatedSceneJsonString
+} from "threejson/ai";
+import {
   executeCommands,
-  createCommandContext,
-  sceneToStandardJsonSimple,
-  createJsonScene
-} from "threejson";
+  createCommandContext
+} from "threejson/commands";
+import { sceneToStandardJsonSimple } from "threejson/scene-export";
+import { createJsonScene } from "threejson/runtime";
 import { resolveSceneHostUrl, sceneHostAssetUrl } from "./sceneHostPaths.js";
 
 /** Resolves a repo-relative path (docs/zh/event-mechanism.md, assets/json/demo-show/...) to a

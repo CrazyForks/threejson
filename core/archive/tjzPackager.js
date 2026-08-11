@@ -1,6 +1,12 @@
-import { strToU8, zipSync } from "fflate";
+import * as fflate from "fflate";
 import { normalizeArchivePath } from "../util/archiveCommon.js";
 import { normalizeTjzManifest } from "./tjzManifest.js";
+
+const { strToU8, zipSync } = fflate;
+
+if (typeof strToU8 !== "function" || typeof zipSync !== "function") {
+  throw new Error("ThreeJSON .tjz packaging requires the optional peer: npm install fflate");
+}
 
 async function normalizeAssetInputToBytes(input) {
   if (input instanceof Uint8Array) {

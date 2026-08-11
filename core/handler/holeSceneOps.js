@@ -2,7 +2,7 @@
  * Scene hole primitives: CSG subtract, restore by originHole, deploy stand-in mesh with holeData (domain-agnostic).
  */
 
-import { evaluateMeshBoolean } from "./csgBrushOps.js";
+import { evaluateMeshBoolean } from "./csgCapability.js";
 
 /**
  * @param {import("three").Scene|import("three").Object3D} scene

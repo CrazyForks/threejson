@@ -1,4 +1,9 @@
-import { hasValue, isCanonicalScenePayload, resolveRenderLoopFpsPolicy, valueOr } from "threejson";
+import {
+  hasValue,
+  isCanonicalScenePayload,
+  resolveRenderLoopFpsPolicy,
+  valueOr
+} from "threejson/runtime-config";
 import { mergeSceneHelpersFromSysConfig } from "./mergeSceneHelpers.js";
 
 /** Shared scene-host runtime config builder used by editor/player adapters. */

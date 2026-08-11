@@ -21,8 +21,6 @@ import { createTweenGroupStore } from "../compat/adapters/tween.js";
 import { createAnimationMixerStore } from "../handler/animationMixerRegistry.js";
 import { createAnimationStateMachineStore } from "../handler/animationStateMachine.js";
 import { createScenePassRegistryStore } from "../util/scenePassRuntime.js";
-import { createRuntimeEntityRegistryStore } from "./runtimeEntityRegistry.js";
-import { createFrameCommitScheduler } from "./frameCommitScheduler.js";
 
 /**
  * THREE-revision/sceneConfig compat context for the in-progress deploy (see
@@ -185,8 +183,6 @@ function createRuntimeContext() {
   ctx.animationStateMachine = createAnimationStateMachineStore({ ownerRuntimeContext: ctx });
   ctx.animationMixer = createAnimationMixerStore();
   ctx.scenePassRegistry = createScenePassRegistryStore();
-  ctx.frameCommitScheduler = createFrameCommitScheduler();
-  ctx.entityRegistry = createRuntimeEntityRegistryStore();
   ctx.compat = createCompatContextStore();
 
   return ctx;

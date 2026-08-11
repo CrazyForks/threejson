@@ -46,6 +46,7 @@ import {
 } from "./agentTools.js";
 import {
   buildIntentHints,
+  buildCommandIntentHints,
   analyzeSceneUsage,
   evaluateCapabilityFit,
   matchIntentSignals
@@ -176,6 +177,7 @@ export {
   planTexturesDry,
   evaluateSceneCapabilityFit,
   buildIntentHints,
+  buildCommandIntentHints,
   THREE_JSON_AGENT_CAPABILITY_INDEX,
   THREE_JSON_AGENT_EXAMPLE_INDEX,
   analyzeSceneUsage,

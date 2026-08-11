@@ -12,15 +12,10 @@
 <script type="importmap">
 {
   "imports": {
-    "threejson": "/builtins/full.js",
-    "threejson/core": "/core/index.js",
+    "threejson/runtime": "/core/runtime.js",
     "three": "https://esm.sh/three@0.184.0",
     "three/examples/jsm/": "https://esm.sh/three@0.184.0/examples/jsm/",
-    "@tweenjs/tween.js": "https://esm.sh/@tweenjs/tween.js@25.0.0",
-    "html2canvas-pro": "https://esm.sh/html2canvas-pro@2.0.4",
-    "gifuct-js": "https://esm.sh/gifuct-js@2.1.2",
-    "three-mesh-bvh": "https://esm.sh/three-mesh-bvh@0.9.10?deps=three@0.184.0",
-    "three-bvh-csg": "https://esm.sh/three-bvh-csg@0.0.18?deps=three@0.184.0,three-mesh-bvh@0.9.10"
+    "@tweenjs/tween.js": "https://esm.sh/@tweenjs/tween.js@25.0.0"
   }
 }
 </script>
@@ -29,19 +24,30 @@
 模块脚本示例：
 
 ```js
-// 默认：内置 domain 已注册 + core API + door / cabinet 等简写
-import { createJsonScene, door } from "threejson";
+// 普通 JSON 场景：最小运行时，不引入 AI、编辑器、归档或业务 domain 聚合面
+import { createJsonScene } from "threejson/runtime";
 
-// 仅 core，不注册内置 domain
-import { createJsonScene } from "threejson/core";
+// 需要 door / cabinet 等内置业务 domain 时，再映射并导入聚合入口
+import { createJsonScene, door } from "threejson";
 ```
 
 | import map 键 | 物理文件 | npm |
 |---------------|----------|-----|
+| `threejson/runtime` | `/core/runtime.js` | `threejson/runtime` |
 | `threejson` | `/builtins/full.js` | `threejson` |
 | `threejson/core` | `/core/index.js` | `threejson/core` |
 
 路径以**站点根**为准（与 `/assets/...` 相同）。
+
+表中的 `threejson` 与 `threejson/core` 是兼容聚合入口，不属于最小 import map。可选能力也只在实际使用时增加映射：
+
+| 场景能力 | import map 依赖 |
+|---|---|
+| `.tjz` 归档 | `fflate` |
+| GIF 纹理 | `gifuct-js` |
+| HTML `infoPanel` | `html2canvas-pro` |
+| CSG（`joins` / `inters` / `holes`） | `three-bvh-csg` + `three-mesh-bvh` |
+| SDF 场景文字 | `troika-three-text` |
 
 普通 JSON 场景不需要加载 `.tjz` 压缩实现，也不需要在 import map 中配置 `fflate`。
 只有页面显式调用归档 API 时，才增加独立入口和依赖：

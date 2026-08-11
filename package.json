@@ -19,7 +19,21 @@
   "exports": {
     ".": "./builtins/full.js",
     "./core": "./core/index.js",
+    "./runtime": "./core/runtime.js",
+    "./assets": "./core/assets.js",
+    "./ai": "./core/ai/index.js",
+    "./commands": "./core/command/index.js",
+    "./events": "./core/runtime/eventMechanism/resolveBindSceneEvents.js",
+    "./mesh-export": "./core/handler/meshExportHandler.js",
+    "./player": "./core/player.js",
+    "./resources": "./core/resources.js",
+    "./runtime-config": "./core/runtimeConfig.js",
+    "./scene-export": "./core/sceneExport.js",
+    "./scene-payload": "./core/scenePayload.js",
+    "./texture-sink": "./core/ai/browserTextureSink.js",
+    "./visual-defaults": "./core/theme/runtimeVisualDefaults.js",
     "./archive": "./core/archive/index.js",
+    "./csg": "./core/handler/csgBrushOps.js",
     "./builtins": "./builtins/register.js",
     "./builtins/register": "./builtins/register.js",
     "./domains/*": "./domains/*/index.js",
@@ -51,14 +65,37 @@
     "@dimforge/rapier3d-compat": "^0.19.3",
     "@tweenjs/tween.js": "^25.0.0",
     "echarts": "^5.5.0",
+    "fflate": "^0.8.3",
+    "gifuct-js": "^2.1.2",
     "html2canvas-pro": "^2.0.0",
-    "three": ">=0.179.0"
+    "three": ">=0.179.0",
+    "three-bvh-csg": "^0.0.18",
+    "three-mesh-bvh": "^0.9.10",
+    "troika-three-text": "^0.52.4"
   },
   "peerDependenciesMeta": {
     "@dimforge/rapier3d-compat": {
       "optional": true
     },
     "echarts": {
+      "optional": true
+    },
+    "fflate": {
+      "optional": true
+    },
+    "gifuct-js": {
+      "optional": true
+    },
+    "html2canvas-pro": {
+      "optional": true
+    },
+    "three-bvh-csg": {
+      "optional": true
+    },
+    "three-mesh-bvh": {
+      "optional": true
+    },
+    "troika-three-text": {
       "optional": true
     }
   },
@@ -92,18 +129,16 @@
     "json-scene"
   ],
   "license": "MIT",
-  "dependencies": {
-    "fflate": "^0.8.3",
-    "gifuct-js": "^2.1.2",
-    "three-bvh-csg": "^0.0.18",
-    "troika-three-text": "^0.52.4"
-  },
   "devDependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",
     "@threejson/assets": "^1.1.3",
     "@tweenjs/tween.js": "^25.0.0",
+    "fflate": "^0.8.3",
+    "gifuct-js": "^2.1.2",
     "html2canvas-pro": "^2.0.0",
     "three": "^0.184.0",
-    "three-mesh-bvh": "^0.9.10"
+    "three-bvh-csg": "^0.0.18",
+    "three-mesh-bvh": "^0.9.10",
+    "troika-three-text": "^0.52.4"
   }
 }

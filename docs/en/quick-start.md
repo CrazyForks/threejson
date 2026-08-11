@@ -11,16 +11,18 @@ This guide focuses on one task: getting your first runnable ThreeJSON scene into
 ### npm
 
 ```bash
-npm install threejson three
+npm install threejson three @tweenjs/tween.js
 ```
 
-`three` is the core peer dependency. Some features use optional packages:
+The normal JSON runtime does not require the optional capability packages. Install only what the scene uses:
 
-```bash
-npm install @tweenjs/tween.js html2canvas-pro fflate gifuct-js three-bvh-csg troika-three-text
-```
-
-Install them when you use animation helpers, screenshots, archives, GIF textures, CSG, text, or related features.
+| Capability | Install |
+|---|---|
+| `.tjz` archive | `fflate` |
+| GIF texture | `gifuct-js` |
+| HTML `infoPanel` texture | `html2canvas-pro` |
+| CSG (`joins`, `inters`, `holes`) | `three-bvh-csg three-mesh-bvh` |
+| SDF scene text | `troika-three-text` |
 
 If your JSON references the official sample assets, you can install the optional asset package:
 
@@ -39,14 +41,15 @@ Without a bundler, use native ES modules and an import map:
 {
   "imports": {
     "three": "https://esm.sh/three@0.184.0",
-    "threejson": "https://esm.sh/threejson@0.1.0-alpha.4",
-    "threejson/core": "https://esm.sh/threejson@0.1.0-alpha.4/core"
+    "three/examples/jsm/": "https://esm.sh/three@0.184.0/examples/jsm/",
+    "@tweenjs/tween.js": "https://esm.sh/@tweenjs/tween.js@25.0.0",
+    "threejson/runtime": "https://esm.sh/threejson@0.1.0-alpha.9/runtime"
   }
 }
 </script>
 ```
 
-Application code should import public package entries such as `threejson` and `threejson/core`. Do not import repository internals such as `../core/index.js`.
+For normal scene loading, import `threejson/runtime`. Add the aggregate `threejson` entry only for built-in business domains, or another documented capability subpath when needed. Do not import repository internals such as `../core/index.js`.
 
 > Browser modules, textures, and models are not reliable through `file://`. Serve pages through HTTP, for example Vite, Live Server, or `npx serve`.
 
@@ -125,7 +128,7 @@ Create `index.html`:
   <canvas id="stage"></canvas>
 
   <script type="module">
-    import { createJsonScene } from "threejson";
+    import { createJsonScene } from "threejson/runtime";
 
     const sceneJson = {
       version: "next",
@@ -197,7 +200,7 @@ Component:
 
 ```jsx
 import { useEffect, useRef } from "react";
-import { createJsonScene } from "threejson";
+import { createJsonScene } from "threejson/runtime";
 
 const sceneJson = {
   version: "next",
@@ -272,7 +275,7 @@ Component:
 
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from "vue";
-import { createJsonScene } from "threejson";
+import { createJsonScene } from "threejson/runtime";
 
 const canvasRef = ref(null);
 let runtime = null;
@@ -336,7 +339,7 @@ npm install threejson three
 Renderer code:
 
 ```js
-import { createJsonScene } from "threejson";
+import { createJsonScene } from "threejson/runtime";
 
 const runtime = await createJsonScene(sceneJson, {
   canvas: document.querySelector("#stage"),
@@ -369,7 +372,7 @@ await createJsonScene(sceneJson, {
 Or configure globally:
 
 ```js
-import { setAssetsBaseUrl, setAssetsBaseMode } from "threejson/core";
+import { setAssetsBaseUrl, setAssetsBaseMode } from "threejson/assets";
 
 setAssetsBaseUrl("/assets");
 setAssetsBaseMode("base-first");

@@ -30,7 +30,7 @@ import {
 } from './meshImportLoaders.js';
 import {loadingManager} from '../cache/loading.js';
 import {trackDisposableResource} from '../handler/trackedResourceRegistry.js';
-import { evaluateMeshBoolean } from '../handler/csgBrushOps.js';
+import { evaluateMeshBoolean } from '../handler/csgCapability.js';
 import { registerObject } from '../handler/objectRegistry.js';
 import { setUserDataObjJson } from '../handler/objectDescriptorAttach.js';
 import { tryRegisterGltfAnimationMixers } from '../handler/animationMixerRegistry.js';

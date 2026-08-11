@@ -1093,7 +1093,7 @@ function confirmTemplateExport() {
     if (type === "html") {
       addZipTextFile(entries, "index.html", html);
     } else {
-      addZipTextFile(entries, "package.json", buildPackageJson(type));
+      addZipTextFile(entries, "package.json", buildPackageJson(type, { sceneJsonText }));
       const files = buildTemplateFiles(type);
       for (const [path, text] of Object.entries(files)) {
         addZipTextFile(entries, path, text);

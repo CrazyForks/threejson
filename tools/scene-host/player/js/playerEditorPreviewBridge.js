@@ -35,7 +35,7 @@ export function createPlayerEditorPreviewBridge(options) {
     if (!openerOrigin) {
       return;
     }
-    postScenePreviewMessage(window.opener, { action: "ready" }, openerOrigin);
+    postScenePreviewMessage(window.opener, { action: "ready" }, openerOrigin, [openerOrigin]);
   }
 
   function notifyEditorLoaded(ok, errorMessage = "") {
@@ -52,7 +52,8 @@ export function createPlayerEditorPreviewBridge(options) {
         ok: Boolean(ok),
         error: errorMessage || undefined
       },
-      openerOrigin
+      openerOrigin,
+      [openerOrigin]
     );
   }
 
@@ -96,7 +97,7 @@ export function createPlayerEditorPreviewBridge(options) {
     }
     installed = true;
     window.addEventListener("message", (event) => {
-      if (!isScenePreviewMessageEvent(event) || event.origin !== openerOrigin) {
+      if (!isScenePreviewMessageEvent(event, [openerOrigin]) || event.origin !== openerOrigin) {
         return;
       }
       if (window.opener && event.source !== window.opener) {

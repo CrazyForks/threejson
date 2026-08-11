@@ -99,7 +99,11 @@ export function createRuntimeEntityRegistryStore() {
 }
 
 function resolveStore(runtimeScope) {
-  return resolveRuntimeContext(runtimeScope).entityRegistry;
+  const runtimeContext = resolveRuntimeContext(runtimeScope);
+  if (!runtimeContext.entityRegistry) {
+    runtimeContext.entityRegistry = createRuntimeEntityRegistryStore();
+  }
+  return runtimeContext.entityRegistry;
 }
 
 export function getRuntimeEntityRegistry(runtimeScope) {

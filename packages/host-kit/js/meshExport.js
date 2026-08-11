@@ -11,7 +11,7 @@
  * The format labels are i18n keys rather than literals so each app renders them through its own
  * catalog — see host-kit's i18n module for `threebox.meshExport.*`.
  */
-import { exportMesh } from "threejson";
+import { exportMesh } from "threejson/mesh-export";
 
 export const MESH_EXPORT_FORMATS = Object.freeze([
   { value: "glb", labelKey: "threebox.meshExport.formatGlb", fallback: "GLB (recommended)" },

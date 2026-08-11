@@ -42,3 +42,6 @@ export { requestUpdatedSceneJsonString } from "./ai/sceneAiService.js";
 // Edit-time utility helpers.
 export { cloneJson } from "./util/cloneJson.js";
 export { exportWysiwygDeployRootFromObject3D } from "./util/sceneToJson.js";
+export { getDomain, isKnownDomainHandler } from "./handler/businessDomainRegistry.js";
+export { setUserDataObjJson } from "./handler/objectDescriptorAttach.js";
+export { snapshotBoxModelTransformFromObject3D } from "./builder/modelBuilder.js";

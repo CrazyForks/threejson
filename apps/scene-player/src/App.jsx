@@ -10,16 +10,14 @@
  *   threejson             → the engine, transitively
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  useScenePlayer,
-  useHostI18n,
-  usePlayerSettings,
-  usePlaylist
-} from "@threejson/react";
+import { useScenePlayer } from "@threejson/react/scene-player";
+import { useHostI18n } from "@threejson/react/i18n";
+import { usePlayerSettings } from "@threejson/react/player-settings";
+import { usePlaylist } from "@threejson/react/playlist";
 import { isSupportedSceneFileName } from "@threejson/player-kit/js/createPlayerRuntime.js";
 import { getDefaultSceneUrl } from "@threejson/host-kit/js/playerSettingsStore.js";
 import { resolveSceneHostUrl } from "@threejson/host-kit/js/sceneHostPaths.js";
-import { MeshExportDialog } from "@threejson/react-ui";
+import { MeshExportDialog } from "@threejson/react-ui/mesh-export";
 import { SettingsDialog } from "./SettingsDialog.jsx";
 import { createScenePlayerPreviewReceiver } from "./scenePreviewProtocol.js";
 

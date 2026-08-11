@@ -31,4 +31,4 @@ When `sceneConfig.intro.postLoad` is configured, core displays a DOM intro overl
 
 ## Text Font Deployment
 
-Before canonical object deployment, `preloadSceneTextFonts(sceneConfig, objectList)` preloads SDF text fonts only when the scene needs them. Without SDF text, it is a no-op. Bare ESM pages that use SDF text should configure `troika-three-text` and `fflate` in the import map.
+Before canonical object deployment, `preloadSceneTextFonts(sceneConfig, objectList)` preloads SDF text fonts only when the scene needs them. Without SDF text, it is a no-op. Bare ESM pages that use SDF text should configure `troika-three-text` in the import map. `fflate` is unrelated and is needed only by `.tjz` archive APIs.

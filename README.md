@@ -90,14 +90,24 @@ Peer dependencies must be installed in your app (versions should satisfy the `pe
 - **Three.js**: `>= 0.179.0` (recommended **0.184.x**). See [`docs/zh/three-compat.md`](docs/zh/three-compat.md) (Chinese; version matrix and workarounds).
 
 ```bash
-npm install threejson three @tweenjs/tween.js html2canvas-pro
+npm install threejson three @tweenjs/tween.js
 ```
 
-If you use **`textureKind: "gif"`**, the runtime does `import("gifuct-js")`; your bundler should resolve it from **`node_modules`** (`gifuct-js` is a dependency of `threejson` and is usually installed transitively).
+The minimal scene runtime has no mandatory archive, GIF, HTML rasterization, CSG, or SDF-text package. Install an optional peer only when the scene uses its capability:
 
-For **`objType: "text"`** with **`mode: "sdf"`** (default), the runtime lazy-loads **`troika-three-text`** (a `dependencies` entry; bundlers usually resolve it automatically). No extra setup is needed for `texture` / `mesh` modes or scenes without text objects.
+- `.tjz` archives: `fflate`
+- GIF textures: `gifuct-js`
+- HTML `infoPanel` textures: `html2canvas-pro`
+- CSG (`joins`, `inters`, or `holes`): `three-bvh-csg three-mesh-bvh`
+- SDF scene text: `troika-three-text`
 
-Example:
+For a normal JSON scene, prefer the narrow runtime entry:
+
+```js
+import { createJsonScene } from "threejson/runtime";
+```
+
+Use the aggregate entry only when you also need built-in business domains or its compatibility API surface:
 
 ```js
 import { createSceneRuntime, deployMesh, door } from "threejson";
@@ -114,7 +124,8 @@ After `npm install`, built-in domains and `/assets/...` paths in scene JSON **de
 **Use a local static mount** (clone, self-hosted):
 
 ```js
-import { createJsonScene, LOCAL_ASSETS_BASE, setAssetsBaseUrl } from "threejson/core";
+import { createJsonScene } from "threejson/runtime";
+import { LOCAL_ASSETS_BASE, setAssetsBaseUrl } from "threejson/assets";
 
 setAssetsBaseUrl(LOCAL_ASSETS_BASE); // "/assets"
 
@@ -132,7 +143,7 @@ Bundlers (Vite, Webpack, etc.) resolve `three` and addons from `node_modules`.
 
 ## Use without npm (clone + static server)
 
-Clone the repo and serve it over HTTP (e.g. Live Server). Map **`threejson`** → [`builtins/full.js`](builtins/full.js) and **`threejson/core`** → [`core/index.js`](core/index.js) in an [import map](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script/type/importmap), then use `import { createJsonScene } from "threejson"` like npm. See [`examples/html-demo/README.md`](examples/html-demo/README.md). Relative `core/index.js` + `builtins/register.js` is documented in `00-05-import-paths.html`. Map `three`, `@tweenjs/tween.js`, `html2canvas-pro` by default. Add **`gifuct-js`** (`textureKind: "gif"`) and **`troika-three-text`** + **`fflate`** (SDF scene text) only when needed — see [`docs/en/quick-start.md`](docs/en/quick-start.md).
+Clone the repo and serve it over HTTP (e.g. Live Server). For ordinary JSON scenes, map **`threejson/runtime`** → [`core/runtime.js`](core/runtime.js), plus `three`, `three/examples/jsm/`, and `@tweenjs/tween.js`. Map the aggregate **`threejson`** → [`builtins/full.js`](builtins/full.js) only when built-in business domains are needed. Optional capability packages are mapped only when used; in particular, SDF text needs `troika-three-text`, not `fflate`. See [`examples/html-demo/README.md`](examples/html-demo/README.md) and [`docs/en/quick-start.md`](docs/en/quick-start.md).
 
 ## Quick Local Preview
 

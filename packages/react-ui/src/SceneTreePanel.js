@@ -8,7 +8,7 @@
  * Authored with `createElement` rather than JSX — these packages ship raw ESM with no build step.
  */
 import { createElement as h, useCallback, useMemo, useState } from "react";
-import { useHostI18n } from "@threejson/react";
+import { useHostI18n } from "@threejson/react/i18n";
 import { buildSceneTreeModel, countSceneTreeNodes } from "@threejson/host-kit/js/sceneTreeModel.js";
 
 /** Stable per-row key: authored id when present, uuid otherwise. */

@@ -13,7 +13,7 @@
  *   import "@threejson/react-ui/styles.css";
  */
 import { createElement as h, useState } from "react";
-import { useHostI18n } from "@threejson/react";
+import { useHostI18n } from "@threejson/react/i18n";
 import { MESH_EXPORT_FORMATS, exportSceneMeshToFile } from "@threejson/host-kit/js/meshExport.js";
 
 /**

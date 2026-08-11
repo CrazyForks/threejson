@@ -18,6 +18,8 @@ export {
   HIGHLIGHT_ALARM_RED,
   HIGHLIGHT_LOCATE_AMBER
 } from "./channels.js";
+export { createSceneHighlightBundle } from "./bundle.js";
+export { createPageHighlightSetup } from "./pageSetup.js";
 
 registerPassListEntryExpander(expandPassListEntry);
 

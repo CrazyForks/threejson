@@ -512,7 +512,11 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
       return;
     }
     const playerUrl = new URL("../player/index.html", window.location.href);
-    const playerOrigin = resolveScenePreviewPeerOrigin(playerUrl.href);
+    const playerOrigin = resolveScenePreviewPeerOrigin(
+      playerUrl.href,
+      window.location.href,
+      [playerUrl.origin]
+    );
     const openerOrigin = resolveScenePreviewPeerOrigin(window.location.origin);
     if (!playerOrigin || !openerOrigin) {
       showToast(
@@ -532,7 +536,11 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
     }
     let sent = false;
     const onMessage = (event) => {
-      if (!isScenePreviewMessageEvent(event) || event.origin !== playerOrigin || event.source !== win) {
+      if (
+        !isScenePreviewMessageEvent(event, [playerOrigin])
+        || event.origin !== playerOrigin
+        || event.source !== win
+      ) {
         return;
       }
       if (event.data?.action === "ready" && !sent) {
@@ -540,7 +548,8 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
         postScenePreviewMessage(
           win,
           { action: "load", payload: sceneJson, label: currentLabel, bindSceneEvents: false },
-          playerOrigin
+          playerOrigin,
+          [playerOrigin]
         );
       }
       if (event.data?.action === "loaded") {
