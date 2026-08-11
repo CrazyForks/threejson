@@ -5,11 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ThreeJSON Shower</title>
   <link rel="icon" href="../../../assets/img/favicon.ico" type="image/x-icon">
+  <script>
+    // Theme is a first-paint concern. Keep it independent from the scene runtime/module graph so a
+    // previously selected light theme is applied before the stylesheet can paint a dark frame.
+    (() => {
+      let selected = "auto";
+      try {
+        selected = localStorage.getItem("threejson.site.theme") || "auto";
+      } catch (_error) {
+        // Storage can be unavailable in privacy-restricted contexts; system preference is safe.
+      }
+      const actual = selected === "light" || selected === "dark"
+        ? selected
+        : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.dataset.theme = actual;
+      document.documentElement.style.colorScheme = actual;
+    })();
+  </script>
+  <link rel="preconnect" href="https://esm.sh" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <script type="importmap">
     {
       "imports": {
         "threejson": "../../../builtins/full.js",
         "threejson/core": "../../../core/index.js",
+        "threejson/assets": "../../../core/assets.js",
         "three": "https://esm.sh/three@0.184.0",
         "three/examples/jsm/": "https://esm.sh/three@0.184.0/examples/jsm/",
         "@tweenjs/tween.js": "https://esm.sh/@tweenjs/tween.js@25.0.0",
@@ -25,11 +45,7 @@
       }
     }
   </script>
-  <link rel="stylesheet" href="https://esm.sh/codemirror@5.65.16/lib/codemirror.css">
-  <link rel="stylesheet" href="https://esm.sh/codemirror@5.65.16/theme/material-darker.css">
   <link rel="stylesheet" href="./css/shower.css">
-  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/javascript/javascript.min.js"></script>
 </head>
 <body>
   <div id="appShell">
@@ -39,7 +55,7 @@
       </a>
       <div class="titleBlock">
         <div id="exampleTitle">ThreeJSON Shower</div>
-        <span id="statusText">Ready</span>
+        <span id="statusText">正在加载...</span>
       </div>
       <div class="headerTools">
         <label class="selectTool">
@@ -87,7 +103,9 @@
         </div>
         <div id="leftContent" class="leftContent">
           <aside id="exampleCatalogPanel" class="exampleCatalogPanel" hidden></aside>
-          <div id="editorPanel" class="editorPanel"></div>
+          <div id="editorPanel" class="editorPanel">
+            <div class="editorLoadingPlaceholder" data-i18n="editorLoading">正在加载 JSON 编辑器...</div>
+          </div>
           <div id="treePanel" class="treePanel" hidden></div>
         </div>
         <aside id="tutorialPanel" class="tutorialPanel">
@@ -127,7 +145,10 @@
         </div>
         <div id="canvasWrap">
           <canvas id="canvasContainer">WebGL required</canvas>
-          <div id="loadingMask">Loading...</div>
+          <div id="loadingMask" class="visible" role="status" aria-live="polite">
+            <span class="loadingSpinner" aria-hidden="true"></span>
+            <span id="loadingText">正在加载场景...</span>
+          </div>
         </div>
       </section>
     </main>
@@ -191,6 +212,6 @@
       </div>
     </div>
   </div>
-  <script type="module" src="./js/main.js"></script>
+  <script type="module" src="./js/main.js?v=20260811-startup-3"></script>
 </body>
 </html>

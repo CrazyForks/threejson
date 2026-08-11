@@ -1,17 +1,19 @@
 import * as THREE from "three";
-import { strToU8, zipSync } from "fflate";
+import "../../../../builtins/register.js";
+import {
+  createJsonScene
+} from "../../../../core/runtime.js";
 import {
   buildFriendlyScenePayloadFromCanonical,
-  createJsonScene,
-  createPluginHost,
-  exportMesh,
   detectScenePayloadViewFormat,
-  normalizeScenePayload,
+  normalizeScenePayload
+} from "../../../../core/scenePayload.js";
+import {
   getThreeJsonSceneAudioRoots,
   pauseAllThreeJsonSceneAudio,
   resumeAllThreeJsonSceneAudio,
   teardownThreeJsonSceneAudioFromRuntime
-} from "threejson";
+} from "../../../../core/builder/audioBuilder.js";
 import {
   buildAdaptiveContentBoundingBoxTHREE,
   fitPerspectiveCameraToContentBoundsTHREE
@@ -28,12 +30,6 @@ import {
   renderViewportGizmoOverlay,
   updateViewportGizmoOverlay
 } from "../../shared/js/viewportGizmoOverlay.js";
-import {
-  jsonStringForScript,
-  buildHtmlTemplate,
-  buildPackageJson,
-  buildTemplateFiles
-} from "../../shared/js/templateExportBuilders.js";
 
 const STORAGE = {
   autoRun: "threejson.shower.autoRun",
@@ -50,6 +46,11 @@ const STORAGE = {
 const STORAGE_EDITOR_BRIDGE_PREFIX = "threejson.editor.openScene.";
 const AUTO_RENDER_DELAY_MS = 700;
 const DEMO_MANIFEST_URL = "assets/json/demo-show/manifest.json";
+const CODEMIRROR_BASE_URL = "https://cdn.jsdelivr.net/npm/codemirror@5.65.16";
+const CODEMIRROR_STYLE_URLS = [
+  `${CODEMIRROR_BASE_URL}/lib/codemirror.css`,
+  `${CODEMIRROR_BASE_URL}/theme/material-darker.css`
+];
 const params = new URLSearchParams(window.location.search);
 let lang = resolveLang();
 let theme = localStorage.getItem(STORAGE.theme) || "auto";
@@ -76,6 +77,7 @@ const labels = {
     fit: "自适应",
     fullscreen: "全屏",
     loading: "加载中...",
+    editorLoading: "正在加载 JSON 编辑器...",
     ready: "Ready",
     noObjects: "暂无对象",
     parseFailed: "JSON 解析失败：",
@@ -132,6 +134,7 @@ const labels = {
     fit: "Fit",
     fullscreen: "Fullscreen",
     loading: "Loading...",
+    editorLoading: "Loading JSON editor...",
     ready: "Ready",
     noObjects: "No objects",
     parseFailed: "JSON parse failed: ",
@@ -193,6 +196,7 @@ const els = {
   canvas: document.getElementById("canvasContainer"),
   canvasWrap: document.getElementById("canvasWrap"),
   loading: document.getElementById("loadingMask"),
+  loadingText: document.getElementById("loadingText"),
   formatSwitch: document.getElementById("jsonFormatSwitch"),
   friendlyBtn: document.getElementById("friendlyBtn"),
   standardBtn: document.getElementById("standardBtn"),
@@ -236,7 +240,7 @@ async function init() {
   els.themeSelect.value = theme;
   applyTheme();
   applyI18n();
-  els.status.textContent = t("ready");
+  els.status.textContent = t("loading");
   els.autoRun.checked = localStorage.getItem(STORAGE.autoRun) !== "0";
   els.autoRun.addEventListener("change", () => {
     localStorage.setItem(STORAGE.autoRun, els.autoRun.checked ? "1" : "0");
@@ -285,25 +289,50 @@ async function init() {
   });
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
 
-  editor = window.CodeMirror(els.editorPanel, {
-    value: "{}",
-    mode: { name: "javascript", json: true },
-    theme: "material-darker",
-    lineNumbers: true,
-    tabSize: 2,
-    indentUnit: 2
-  });
-  editor.on("change", () => scheduleAutoRender());
-  editor.on("blur", () => {
-    if (els.autoRun.checked && activeTab !== "tree") {
-      clearTimeout(runTimer);
-      void runFromEditor();
-    }
-  });
-
   wireControls();
-  await loadInitialJson();
+  setEditorControlsReady(false);
+  // Scene display must not wait on the remote CodeMirror enhancement. The canvas and editor load in
+  // parallel; on a cold CDN connection users still get the scene as soon as ThreeJSON is ready.
+  const initialScenePromise = loadInitialJson();
+  const editorPromise = initializeCodeEditor();
+  await initialScenePromise;
   applyCachedCatalogState();
+  await editorPromise;
+}
+
+async function initializeCodeEditor() {
+  try {
+    const CodeMirror = await loadCodeMirror();
+    els.editorPanel.textContent = "";
+    editor = CodeMirror(els.editorPanel, {
+      value: "{}",
+      mode: { name: "javascript", json: true },
+      theme: "material-darker",
+      lineNumbers: true,
+      tabSize: 2,
+      indentUnit: 2
+    });
+    editor.on("change", () => scheduleAutoRender());
+    editor.on("blur", () => {
+      if (els.autoRun.checked && activeTab !== "tree") {
+        clearTimeout(runTimer);
+        void runFromEditor();
+      }
+    });
+    setTab(activeTab, { persist: false });
+    setEditorControlsReady(true);
+  } catch (error) {
+    console.error("[shower] CodeMirror failed to initialize:", error);
+    els.editorPanel.textContent = lang === "zh-CN" ? "JSON 编辑器加载失败。" : "JSON editor failed to load.";
+    els.editorPanel.classList.add("editorLoadError");
+  }
+}
+
+function setEditorControlsReady(ready) {
+  els.editorPanel?.setAttribute("aria-busy", ready ? "false" : "true");
+  els.jsonToolbar?.querySelectorAll("button").forEach((button) => {
+    button.disabled = !ready;
+  });
 }
 
 function getCachedTab() {
@@ -424,9 +453,11 @@ function setHoverMenu(menu) {
 }
 
 async function loadInitialJson() {
-  const raw = params.get("json") || "assets/json/demo-show/01-box.json";
-  await loadDemoManifest();
-  await loadExampleJson(raw);
+  const raw = params.get("json") || "assets/json/demo-show/minimal-scene/friendly-json.json";
+  // These are independent local resources. Fetching them together avoids making every initial
+  // scene wait for the catalog before its own JSON request even starts.
+  const manifestPromise = loadDemoManifest();
+  await loadExampleJson(raw, { beforeRender: manifestPromise });
 }
 
 async function loadDemoManifest() {
@@ -441,11 +472,12 @@ async function loadDemoManifest() {
   }
 }
 
-async function loadExampleJson(raw) {
+async function loadExampleJson(raw, { beforeRender = Promise.resolve() } = {}) {
   const url = resolveSceneHostUrl(raw);
   showLoading(true);
   try {
-    const res = await fetch(url);
+    const sceneResponsePromise = fetch(url);
+    const [res] = await Promise.all([sceneResponsePromise, beforeRender]);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     fullJson = await res.json();
     currentJsonUrl = raw;
@@ -520,11 +552,11 @@ function setTab(tab, options = {}) {
   els.editorPanel.hidden = isTree;
   els.jsonToolbar.hidden = isTree;
   els.treePanel.hidden = !isTree;
-  if (tab === "core") setEditorJson(toCore(fullJson));
-  if (tab === "full") setEditorJson(fullJson);
+  if (tab === "core" && editor) setEditorJson(toCore(fullJson));
+  if (tab === "full" && editor) setEditorJson(fullJson);
   if (tab === "tree") renderTree();
   syncJsonFormatUi();
-  editor.refresh();
+  editor?.refresh();
 }
 
 function setEditorJson(value) {
@@ -544,6 +576,7 @@ function readEditorJson() {
 }
 
 function readCurrentScene() {
+  if (!editor) return fullJson;
   if (activeTab === "core") return mergeCoreIntoFull(readEditorJson());
   if (activeTab === "full") return readEditorJson();
   return fullJson;
@@ -749,6 +782,7 @@ async function runScene(sceneJson) {
   if (bootstrapKind) {
     createOptions.onSceneReady = (ctx) => runExampleBootstrap(bootstrapKind, ctx);
     if (bootstrapKind === "physics-rapier") {
+      const { createPluginHost } = await import("../../../../core/plugin/pluginHost.js");
       createOptions.pluginHost = createPluginHost();
     }
   }
@@ -1028,6 +1062,7 @@ async function exportModel(format = "glb") {
   showLoading(true);
   try {
     clearHighlight();
+    const { exportMesh } = await import("../../../../core/handler/meshExportHandler.js");
     const result = await exportMesh(runtime.scene, {
       format,
       scope: "scene",
@@ -1070,15 +1105,21 @@ function syncTemplateExportDefaults() {
 }
 
 function addZipTextFile(entries, path, text) {
-  entries[path] = strToU8(text);
+  entries[path] = new TextEncoder().encode(text);
 }
 
-function confirmTemplateExport() {
+async function confirmTemplateExport() {
   const type = els.templateExportType?.value || "html";
   const format = els.templateExportFormat?.value || "standard";
   const jsonLocation = els.templateExportJsonLocation?.value || (type === "html" ? "inline" : "external");
   closeTemplateExportModal();
   try {
+    const {
+      jsonStringForScript,
+      buildHtmlTemplate,
+      buildPackageJson,
+      buildTemplateFiles
+    } = await import("../../shared/js/templateExportBuilders.js");
     const scene = readCurrentScene();
     const payload = format === "friendly" ? toFriendly(scene) : toStandard(scene);
     const sceneJsonText = jsonStringForScript(payload, 2);
@@ -1102,6 +1143,7 @@ function confirmTemplateExport() {
     if (!inlineJson || type !== "html") {
       addZipTextFile(entries, "assets/json/scene.json", `${sceneJsonText}\n`);
     }
+    const { zipSync } = await import("fflate");
     const zip = zipSync(entries, { level: 6 });
     downloadBlob(new Blob([zip], { type: "application/zip" }), `threejson-template-${type}.zip`);
     showMessage(t("templateExportDone"));
@@ -1124,8 +1166,46 @@ function downloadBlob(blob, filename) {
 }
 
 function showLoading(visible) {
-  els.loading.textContent = t("loading");
+  if (els.loadingText) els.loadingText.textContent = t("loading");
   els.loading.classList.toggle("visible", Boolean(visible));
+}
+
+async function loadCodeMirror() {
+  if (typeof window.CodeMirror === "function") return window.CodeMirror;
+  const stylePromise = Promise.all(CODEMIRROR_STYLE_URLS.map(loadStylesheet)).catch((error) => {
+    console.warn("[shower] CodeMirror stylesheet failed to load:", error);
+  });
+  await loadClassicScript(`${CODEMIRROR_BASE_URL}/lib/codemirror.min.js`);
+  await loadClassicScript(`${CODEMIRROR_BASE_URL}/mode/javascript/javascript.min.js`);
+  await stylePromise;
+  if (typeof window.CodeMirror !== "function") {
+    throw new Error("CodeMirror failed to load.");
+  }
+  return window.CodeMirror;
+}
+
+function loadClassicScript(src) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.crossOrigin = "anonymous";
+    script.addEventListener("load", resolve, { once: true });
+    script.addEventListener("error", () => reject(new Error(`Failed to load script: ${src}`)), { once: true });
+    document.head.appendChild(script);
+  });
+}
+
+function loadStylesheet(href) {
+  return new Promise((resolve, reject) => {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = href;
+    link.crossOrigin = "anonymous";
+    link.addEventListener("load", resolve, { once: true });
+    link.addEventListener("error", () => reject(new Error(`Failed to load stylesheet: ${href}`)), { once: true });
+    document.head.appendChild(link);
+  });
 }
 
 function escapeHtml(value) {
