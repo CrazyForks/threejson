@@ -2,7 +2,7 @@
  * Structural scene JSON validation (no tools/common/editor-single dependency).
  */
 import { analyzeSceneUsage } from "../ai/sceneCapability.js";
-import { sanitizeAiJsonText } from "../ai/sceneJsonSanitize.js";
+import { sanitizeAiJsonText } from "../util/sceneJsonSanitize.js";
 import { DEFAULT_FRIENDLY_SCENE_LIST_ORDER } from "./sceneFriendlyMap.js";
 import { isLoadableScenePayload } from "./sceneFriendlyNormalizer.js";
 

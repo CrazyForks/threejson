@@ -10,6 +10,11 @@ export * from "./handler/businessDomainModelDispatch.js";
 export * from "./handler/sceneJsonHandler.js";
 export * from "./handler/sceneFriendlyMap.js";
 export * from "./handler/sceneFriendlyNormalizer.js";
+export {
+  normalizeSceneJsonObject,
+  parseJsonObjectWithoutSceneValidation,
+  parseSceneJsonString
+} from "./handler/sceneJsonParser.js";
 export * from "./handler/sceneRuntimeHandler.js";
 export {
   createControlsFromDescriptor,

@@ -35,17 +35,19 @@ import {
 import { fetchReferenceMaterial } from "./sceneReferenceCatalog.js";
 import { requestSceneOutline } from "./agentTools.js";
 import {
-  buildSanitizedJsonParseErrorMessage,
   isLikelyTruncatedJsonText,
-  sanitizeAiJsonText,
   stripMarkdownCodeFence
 } from "./sceneJsonSanitize.js";
 import {
   buildFriendlyScenePayloadFromCanonical,
   buildStandardScenePayloadFromCanonical,
-  isLoadableScenePayload,
   normalizeScenePayload
 } from "../handler/sceneFriendlyNormalizer.js";
+import {
+  normalizeSceneJsonObject,
+  parseJsonObjectWithoutSceneValidation,
+  parseSceneJsonString
+} from "../handler/sceneJsonParser.js";
 
 const PROVIDERS = {
   chatgpt: {
@@ -192,54 +194,6 @@ function extractJsonText(rawText) {
     return rawText.slice(firstBrace, lastBrace + 1).trim();
   }
   return rawText.trim();
-}
-
-function normalizeSceneJsonObject(sceneObj) {
-  if (!isObject(sceneObj)) {
-    throw new Error("Generated scene JSON must be an object.");
-  }
-  if (!isLoadableScenePayload(sceneObj)) {
-    throw new Error(
-      "Generated scene JSON must contain worldInfo or standard objectList/sceneConfig."
-    );
-  }
-  // Scene collection properties are optional. Models sometimes mirror the full schema with many
-  // empty arrays; keeping those placeholders bloats segmented responses and the JSON viewer.
-  // Limit pruning to deployable collection containers so semantic arrays such as lights: [] or
-  // animation parameters are preserved.
-  if (isObject(sceneObj.worldInfo)) {
-    for (const [key, value] of Object.entries(sceneObj.worldInfo)) {
-      if (Array.isArray(value) && value.length === 0) {
-        delete sceneObj.worldInfo[key];
-      }
-    }
-  }
-  for (const key of ["objectList", "assetLibrary"]) {
-    if (Array.isArray(sceneObj[key]) && sceneObj[key].length === 0) {
-      delete sceneObj[key];
-    }
-  }
-  return sceneObj;
-}
-
-function parseSceneJsonString(sceneJsonString) {
-  const raw = String(sceneJsonString || "").trim();
-  const sanitized = sanitizeAiJsonText(raw);
-  let parsed;
-  try {
-    parsed = JSON.parse(sanitized);
-  } catch (err) {
-    throw new SyntaxError(buildSanitizedJsonParseErrorMessage(sanitized, err));
-  }
-  return normalizeSceneJsonObject(parsed);
-}
-
-function parseJsonObjectWithoutSceneValidation(sceneJsonString) {
-  const parsed = JSON.parse(sanitizeAiJsonText(String(sceneJsonString || "").trim()));
-  if (!isObject(parsed)) {
-    throw new Error("Generated scene JSON must be an object.");
-  }
-  return parsed;
 }
 
 function prettyJson(sceneObj) {

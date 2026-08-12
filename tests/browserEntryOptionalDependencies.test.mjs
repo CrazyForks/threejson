@@ -118,6 +118,16 @@ test("native scene-host import maps cover every bare specifier in their applicat
   }
 });
 
+test("ThreeJSON root and AI entries expose the shared scene parser used by native Editor", async () => {
+  const [rootEntry, aiEntry] = await Promise.all([
+    import("../builtins/full.js"),
+    import("../core/ai/index.js")
+  ]);
+  assert.equal(typeof rootEntry.parseSceneJsonString, "function");
+  assert.equal(rootEntry.parseSceneJsonString, aiEntry.parseSceneJsonString);
+  assert.equal(rootEntry.parseSceneJsonString('{"worldInfo":{"boxModelList":[]}}').worldInfo.boxModelList, undefined);
+});
+
 test("minimal runtime entry has no static optional-capability dependency", () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf8"));
   assert.equal(packageJson.exports?.["./runtime"], "./core/runtime.js");

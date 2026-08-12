@@ -1,4 +1,4 @@
-import { parseAiJsonFragment } from "../ai/sceneJsonSanitize.js";
+import { parseAiJsonFragment } from "../util/sceneJsonSanitize.js";
 import { COMMAND_API_VERSION } from "./types.js";
 
 /**
