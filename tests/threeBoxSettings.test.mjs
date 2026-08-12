@@ -40,7 +40,12 @@ afterEach(() => {
 test("ThreeBox defaults remember API keys locally", () => {
   installMemoryLocalStorage();
   assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.rememberKeys, true);
-  assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.onlineTextureHints, true);
+  assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.texturePipelineEnabled, true);
+  assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.textureStrategy, "semantic-hybrid");
+  assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.textureLocalCache, true);
+  assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.textureAllowUnknownLicense, false);
+  assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.texturePersistenceMode, "remote");
+  assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.texturePbr, true);
   assert.equal(THREEBOX_SETTINGS_DEFAULTS.ai.maxSceneSegments, 16);
   assert.equal(THREEBOX_SETTINGS_DEFAULTS.general.previewAuxiliaryLights, true);
   assert.equal(THREEBOX_SETTINGS_DEFAULTS.io.sceneJsonFormat, "standard");
@@ -71,7 +76,8 @@ test("ThreeBox defaults remember API keys locally", () => {
   const settings = loadThreeBoxSettingsBundle();
   assert.equal(settings.ai.rememberKeys, true);
   assert.equal(settings.ai.animationCapabilityMode, "auto");
-  assert.equal(settings.ai.onlineTextureHints, true);
+  assert.equal(settings.ai.texturePipelineEnabled, true);
+  assert.equal(settings.ai.textureStrategy, "semantic-hybrid");
   assert.equal(settings.ai.maxSceneSegments, 16);
   assert.equal(settings.general.previewAuxiliaryLights, true);
   assert.equal(settings.io.sceneJsonFormat, "standard");
@@ -127,6 +133,17 @@ test("ThreeBox persists valid thinking preferences and repairs unsupported value
   assert.equal(loadThreeBoxSettingsBundle().ai.thinkingPreference, "disabled");
 });
 
+test("ThreeBox repairs unsupported texture acquisition and persistence settings", () => {
+  const store = installMemoryLocalStorage();
+  store.set(
+    THREEBOX_SETTINGS_STORAGE_KEY,
+    JSON.stringify({ ai: { textureStrategy: "legacy-url-fill", texturePersistenceMode: "always-upload" } })
+  );
+  const settings = loadThreeBoxSettingsBundle();
+  assert.equal(settings.ai.textureStrategy, "semantic-hybrid");
+  assert.equal(settings.ai.texturePersistenceMode, "remote");
+});
+
 test("ThreeBox migrates the legacy always-refine limit away from 20", () => {
   const store = installMemoryLocalStorage();
   store.set(
@@ -167,19 +184,23 @@ test("ThreeBox persist keeps keys by default and clears them when rememberKeys i
   persistThreeBoxSettings({
     ai: {
       rememberKeys: true,
+      textureServiceApiKey: "texture-secret",
       providers: [{ id: "p1", apiKey: "secret" }]
     }
   });
   let saved = JSON.parse(Array.from(store.values())[0]);
   assert.equal(saved.ai.providers[0].apiKey, "secret");
+  assert.equal(saved.ai.textureServiceApiKey, "texture-secret");
 
   store.clear();
   persistThreeBoxSettings({
     ai: {
       rememberKeys: false,
+      textureServiceApiKey: "texture-secret",
       providers: [{ id: "p1", apiKey: "secret" }]
     }
   });
   saved = JSON.parse(Array.from(store.values())[0]);
   assert.equal(saved.ai.providers[0].apiKey, "");
+  assert.equal(saved.ai.textureServiceApiKey, "");
 });

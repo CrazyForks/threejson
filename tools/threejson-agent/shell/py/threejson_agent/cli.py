@@ -16,7 +16,6 @@ from .config import (
 )
 from .node_scene_bridge import run_scene_agent_node
 from .texture_node import fill_textures_node, plan_textures_node
-from .texture_python import fill_textures_python
 from .node_asset_bridge import asset_bridge_node
 
 _REDIRECT_PREFIX = "[threejson-agent]"
@@ -289,54 +288,34 @@ def texture_group() -> None:
 
 @texture_group.command("plan")
 @click.option("--input", "-i", "input_path", type=click.Path(path_type=Path, dir_okay=False), required=True)
-@click.option("--mode", type=click.Choice(["node_bridge", "python"]), default=None)
 @click.pass_context
-def texture_plan(ctx, input_path, mode) -> None:
+def texture_plan(ctx, input_path) -> None:
     setting = ctx.obj["setting"]
     root = ctx.obj["project_root"]
     input_path = _resolve_cli_path(ctx, input_path)
-    m = mode or setting.get("texture", {}).get("mode", "node_bridge")
-    if m == "python":
-        result = fill_textures_python(
-            scene_path=input_path,
-            setting=setting,
-            project_root=root,
-            dry_run=True,
-        )
-    else:
-        result = plan_textures_node(
-            project_root=root,
-            scene_path=input_path,
-            setting=setting,
-            dry_run=True,
-        )
+    result = plan_textures_node(
+        project_root=root,
+        scene_path=input_path,
+        setting=setting,
+        dry_run=True,
+    )
     click.echo(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 @texture_group.command("fill")
 @click.option("--input", "-i", "input_path", type=click.Path(path_type=Path, dir_okay=False), required=True)
-@click.option("--mode", type=click.Choice(["node_bridge", "python"]), default=None)
 @click.option("--hint", default="")
 @click.pass_context
-def texture_fill(ctx, input_path, mode, hint) -> None:
+def texture_fill(ctx, input_path, hint) -> None:
     setting = ctx.obj["setting"]
     root = ctx.obj["project_root"]
     input_path = _resolve_cli_path(ctx, input_path)
-    m = mode or setting.get("texture", {}).get("mode", "node_bridge")
-    if m == "python":
-        result = fill_textures_python(
-            scene_path=input_path,
-            setting=setting,
-            project_root=root,
-            user_hint=hint,
-        )
-    else:
-        result = fill_textures_node(
-            project_root=root,
-            scene_path=input_path,
-            setting=setting,
-            user_hint=hint,
-        )
+    result = fill_textures_node(
+        project_root=root,
+        scene_path=input_path,
+        setting=setting,
+        user_hint=hint,
+    )
     click.echo(json.dumps(result, ensure_ascii=False, indent=2))
 
 
@@ -359,8 +338,6 @@ def run_pipeline(
     ag = setting.get("agent", {})
     enabled = ag.get("enabled", False) if agent is None else agent
     d = depth or ag.get("depth", "medium")
-    tex_mode = setting.get("texture", {}).get("mode", "node_bridge")
-    fill_via_bridge = fill_textures and tex_mode != "python"
     result = run_scene_agent_node(
         mode="generate",
         prompt=prompt,
@@ -368,7 +345,7 @@ def run_pipeline(
         project_root=ctx.obj["project_root"],
         agent_enabled=enabled,
         depth=d,
-        fill_textures=fill_via_bridge,
+        fill_textures=fill_textures,
         stream=stream,
         stream_preview=stream_preview,
         on_progress=click.echo,
@@ -382,10 +359,6 @@ def run_pipeline(
             query=asset_query,
             mode=asset_mode,
             limit=1,
-        )
-    if fill_textures and tex_mode == "python":
-        fill_textures_python(
-            scene_path=path, setting=setting, project_root=ctx.obj["project_root"]
         )
 
 

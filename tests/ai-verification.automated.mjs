@@ -9,7 +9,7 @@ import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 
 import { validateSceneJson } from "../core/ai/agentTools.js";
-import { listTextureUrlPointers } from "../core/ai/textureAiService.js";
+import { listMaterialTextureSlots } from "../core/texture/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -27,11 +27,11 @@ test("fixture base-scene-friendly validates", () => {
   assert.ok((r.boxCount || 0) >= 3);
 });
 
-test("fixture scene-with-texture-slots exposes textureUrl pointer slots", () => {
+test("fixture scene-with-texture-slots exposes material texture slots", () => {
   const scene = JSON.parse(readFixture("scene-with-texture-slots.json"));
-  const ptrs = listTextureUrlPointers(scene);
-  assert.ok(ptrs.length >= 2);
-  assert.ok(ptrs.every((p) => p.endsWith("/textureUrl")));
+  const slots = listMaterialTextureSlots(scene);
+  assert.ok(slots.filter((slot) => slot.slot === "baseColor").length >= 2);
+  assert.ok(slots.some((slot) => slot.slot === "normal"));
 });
 
 test("fixture invalid-scene fails validateSceneJson", () => {

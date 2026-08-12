@@ -13,6 +13,17 @@ import {
   isTextureUrlCacheEnabled,
   rememberCanonicalTexture
 } from "../cache/textureUrlCache.js";
+import { MATERIAL_TEXTURE_SLOTS } from "../texture/textureSlots.js";
+
+const MATERIAL_TEXTURE_FIELD_TO_SLOT = Object.freeze({
+  textureUrl: "baseColor",
+  map: "baseColor",
+  ...Object.fromEntries(
+    Object.entries(MATERIAL_TEXTURE_SLOTS)
+      .filter(([slot]) => slot !== "baseColor")
+      .map(([slot, value]) => [value.descriptorField, slot])
+  )
+});
 
 function hasValue(value) {
   return value !== undefined && value !== null;
@@ -241,6 +252,45 @@ function loadTextureFromMaterialJson(materialJson, opts = {}) {
   return texture;
 }
 
+/** Whether a descriptor contains at least one supported color/PBR map URL. */
+function materialJsonHasAnyTexture(materialJson) {
+  if (!materialJson || typeof materialJson !== "object") return false;
+  return Object.keys(MATERIAL_TEXTURE_FIELD_TO_SLOT).some((field) => {
+    const value = materialJson[field];
+    return typeof value === "string" && value.trim();
+  });
+}
+
+/**
+ * Load every supported texture field and assign it to a THREE.Material. Base-color retains the
+ * existing image/video/GIF behavior; all physical maps are image textures.
+ */
+function applyMaterialTextureSetFromJson(threeMaterial, materialJson, opts = {}) {
+  if (!threeMaterial || !materialJson || typeof materialJson !== "object") return {};
+  const applied = {};
+  for (const [field, slot] of Object.entries(MATERIAL_TEXTURE_FIELD_TO_SLOT)) {
+    if (applied[slot]) continue;
+    const rawUrl = materialJson[field];
+    if (typeof rawUrl !== "string" || !rawUrl.trim()) continue;
+    const definition = MATERIAL_TEXTURE_SLOTS[slot];
+    const source = field === "textureUrl" || field === "map"
+      ? materialJson
+      : { ...materialJson, textureUrl: rawUrl.trim(), textureKind: "image", mapSourceKind: "image" };
+    const texture = loadTextureFromMaterialJson(source, opts);
+    if (!texture) continue;
+    if (definition.color && "colorSpace" in texture) {
+      texture.colorSpace = THREE.SRGBColorSpace;
+    } else if ("colorSpace" in texture) {
+      texture.colorSpace = THREE.NoColorSpace;
+    }
+    threeMaterial[definition.runtimeField] = texture;
+    applied[slot] = texture;
+  }
+  if (applied.opacity) threeMaterial.transparent = true;
+  if (Object.keys(applied).length) threeMaterial.needsUpdate = true;
+  return applied;
+}
+
 /**
  * Apply `textureRepeat` from material JSON to an existing THREE.Texture (does not load a URL).
  *
@@ -271,5 +321,7 @@ export {
   loadTextureFromMaterialJson,
   createVideoTextureFromMaterialJson,
   normalizeMaterialTextureKind,
-  applyTextureRepeatToMap
+  applyTextureRepeatToMap,
+  materialJsonHasAnyTexture,
+  applyMaterialTextureSetFromJson
 };

@@ -15,7 +15,7 @@ tools/threejson-agent/
 
 | Path | What it is |
 |------|------------|
-| [`core/ai`](../../core/ai/) | **Brain** — `runSceneAgent`, scene generate/update, textures |
+| [`core/ai`](../../core/ai/) | **Brain** — `runSceneAgent`, scene generation/update, semantic texture planning |
 | `bridge/` | **Node entry** — thin subprocess wrappers (not a second agent implementation) |
 | [`shell/py/`](shell/py/README.md) | **Python shell** — Click CLI + Gradio GUI |
 | `setting.json` | Product config (LLM keys, texture, asset) |
@@ -53,7 +53,7 @@ npm run threejson-agent:gui
 ## Node bridges
 
 - `bridge/scene-agent.mjs` — `runSceneAgent` from `core/ai`
-- `bridge/texture-fill.mjs` — `fillTextureUrls` + `nodeTextureSink`
+- `bridge/texture-fill.mjs` — unified semantic plan + host-injected texture service Provider
 - `bridge/asset.mjs` — asset subcomponent (Python shell must not import `asset_provider` directly in production flow)
 
 ## More detail

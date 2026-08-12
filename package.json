@@ -22,6 +22,7 @@
     "./runtime": "./core/runtime.js",
     "./assets": "./core/assets.js",
     "./ai": "./core/ai/index.js",
+    "./texture": "./core/texture/index.js",
     "./commands": "./core/command/index.js",
     "./events": "./core/runtime/eventMechanism/resolveBindSceneEvents.js",
     "./mesh-export": "./core/handler/meshExportHandler.js",
@@ -30,7 +31,6 @@
     "./runtime-config": "./core/runtimeConfig.js",
     "./scene-export": "./core/sceneExport.js",
     "./scene-payload": "./core/scenePayload.js",
-    "./texture-sink": "./core/ai/browserTextureSink.js",
     "./visual-defaults": "./core/theme/runtimeVisualDefaults.js",
     "./archive": "./core/archive/index.js",
     "./csg": "./core/handler/csgBrushOps.js",
@@ -115,7 +115,7 @@
     "mcp-threejson:install": "npm install --prefix tools/mcp-threejson",
     "desktop-agent:install": "npm install --prefix tools/threejson-agent-desktop",
     "build:pack": "npm pack --pack-destination=dist",
-    "build:pack-assets": "npm pack --prefix assets --pack-destination=assets/dist",
+    "build:pack-assets": "npm --prefix assets run build:pack",
     "pack:all": "npm run build:pack && npm run build:pack-assets"
   },
   "engines": {
@@ -131,7 +131,7 @@
   "license": "MIT",
   "devDependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",
-    "@threejson/assets": "^1.1.3",
+    "@threejson/assets": "file:assets",
     "@tweenjs/tween.js": "^25.0.0",
     "fflate": "^0.8.3",
     "gifuct-js": "^2.1.2",

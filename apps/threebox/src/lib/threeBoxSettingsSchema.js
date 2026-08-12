@@ -41,7 +41,6 @@ export const THREEBOX_SETTINGS_DEFAULTS = {
     attachReferenceLinks: true,
     capabilityLookupEnabled: true,
     animationCapabilityMode: "auto",
-    onlineTextureHints: true,
     maxSceneSegments: 16,
     // Runaway guard used only when a genuinely complex scene enters incremental construction.
     maxAutoRefineRounds: 6,
@@ -135,7 +134,6 @@ export const THREEBOX_SETTINGS_FIELDS = [
     label: "动画/事件脚本能力",
     options: [["auto", "自动（由协商模型判断）"], ["on", "始终启用"], ["off", "关闭"]]
   },
-  { section: "ai", path: "ai.onlineTextureHints", type: "checkbox", label: "为适合的物体自动添加在线纹理" },
   {
     section: "ai",
     path: "ai.maxSceneSegments",

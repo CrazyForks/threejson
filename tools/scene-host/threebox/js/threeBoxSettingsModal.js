@@ -80,7 +80,19 @@ export function createThreeBoxSettingsModal(host = {}) {
       input = document.createElement("input");
       input.type = "checkbox";
       input.checked = Boolean(value);
-      input.addEventListener("change", () => setSettingsByPath(draft, field.path, input.checked));
+      input.addEventListener("change", () => {
+        if (
+          field.path === "ai.textureAllowUnknownLicense"
+          && input.checked
+          && !window.confirm(t(
+            "threebox.settings.textureUnknownLicenseConfirm",
+            "许可信息未知的图片可能存在版权风险。确定要允许 ThreeBox 自动应用吗？"
+          ))
+        ) {
+          input.checked = false;
+        }
+        setSettingsByPath(draft, field.path, input.checked);
+      });
     } else if (field.type === "select") {
       input = document.createElement("select");
       for (const [optValue, optLabel] of field.options || []) {

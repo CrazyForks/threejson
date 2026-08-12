@@ -1,164 +1,40 @@
 ---
 name: threejson-ai-scene
-description: Generate or modify ThreeJSON scene JSON, core command scripts, and adaptive direct/incremental scene execution via core/ai; plan/fill textureUrl. Use for prompts, image-to-scene, command-mode edits, or texture pipelines.
+description: Generate or adjust ThreeJSON scenes and plan semantic texture needs through the explicit AI and texture entries.
 ---
 
 # ThreeJSON AI Scene Skill
 
-## Purpose
+## Entry points
 
-Provide a clear workflow for AI-driven ThreeJSON scene generation and scene updates.
+Import scene AI from `threejson/ai`, never from the engine root. Import the provider-neutral texture core from `threejson/texture`.
 
-This skill is the human-readable guide. **Runtime LLM prompts** are assembled in `threeJsonCoreSkill.js` (scene) and `texturePrompt.js` (texture task plans). The supplier-model negotiation in `sceneChatSession.js` selects intent, generation strategy, capability IDs, and whether animation guidance is needed. `sceneCapability.js` remains the post-generation capability review surface. Editing this SKILL.md alone does not change single-turn API behavior.
+```js
+import { createSceneAiClient, createSceneTexturePlanner } from "threejson/ai";
+import { planSceneTextures, runSceneTexturePipeline } from "threejson/texture";
+```
 
-## When To Use
+## Scene workflow
 
-Use this skill when the request includes one of these intents:
+1. A new conversation's first user message is generation without a generate-vs-adjust model call.
+2. In automatic mode, negotiation selects complete generation or incremental construction from actual scene/output complexity.
+3. Render the first valid scene as soon as it is available.
+4. Adjust existing scenes with commands first, JSON Patch second, and full JSON only as fallback.
+5. Stop when the model returns `# done`, no concrete remaining work, or repeated/no-op output. Round limits are safety guards only.
 
-- Generate a new ThreeJSON scene from a natural-language prompt.
-- Generate a scene from a reference image (URL / `data:` URL / raw base64 + MIME via `resolveVisionImageUrl`) using compatible vision-capable Chat Completions.
-- Modify an existing scene JSON string based on a prompt (browser or Node).
-- Modify an existing `.json` / `.js` scene file by prompt (Node only).
-- Integrate AI scene generation in browser HTML flow.
-- Switch between ChatGPT and DeepSeek providers for scene tasks.
-- Plan or generate material textures: chat proposes per-slot prompts, image API produces pixels, sinks persist URLs or paths into `textureUrl`.
-- Apply **command-mode** edits (`requestUpdatedSceneEditCommands`) producing `scene.*` / `object.*` / `material.*` / `camera.*` scripts (not `editor.*`).
-- Run adaptive scene execution (`runSceneAgent`): direct by default, incremental only for genuinely complex/output-limited work.
+Scene authoring must use standard ThreeJSON (`threeJsonId`, `sceneConfig`, heterogeneous `objectList`) and preserve unrelated fields during edits. Visible text requires `objType: "text"` and `content`; metadata names do not render glyphs.
 
-## Capability catalog (runtime prompts)
+## Texture workflow
 
-Generation/update prompts (`threeJsonCoreSkill.js`) include a compact runtime index from `sceneCapabilityIndex.js`. Before formal generation, the supplier model returns a fixed JSON negotiation result containing `intent`, `generationStrategy`, `estimatedSegments`, `executionMode`, `refinementGoals`, `selectedCapabilityIds`, and `requiresAnimation`. Core parses that response and injects the selected references and optional detailed animation block. Local intent matching is only the graceful fallback when negotiation omits those fields or cannot be parsed. Host-only wiring (PluginHost, extension bootstrap) is **not** auto-generated — see [`docs/zh/extensions.md`](../../docs/zh/extensions.md). Business objects use [`docs/zh/domains.md`](../../docs/zh/domains.md) — see [`docs/zh/glossary.md`](../../docs/zh/glossary.md).
+1. Scan real material capabilities with `listMaterialTextureSlots`.
+2. Call `planSceneTextures` once with `createSceneTexturePlanner`. The plan contains semantics only and must not contain URLs.
+3. Let a host-injected `TextureAcquisitionProvider` search, generate, or persist candidates.
+4. Reject unknown-license candidates from automatic application unless the user explicitly enabled that risk.
+5. Use `applyTextureAssignmentAsync` so every map is preloaded before descriptor/runtime commit.
+6. Keep a usable base material when any texture task fails.
 
-Use `THREE_JSON_AGENT_CAPABILITY_INDEX` as the token-cheap multi-turn lookup surface. Do not paste all docs into every turn; use the index first, then retrieve docs/examples only for a specific capability.
+Supported slots are base color, normal, roughness, metalness, AO, emissive, opacity, bump, and displacement. Ordinary image generation supplies base color only. Full PBR output requires explicit `pbr-set` or `pbr-derive` capability.
 
-Business domains have their own compact lookup ids (`deviceCabinetDomain`, `deviceUpsDomain`, `statBarDomain`, `natureSkyDomain`, and so on). These negotiation ids are deliberately distinct from runtime domain strings such as `device.cabinet`. Negotiation should select the most specific relevant id; the generation prompt then injects only that domain's detailed contract. For machine-room/data-center scenes, device-domain guidance requires a coherent room/equipment scale, derives floors and walls from rack-grid bounds, and gives every full-size cabinet a distinct non-overlapping position. A practical cabinet geometry is `{ width: 6, length: 12, height: 20 }` with base-anchored `position.y: 0`; do not mix that with a generic 10-unit room. Prefer direct domain-specific fields on standard `objectList` records so `threeJsonId`, geometry, and position remain unambiguous.
+Poly Haven, Openverse, image generation, R2, proxying, and archival are service/host concerns. They must not be imported by `threejson`, `threejson/core`, or the pure texture module. A plain cube and an AI call without a texture Provider must issue no texture network requests.
 
-## Core Interfaces
-
-Runtime exports: npm **`threejson`** (built-in domains + core) or **`threejson/core`**; in-repo [`../index.js`](../index.js) / [`../core/index.js`](../core/index.js) (pure core). AI helpers are re-exported from core; [`index.js`](./index.js) in this folder remains an internal aggregator and browser `window.ThreeJsonAI` side-effect entry.
-
-From **`threejson`** / **`threejson/core`** / **`core/index.js`** (ESM named exports):
-
-1. `generateSceneJsonString(prompt, options?)` — full scene JSON string. AI authoring and the default return use standard scheme B (`sceneConfig` + `objectList`); pass `outputFormat: "friendly"` to project only the final return to `worldInfo` lists.
-2. `generateSceneJsonFromImage({ prompt?, image }, options?)` — same output shape as (1); `image` is an `http(s)` URL, `data:image/*` string, or `{ base64, mimeType? }`. Uses multimodal Chat Completions (same `fetch` helper as text chat). Supports `options.imageDetail`: `auto` | `low` | `high` (OpenAI `image_url.detail`). Prefer vision-capable models (for example GPT-4o class); `deepseek-chat` commonly cannot consume images here.
-3. `updateSceneJsonString(prompt, currentSceneJsonString, options?)` — updated full scene JSON string; optional `updateMode: "incremental"` for RFC 6902 patch array output (`scenePatch.js`).
-4. `requestUpdatedSceneEditCommands(prompt, context?, options?)` — LLM outputs core command scripts; `outputMode: "commands"|"json"`; context may include `objectList`, spatial cards, selection, `fullSceneJson`.
-5. `updateSceneJsonFile(prompt, sceneFilePath, options?)` — read file, apply AI, write back; **Node only**, import from `core/util/nodeSceneFile.js` (not `core/ai/index.js`).
-6. `planTextures(sceneJsonStringOrObject, userHint, options?)` — chat returns `{ tasks: [{ pointer, prompt, size? }] }` validated against scene JSON Pointers (RFC 6901).
-7. `fillTextureUrls(sceneJsonStringOrObject, options?)` — optionally calls `planTextures`, then runs `imageProvider.generateImage` per task, normalizes `url` / `b64_json` / bytes, writes strings via **`sink.saveLocal` / `sink.upload`** (required for persistence). External Node tools may pass `localOutputDir` only if wrapped with `core/util/nodeTextureSink.withNodeTextureSink`. Returns `{ scene, sceneJsonString, tasks, skipped, taskResults }`.
-8. `createOpenAiImageProvider({ apiKey, baseUrl?, model?, defaultSize?, responseFormat? })` — reference `fetch` implementation for OpenAI `/v1/images/generations` (DALL·E-style `response_format`: `url` or `b64_json`).
-9. `normalizeImageRawToBlob(raw)` — unify provider output before sinks.
-10. `listTextureUrlPointers(sceneObj)` — list valid `/objectList/.../textureUrl` targets, with friendly `/worldInfo/boxModelList/...` compatibility (includes `material`, `materials[]`, nested `joins` / `inters` / `holes`).
-11. `parseSceneJsonString(str)` / `extractJsonText(str)` / `resolveVisionImageUrl(image)` — parsing and image URL normalization for vision chat.
-12. `createSceneAiClient(defaultOptions?)` — merges defaults into generate/update/plan/fill/agent methods (no file I/O).
-13. `classifyTurnIntent(input, { sceneGenerationMode, ...transport })` accepts `"auto"` (default), `"direct"`, or `"draft_refine"` and returns the concrete negotiated `executionMode`. In auto mode the model judges actual construction/output complexity; high quality, textures, animation, or visual ambition alone do not make a scene incremental.
-14. `runSceneAgent(input, options?)` executes the resolved policy. `executionMode: "direct"` returns one complete usable scene; `"draft_refine"` is reserved for genuinely complex scenes or a detected direct output-limit fallback. Adjustments finish after one successful mutation batch unless the model explicitly requests `# continue`; `commandMaxTokens` defaults to 3000, and `currentSceneJsonString` stays local unless `fullSceneJson` is explicitly supplied as model context. `agent.maxRefineRounds` is a runaway guard (default 6, hard maximum 20), not a target. All calls share a total deadline (default 180 seconds; `turnTimeoutMs`/`turnDeadlineAt`). Browser agent does not persist generated textures to disk.
-15. The supplier-model negotiation chooses relevant capability IDs before formal generation; `sceneCapability.js` performs optional post-generation capability-fit review.
-16. `generateSceneJsonString` options: `planFirst`, `capabilityReview` (default on), `maxCapabilityReviewAttempts`, `maxTokens` (**default 6000** for generation), and optional segmented output. The supplier-model negotiation chooses `single`, `segmented`, or `compact`; planned `segmented` output starts its continuation/stitching protocol in the first response and uses the caller's `maxSceneSegments` limit (default 16, hard maximum 64). `single` and `compact` do not silently upgrade into arbitrary-cutoff continuation. If an unsegmented response genuinely hits the provider limit, generation makes at most one full compact retry from the beginning; set `compactRetryOnTruncation: false` to disable it.
-17. `agentDepth.js` is retained for legacy callers only; current execution policy does not use `simple`/`medium`/`deep` quality presets. Layout/material LLM review is opt-in (`agent.layoutReview: true`), not an unconditional phase.
-18. Animation capability prompting accepts `animationCapabilityMode: "auto" | "on" | "off"`. `auto` follows the supplier negotiation, `on` always injects animation guidance, and `off` never injects it.
-
-Browser global `window.ThreeJsonAI` exposes `createSceneAiClient`, `generateSceneJsonString`, `generateSceneJsonFromImage`, `updateSceneJsonString`, `resolveVisionImageUrl`, `planTextures`, `fillTextureUrls`, `createOpenAiImageProvider`, `normalizeImageRawToBlob`, `listTextureUrlPointers`, and **`runSceneAgent`** (no `updateSceneJsonFile`; avoid shipping secrets in public bundles).
-
-Low-level `requestChatCompletion` is exported from `sceneAiService.js` if you need custom message arrays.
-
-## Texture Pipeline
-
-- **Planning (chat LLM):** Input is the current scene JSON plus a user style hint. Output is strict JSON `{ "tasks": [...] }` with one entry per `textureUrl` pointer (see `texturePrompt.js`). Pointers must match the candidate list derived from the scene; invented paths are rejected.
-- **Execution (image model):** Each task calls a pluggable `imageProvider.generateImage({ prompt, size })`, returning `{ kind: 'url' | 'base64' | 'bytes', ... }`. `normalizeImageRawToBlob` downloads ephemeral URLs immediately so links do not expire before persistence.
-- **Persistence (`TextureSink`):** Implement `upload(blob, meta) => Promise<string>` for CDN/OSS/图床, and/or `saveLocal(blob, meta) => Promise<string>` for disk paths. Node CLIs use `createLocalOutputDirSink` / `withNodeTextureSink` from `core/util/nodeTextureSink.js`.
-- **Security / cost:** Treat image keys like chat keys; prefer server-side or private scripts. Image APIs bill per request; use `dryRun: true` to inspect `tasks` only. Respect provider ToS for generated imagery.
-
-## Provider Rules
-
-- Supported providers: `chatgpt`, `deepseek`, `custom` (OpenAI-compatible root URL; **requires** `baseUrl`)
-- Required: `apiKey`
-- Optional: `model`, `baseUrl`, `temperature`, `maxTokens`
-
-Recommended defaults:
-
-- `provider`: `chatgpt`
-- `temperature`: `0.2`
-- `maxTokens`: `4000` for updates/textures; **`generateSceneJsonString` defaults to 6000** unless overridden
-
-Built-in default models: `gpt-4o-mini`, `deepseek-chat` (override with `model`).
-
-## Output Contract
-
-AI output should satisfy:
-
-- A single JSON object representing the **full** scene (no prose outside JSON).
-- Top-level **`threeJsonId`** (stable string; no `worldId`).
-- **Standard form** (required for AI authoring and the default API result): `sceneConfig` + one heterogeneous `objectList`; every deployable item has an explicit `objType`.
-- **Friendly form** (human-facing compatibility projection): request it with `outputFormat: "friendly"`; include only non-empty `worldInfo` lists actually used and omit unused list properties.
-- Geometry fields for generic boxes use `width`, `height`, `depth` (not `length`).
-- Do not embed `alarmList` or page UI chrome in scene JSON.
-- Numeric values are finite and practical for scene rendering.
-- `position`, `rotation`, and `scale` accept `{ "x": ..., "y": ..., "z": ... }` or `[x, y, z]`. Rotation uses radians and numeric expressions such as `"PI / 2"`; generated JSON must not emit legacy `rotationX` or `scaleX` fields.
-- **Scene text** (`objType: "text"` in `objectList`): when the user asks to add/show/write visible words, titles, captions, names, or labels, create a real text record with `content`; `name`/`label` metadata does not render glyphs. Prefer `mode: "sdf"` for clean pure text. Use `infoPanel` only for an explicitly panel-backed sign/card/screen, and `mode: "mesh"` only for explicitly extruded/beveled solid lettering with `mesh.fontJsonUrl`.
-- **Static panels** → `infoPanelList` (baked texture). **Interactive DOM** → `css3dPanelList` (host CSS3D required). **Particles** → prefer `objType: particleEmitter`.
-- Do not put panel chrome in `objType: text` records.
-
-## Command-mode update (preferred for small edits)
-
-Use `requestUpdatedSceneEditCommands` when changing few objects, colors, or camera framing. Output is micro DSL or JSONL (`object.patch`, `material.patch`, `object.add`, `camera.fit`, etc.). Prompt rules live in `sceneCommandSkill.js`. Editor wrappers add `editor.*` separately — not in core prompts.
-
-Implementation note: `sceneAiService.extractJsonText()` may still recover JSON from Markdown fences or surrounding text; prefer teaching the model to output raw JSON only.
-
-## Lifecycle, events, scripts, and smooth animation
-
-- Use `scene.ready` for whole-scene startup, and `object.ready` / `object.dispose` for object-local setup and cleanup. Do not create an endless lifecycle script to simulate frames.
-- Use declarative actions for discrete changes: visibility, position, rotation, scale, color/material patches, and object replacement. Use canonical vector fields or arrays.
-- Use an object's `animations` `transform`/`tween` tracks for smooth position, rotation, or scale interpolation. Use `expression` tracks for deterministic per-frame formulas with `t`, `delta`, `progress`, `PI`, `TAU`, and math functions.
-- EventScript supports `if`, `while`, `repeat`, C-style `for`, `break`, `continue`, arithmetic, `PI`/`E`/`TAU`, math functions, `wait`, and object handles. For articulated motion, animate a parent group for travel and child limbs for local rotation.
-- External scripts use the unified `events.*.script` field. It accepts inline source, HTTP(S)/relative URLs, or `lib://id`; an `assetLibrary` entry with `assetKind: "eventScript"` may provide inline `source` or its own `url`. `scriptUrl` is legacy input only.
-- Physics extensions handle collision and rigid-body integration. They are not the default property-animation system and should be selected only when the requested behavior needs physical simulation.
-
-## File Update Workflow
-
-For `updateSceneJsonFile`:
-
-1. Read existing target file.
-2. Parse existing scene object (`.json` or object literal inside `.js` module).
-3. Ask AI to return the full updated scene JSON.
-4. Validate minimal structure.
-5. Write back:
-   - `.json`: pretty JSON
-   - `.js`: rebuild `const <name> = {...}; export {...};` module style
-
-## Integration Patterns
-
-### Browser (HTML)
-
-- Use `createSceneAiClient()` and call `generateSceneJsonString` / `updateSceneJsonString`.
-- Texture: `planTextures` / `fillTextureUrls` are available, but exposing image or chat API keys in the browser is risky; prefer a backend or local script. Use an `upload` sink to obtain stable URLs if the engine loads textures over HTTP(S).
-- Parse returned string and feed into existing scene build/render flow.
-- Do not use `updateSceneJsonFile` in browser bundles.
-
-### Node
-
-- Use `updateSceneJsonFile` for prompt-based edits that must persist to disk.
-- Use `fillTextureUrls` with `sink` (or Node `withNodeTextureSink({ localOutputDir })`) for batch `textureUrl` generation (requires a separate OpenAI-compatible image key for `createOpenAiImageProvider` unless you substitute another provider).
-- Keep source scene files under version control and review diffs.
-
-## Error Handling
-
-Handle these errors explicitly:
-
-- Unsupported provider
-- Missing API key
-- Empty or non-JSON AI output after extraction
-- Invalid scene structure (not loadable: missing `worldInfo` and empty standard `objectList`/`sceneConfig`)
-- Unsupported file extension for update (only `.json` / `.js`)
-- Upstream API non-200 responses
-- Texture plan JSON missing `tasks` or pointers not in the scene-derived list
-- Image API failures or missing `url` / `b64_json` in image responses
-- Temporary image URL download failure before persistence
-- Missing `imageProvider` when `fillTextureUrls` is not in `dryRun`
-- Missing `sink.saveLocal` / `sink.upload` when persistence is required
-
-## Compatibility Notes
-
-- Keep this file concise and documentation-focused.
-- Keep runtime skill logic in `threeJsonCoreSkill.js` (full scene), `sceneCommandSkill.js` (commands), `texturePrompt.js` (texture plans), and `textureAiService.js` (image pipeline).
-- If schema constraints change, update `threeJsonCoreSkill.js`, `sceneCapability.js`, `sceneCommandSkill.js`, this skill, and `docs/zh/json-format.md` / `core/ai/README.md` together. Archived gap matrix: [`lab/archive/ai-skill-gap-matrix.md`](../../lab/archive/ai-skill-gap-matrix.md).
+The former texture Pointer, image Provider, and Sink APIs no longer exist and must not be recreated as wrappers.

@@ -117,62 +117,7 @@ function listMaterialSlotsForDescriptor(descriptor) {
   return out;
 }
 
-/**
- * @param {unknown[]} models
- * @param {string} basePointer
- * @param {string[]} out
- */
-function walkBoxModelsForTextureUrlPointers(models, basePointer, out) {
-  if (!Array.isArray(models)) {
-    return;
-  }
-  models.forEach((model, i) => {
-    if (!model || typeof model !== "object") {
-      return;
-    }
-    const p = `${basePointer}/${i}`;
-    if (model.material && typeof model.material === "object") {
-      out.push(`${p}/material/textureUrl`);
-    }
-    if (Array.isArray(model.materials)) {
-      model.materials.forEach((mat, j) => {
-        if (mat && typeof mat === "object") {
-          out.push(`${p}/materials/${j}/textureUrl`);
-        }
-      });
-    }
-    const nested = [
-      ["joins", model.joins],
-      ["inters", model.inters],
-      ["holes", model.holes]
-    ];
-    nested.forEach(([key, list]) => {
-      if (Array.isArray(list)) {
-        walkBoxModelsForTextureUrlPointers(list, `${p}/${key}`, out);
-      }
-    });
-  });
-}
-
-/**
- * @param {object} sceneObj
- * @returns {string[]}
- */
-function listTextureUrlPointers(sceneObj) {
-  const out = [];
-  const root = sceneObj?.worldInfo?.boxModelList;
-  if (Array.isArray(root)) {
-    walkBoxModelsForTextureUrlPointers(root, "/worldInfo/boxModelList", out);
-  }
-  if (Array.isArray(sceneObj?.objectList)) {
-    walkBoxModelsForTextureUrlPointers(sceneObj.objectList, "/objectList", out);
-  }
-  return out;
-}
-
 export {
   walkBoxModelsForMaterialSlots,
-  walkBoxModelsForTextureUrlPointers,
-  listMaterialSlotsForDescriptor,
-  listTextureUrlPointers
+  listMaterialSlotsForDescriptor
 };

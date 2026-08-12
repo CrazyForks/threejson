@@ -22,7 +22,7 @@ import {
   runAiSceneTitle,
   runAiTurnSummary
 } from "@threejson/host-kit/js/aiTurnOrchestrator.js";
-import { buildStructuredTurnEnvelope } from "threejson";
+import { buildStructuredTurnEnvelope } from "threejson/ai";
 import { getAiErrorFeedback } from "@threejson/host-kit/js/aiErrorFeedback.js";
 import { isProviderVisionCapable } from "@threejson/host-kit/js/aiTurnOrchestrator.js";
 import { resolveSceneHostUrl } from "@threejson/host-kit/js/sceneHostPaths.js";
@@ -832,7 +832,6 @@ export function App() {
             // continuation cap.
             globalPromptPrefix: settings.ai.globalPromptPrefix || undefined,
             includeReferenceLinks: settings.ai.attachReferenceLinks,
-            onlineTextureHints: settings.ai.onlineTextureHints,
             maxSceneSegments: settings.ai.maxSceneSegments,
             generationStrategy: negotiation.generationStrategy,
             executionMode: negotiation.executionMode,

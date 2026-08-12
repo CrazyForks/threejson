@@ -44,13 +44,10 @@ test("generation system prompt covers core ThreeJSON capabilities", () => {
   assert.match(prompt, /single standard objectList/);
   assert.match(prompt, /renderLoop\.updateAnimations/);
   assert.match(prompt, /motion perceptible/);
-  assert.match(prompt, /identity or material would be self-evidently incomplete as a flat color/);
-  assert.match(prompt, /reachable https image URL/);
-  assert.match(prompt, /optional stable same-origin candidates/);
-  assert.match(prompt, /never as mandatory defaults/);
-  assert.match(prompt, /not limited to ThreeJSON, Three\.js, npm, or a particular CDN/);
+  assert.match(prompt, /separate, optional host pipeline/);
+  assert.match(prompt, /do not invent texture URLs or bundled filenames/);
+  assert.match(prompt, /asset manifest, trusted search, PBR libraries/);
   assert.match(prompt, /textureRepeat/);
-  assert.match(prompt, /Do not force a textureUrl onto generic\/abstract shapes/);
   assert.match(prompt, /sceneConfig/);
   assert.match(THREE_JSON_LIST_PLACEMENT, /nativeThree/);
   assert.match(THREE_JSON_PRIMITIVE_GEOMETRY, /radiusTop/);
@@ -125,19 +122,13 @@ test("generation prompt hides particle capabilities when particle intent is abse
   assert.match(enabled, /particleEmitter/);
 });
 
-test("online texture hints can be disabled in scene prompts", () => {
-  const enabled = buildSceneGenerationSystemPrompt();
-  assert.match(enabled, /\/assets\/textures\/environment\/nature\/planet\//);
-  assert.match(enabled, /earth\.png/);
-  assert.match(enabled, /only as candidates, never as mandatory defaults/);
-  assert.match(enabled, /Do not replace a valid remote URL merely because a bundled candidate exists/);
-  assert.match(enabled, /not limited to ThreeJSON, Three\.js, npm, or a particular CDN/);
-
-  const disabled = buildSceneGenerationSystemPrompt({ onlineTextureHints: false });
-  assert.match(disabled, /host disabled proactive online texture hints/);
-  assert.match(disabled, /Do not add new material\.textureUrl fields/);
-  assert.doesNotMatch(disabled, /self-evidently incomplete as a flat color/);
-  assert.doesNotMatch(disabled, /planet\/earth\.png/);
+test("scene prompts keep texture acquisition provider-neutral and semantic", () => {
+  const prompt = buildSceneGenerationSystemPrompt();
+  assert.match(prompt, /separate, optional host pipeline/);
+  assert.match(prompt, /do not invent texture URLs or bundled filenames/);
+  assert.doesNotMatch(prompt, /\/assets\/textures\/environment\/nature\/planet\//);
+  assert.doesNotMatch(prompt, /planet\/earth\.png/);
+  assert.doesNotMatch(prompt, /Poly Haven|Openverse|R2/);
 });
 
 test("buildIntentHints maps solar system prompt to sphere capability", () => {

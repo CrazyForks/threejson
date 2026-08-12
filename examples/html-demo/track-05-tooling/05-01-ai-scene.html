@@ -11,6 +11,7 @@
       "imports": {
         "threejson": "../../../builtins/full.js",
         "threejson/core": "../../../core/index.js",
+        "threejson/ai": "../../../core/ai/index.js",
         "three": "https://esm.sh/three@0.184.0",
         "three/examples/jsm/": "https://esm.sh/three@0.184.0/examples/jsm/",
         "@tweenjs/tween.js": "https://esm.sh/@tweenjs/tween.js@25.0.0",
@@ -458,11 +459,6 @@
             每轮自适应取景（阶段载入或迭代后 fit 场景）
           </label>
           <label class="checkboxLabel multiline">
-            <input id="aiFillTexturesCheckbox" type="checkbox">
-            完成后填充纹理（与上方 LLM 相同接口根 URL；默认生图模型 dall-e-3）
-          </label>
-          <div class="hint">浏览器直连生图可能受网关 CORS 限制；失败时仍会写入无纹理场景 JSON。</div>
-          <label class="checkboxLabel multiline">
             <input id="aiStageAutoLoadCheckbox" type="checkbox" checked>
             阶段产物自动载入（scene_ready / stage_preview 写入 JSON 并预览画布）
           </label>
@@ -470,18 +466,7 @@
             <input id="aiStreamPreviewCheckbox" type="checkbox" checked>
             流式预览 LLM 输出（默认开；生成 / 调整 / 看图 标签页同步）
           </label>
-          <label class="label" for="aiTextureBrowserModeSelect">浏览器落盘方式</label>
-          <select id="aiTextureBrowserModeSelect">
-            <option value="directory" selected>授权本地目录</option>
-            <option value="upload">图床上传 URL</option>
-            <option value="zipDownload">ZIP 下载（无目录权限时）</option>
-          </select>
-          <button type="button" id="aiPickTextureDirBtn" class="secondary">选择纹理输出目录</button>
-          <div id="aiTextureUploadWrap" hidden>
-            <label class="label" for="aiTextureUploadEndpoint">图床 endpoint（POST multipart）</label>
-            <input id="aiTextureUploadEndpoint" type="url" autocomplete="off" placeholder="https://your-host/upload">
-          </div>
-          <div class="hint" id="aiTextureDirHint">Electron 可直接写仓库 resources/textures/；浏览器需授权目录、图床或 ZIP。外置 CLI 为可选批处理，本 Demo 不依赖它。</div>
+          <div class="hint">本 Demo 聚焦场景 AI。统一纹理管线会在 ThreeBox/Editor 中于场景显示后运行；搜索、生图与归档由宿主注入的纹理服务提供。</div>
           <div class="hint">AI 能力来自 ThreeJSON <code>core/ai</code>（浏览器直连 LLM），不读取 setting.json。</div>
         </div>
 
@@ -605,15 +590,10 @@
 <script type="module">
   import {
     createJsonSceneFit,
-    createSceneAiClient,
-    createOpenAiImageProvider,
-    createDirectorySink,
-    createUploadSink,
-    createZipDownloadSink,
-    parseSceneJsonString,
     resolveScenePayloadForLoad,
     isCanonicalScenePayload
   } from "threejson";
+  import { createSceneAiClient, parseSceneJsonString } from "threejson/ai";
 
   const providerSelect = document.getElementById("providerSelect");
   const customApiBaseWrap = document.getElementById("customApiBaseWrap");
@@ -642,17 +622,11 @@
   const rememberAiConfigCheckbox = document.getElementById("rememberAiConfigCheckbox");
   const aiAgentEnabledCheckbox = document.getElementById("aiAgentEnabledCheckbox");
   const aiAgentDepthSelect = document.getElementById("aiAgentDepthSelect");
-  const aiFillTexturesCheckbox = document.getElementById("aiFillTexturesCheckbox");
   const aiStageAutoLoadCheckbox = document.getElementById("aiStageAutoLoadCheckbox");
   const aiStreamPreviewCheckbox = document.getElementById("aiStreamPreviewCheckbox");
   const aiStreamPreviewGenerate = document.getElementById("aiStreamPreviewGenerate");
   const aiStreamPreviewAdjust = document.getElementById("aiStreamPreviewAdjust");
   const aiStreamPreviewImage = document.getElementById("aiStreamPreviewImage");
-  const aiTextureBrowserModeSelect = document.getElementById("aiTextureBrowserModeSelect");
-  const aiPickTextureDirBtn = document.getElementById("aiPickTextureDirBtn");
-  const aiTextureUploadWrap = document.getElementById("aiTextureUploadWrap");
-  const aiTextureUploadEndpoint = document.getElementById("aiTextureUploadEndpoint");
-  const aiTextureDirHint = document.getElementById("aiTextureDirHint");
   const aiUpdateOutputModeSelect = document.getElementById("aiUpdateOutputModeSelect");
   const aiIncludeFullJsonCheckbox = document.getElementById("aiIncludeFullJsonCheckbox");
   const aiIncludeSpatialSummaryCheckbox = document.getElementById("aiIncludeSpatialSummaryCheckbox");
@@ -663,8 +637,6 @@
   const aiAgentIterativeApplyCheckbox = document.getElementById("aiAgentIterativeApplyCheckbox");
   const aiAgentFitViewEachRoundCheckbox = document.getElementById("aiAgentFitViewEachRoundCheckbox");
 
-  let aiTextureDirectoryHandle = null;
-  let aiTextureZipSink = null;
   let aiStreamPreviewBuffer = "";
   let activeDemoTab = "config";
   let aiAbortController = null;
@@ -683,7 +655,6 @@
   const LS_INCLUDE_SPATIAL = `${LS_PREFIX}include_spatial`;
   const LS_AGENT_ITERATIVE = `${LS_PREFIX}agent_iterative`;
   const LS_AGENT_FIT_VIEW = `${LS_PREFIX}agent_fit_view`;
-  const DEMO_DEFAULT_IMAGE_MODEL = "dall-e-3";
 
   const AI_UPDATE_MODE_UI = {
     "json-full": {
@@ -772,8 +743,6 @@
     sceneOutput.addEventListener("input", onSceneOutputInput);
     sceneOutput.addEventListener("blur", onSceneOutputBlur);
     tabBar.addEventListener("click", onTabBarClick);
-    aiTextureBrowserModeSelect?.addEventListener("change", syncAiTextureModeUi);
-    aiPickTextureDirBtn?.addEventListener("click", onAiPickTextureDirClick);
     document.querySelectorAll("[data-ai-stop]").forEach((btn) => {
       btn.addEventListener("click", onAiCancelClick);
     });
@@ -1358,29 +1327,6 @@
     return { stream: true, streamPreview: true };
   }
 
-  function syncAiTextureModeUi() {
-    const mode = aiTextureBrowserModeSelect?.value || "directory";
-    aiTextureUploadWrap?.toggleAttribute("hidden", mode !== "upload");
-    aiPickTextureDirBtn?.toggleAttribute("hidden", mode !== "directory");
-  }
-
-  async function onAiPickTextureDirClick() {
-    if (!window.showDirectoryPicker) {
-      setMessage("当前浏览器不支持目录选择，请改用 ZIP 下载或外置 CLI。");
-      return;
-    }
-    try {
-      aiTextureDirectoryHandle = await window.showDirectoryPicker();
-      if (aiTextureDirHint) {
-        aiTextureDirHint.textContent = "已授权纹理输出目录。";
-      }
-    } catch (err) {
-      if (err?.name !== "AbortError") {
-        console.warn(err);
-      }
-    }
-  }
-
   function getDemoLlmCredentials() {
     const provider = providerSelect.value;
     const apiKey = apiKeyInput.value.trim();
@@ -1392,8 +1338,7 @@
       provider,
       apiKey,
       model: model || undefined,
-      baseUrl: undefined,
-      imageModel: DEMO_DEFAULT_IMAGE_MODEL
+      baseUrl: undefined
     };
     if (provider === "custom") {
       const base = normalizeDemoCustomBaseUrl(customApiBaseInput.value);
@@ -1405,82 +1350,12 @@
     return creds;
   }
 
-  function formatTextureFillWarning(warning) {
-    if (!warning) {
-      return null;
-    }
-    const w = String(warning);
-    const lower = w.toLowerCase();
-    if (lower.includes("failed to fetch") || lower.includes("networkerror")) {
-      return `纹理填充失败（可能是浏览器跨域 CORS）：${w}。场景 JSON 已写入。`;
-    }
-    if (/\b401\b/.test(w) || lower.includes("unauthorized")) {
-      return `纹理填充失败（401 未授权，请检查 API Key 与网关是否支持 images）：${w}。场景 JSON 已写入。`;
-    }
-    return `纹理填充失败：${w}。场景 JSON 已写入。`;
-  }
-
   async function finalizeDemoSceneAgentResult(result, { source, doneAuto, doneManual }) {
     await setSceneOutput(result.sceneJsonString, { autoRender: true, source });
-    const warn = formatTextureFillWarning(result.textureFillWarning);
-    if (warn) {
-      setMessage(warn);
-      return;
-    }
     setMessage(isAutoRenderEnabled() ? doneAuto : doneManual);
   }
 
-  async function buildDemoTextureOptions() {
-    if (!aiFillTexturesCheckbox?.checked) {
-      return null;
-    }
-    const creds = getDemoLlmCredentials();
-    const imageProvider = createOpenAiImageProvider({
-      apiKey: creds.apiKey,
-      baseUrl: creds.baseUrl,
-      model: creds.imageModel
-    });
-    let sink = null;
-    if (window.ThreeJsonDesktop?.saveTextureToProject) {
-      sink = {
-        saveLocal: async (blob, meta) => {
-          const ext = blob.type?.includes("jpeg") ? "jpg" : "png";
-          const rel = `assets/textures/ai-generated/texture-${meta.index ?? 0}.${ext}`;
-          const buf = new Uint8Array(await blob.arrayBuffer());
-          return window.ThreeJsonDesktop.saveTextureToProject(rel, buf);
-        }
-      };
-    } else {
-      const mode = aiTextureBrowserModeSelect?.value || "directory";
-      if (mode === "upload") {
-        const endpoint = aiTextureUploadEndpoint?.value?.trim();
-        if (!endpoint) {
-          throw new Error("请填写图床 upload endpoint。");
-        }
-        sink = createUploadSink({ endpoint });
-      } else if (mode === "zipDownload") {
-        aiTextureZipSink = createZipDownloadSink();
-        sink = aiTextureZipSink;
-      } else {
-        if (!aiTextureDirectoryHandle) {
-          throw new Error("请先点击「选择纹理输出目录」授权本地目录。");
-        }
-        sink = createDirectorySink(aiTextureDirectoryHandle);
-      }
-    }
-    return {
-      enabled: true,
-      sink,
-      imageProvider,
-      imageApiKey: creds.apiKey,
-      imageBaseUrl: creds.baseUrl,
-      imageModel: creds.imageModel,
-      overwriteExisting: false,
-      concurrency: 2
-    };
-  }
-
-  function buildDemoSceneAgentOnProgress(agent, texture, streamPreviewOn) {
+  function buildDemoSceneAgentOnProgress(agent, streamPreviewOn) {
     const streamOn = streamPreviewOn === true;
     return (payload) => {
       if (!payload) {
@@ -1498,7 +1373,7 @@
         stageJson;
       if (isStageLoad) {
         void enqueueDemoStageSceneLoad(stageJson).then(() => {
-          setMessage(payload.message || "已载入阶段预览，纹理填充或后续步骤进行中…");
+          setMessage(payload.message || "已载入阶段预览，后续步骤进行中…");
         });
         return;
       }
@@ -1510,35 +1385,25 @@
         setMessage(`Agent [${payload.step}] ${label}`);
         return;
       }
-      if (texture?.enabled && payload.kind === "fill_textures") {
-        setMessage(payload.message || "正在填充纹理…");
-      }
     };
   }
 
   async function runDemoSceneAgent(client, input, extraOptions = {}) {
     const agent = getDemoAgentOptions();
-    const texture = await buildDemoTextureOptions();
     const streamOpts = getDemoStreamOptions();
     if (agent.enabled) {
       setMessage("Agent 多轮运行中（消耗更多 Token）…");
     }
     const result = await client.runSceneAgent(input, {
       agent,
-      texture: texture || undefined,
       onProgress: buildDemoSceneAgentOnProgress(
         agent,
-        texture,
         streamOpts.streamPreview
       ),
       signal: aiAbortController?.signal,
       ...streamOpts,
       ...extraOptions
     });
-    if (aiTextureZipSink?.finalizeDownload) {
-      await aiTextureZipSink.finalizeDownload("threejson-ai-textures");
-      setMessage("纹理已打包为 ZIP 下载；请解压到 resources/textures/ 后重新渲染。");
-    }
     return result;
   }
 
@@ -1975,16 +1840,12 @@
     generateFromImageBtn.disabled = locked;
     updateBtn.disabled = locked;
     loadBaseBtn.disabled = locked;
-    aiPickTextureDirBtn && (aiPickTextureDirBtn.disabled = locked);
     aiAgentEnabledCheckbox && (aiAgentEnabledCheckbox.disabled = locked);
     aiAgentDepthSelect && (aiAgentDepthSelect.disabled = locked);
     aiAgentIterativeApplyCheckbox && (aiAgentIterativeApplyCheckbox.disabled = locked);
     aiAgentFitViewEachRoundCheckbox && (aiAgentFitViewEachRoundCheckbox.disabled = locked);
-    aiFillTexturesCheckbox && (aiFillTexturesCheckbox.disabled = locked);
     aiStageAutoLoadCheckbox && (aiStageAutoLoadCheckbox.disabled = locked);
     aiStreamPreviewCheckbox && (aiStreamPreviewCheckbox.disabled = locked);
-    aiTextureBrowserModeSelect && (aiTextureBrowserModeSelect.disabled = locked);
-    aiTextureUploadEndpoint && (aiTextureUploadEndpoint.disabled = locked);
     aiUpdateOutputModeSelect && (aiUpdateOutputModeSelect.disabled = locked);
     aiIncludeFullJsonCheckbox && (aiIncludeFullJsonCheckbox.disabled = locked);
     aiIncludeSpatialSummaryCheckbox && (aiIncludeSpatialSummaryCheckbox.disabled = locked);
@@ -2019,8 +1880,6 @@
     apiKeyInput.removeEventListener("input", saveAiConfigToStorage);
     modelInput.removeEventListener("input", saveAiConfigToStorage);
     customApiBaseInput.removeEventListener("input", saveAiConfigToStorage);
-    aiTextureBrowserModeSelect?.removeEventListener("change", syncAiTextureModeUi);
-    aiPickTextureDirBtn?.removeEventListener("click", onAiPickTextureDirClick);
     aiAgentEnabledCheckbox?.removeEventListener("change", saveAiAgentPrefsToStorage);
     aiAgentDepthSelect?.removeEventListener("change", saveAiAgentPrefsToStorage);
     aiStreamPreviewCheckbox?.removeEventListener("change", onAiStreamPreviewCheckboxChange);

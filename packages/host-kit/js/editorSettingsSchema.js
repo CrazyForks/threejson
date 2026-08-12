@@ -162,7 +162,14 @@ export const EDITOR_SETTINGS_DEFAULTS = {
       streamPreview: true,
       stageAutoLoad: false,
       defaultImageModel: "dall-e-3",
-      textureBrowserMode: "directory"
+      texturePipelineEnabled: true,
+      textureStrategy: "semantic-hybrid",
+      textureServiceUrl: "",
+      textureServiceApiKey: "",
+      textureLocalCache: true,
+      textureAllowUnknownLicense: false,
+      texturePersistenceMode: "remote",
+      texturePbr: true
     }
   };
 
@@ -873,15 +880,33 @@ export const EDITOR_SETTINGS_FIELDS = [
     { section: "ai", path: "ai.streamPreview", type: "checkbox", label: "默认流式预览" },
     { section: "ai", path: "ai.stageAutoLoad", type: "checkbox", label: "生成后自动载入场景" },
     { section: "ai", path: "ai.defaultImageModel", type: "text", label: "默认图像模型" },
+    { section: "ai", path: "ai.texturePipelineEnabled", type: "checkbox", label: "场景显示后自动完善纹理" },
     {
       section: "ai",
-      path: "ai.textureBrowserMode",
+      path: "ai.textureStrategy",
       type: "select",
-      label: "纹理浏览器模式",
+      label: "纹理获取策略",
       options: [
-        { value: "directory", label: "目录" },
-        { value: "upload", label: "上传" },
-        { value: "zip", label: "ZIP 下载" }
+        { value: "semantic-hybrid", label: "语义混合（推荐）" },
+        { value: "manifest", label: "仅内置资源" },
+        { value: "search", label: "优先搜索" },
+        { value: "generate", label: "优先生图" }
       ]
-    }
+    },
+    { section: "ai", path: "ai.textureServiceUrl", type: "text", label: "纹理服务地址（留空使用内置后端）", placeholder: "https://api.threebox.org", testEndpoint: "textureService" },
+    { section: "ai", path: "ai.textureServiceApiKey", type: "password", label: "纹理服务 API Key（留空使用内置密钥）" },
+    { section: "ai", path: "ai.textureLocalCache", type: "checkbox", label: "启用浏览器纹理缓存" },
+    { section: "ai", path: "ai.texturePbr", type: "checkbox", label: "启用完整 PBR 纹理" },
+    {
+      section: "ai",
+      path: "ai.texturePersistenceMode",
+      type: "select",
+      label: "纹理归档策略",
+      options: [
+        { value: "remote", label: "远程代理" },
+        { value: "archive-selected", label: "归档已选择" },
+        { value: "archive-all", label: "归档全部" }
+      ]
+    },
+    { section: "ai", path: "ai.textureAllowUnknownLicense", type: "checkbox", label: "允许自动使用许可未知的纹理" }
   ];

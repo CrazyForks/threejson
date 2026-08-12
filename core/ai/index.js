@@ -22,25 +22,11 @@ import {
   isLikelyCommandScriptText,
   resolveOutputKind
 } from "./sceneCommandSkill.js";
-import {
-  planTextures,
-  fillTextureUrls,
-  createOpenAiImageProvider,
-  normalizeImageRawToBlob,
-  listTextureUrlPointers,
-  toSiteRelativeTexturePath
-} from "./textureAiService.js";
-import {
-  createDirectorySink,
-  createUploadSink,
-  createZipDownloadSink
-} from "./browserTextureSink.js";
+import { createSceneTexturePlanner, requestSceneTexturePlan } from "./sceneTexturePlanner.js";
 import { runSceneAgent } from "./sceneAgent.js";
 import {
   validateSceneJson,
-  listTexturePointersSummary,
   summarizeSchema,
-  planTexturesDry,
   evaluateSceneCapabilityFit,
   buildCapabilityFixPrompt
 } from "./agentTools.js";
@@ -91,11 +77,8 @@ function createSceneAiClient(defaultOptions = {}) {
     async requestSceneRefinementStep(prompt, currentSceneJsonString, options = {}) {
       return requestSceneRefinementStep(prompt, currentSceneJsonString, { ...defaultOptions, ...options });
     },
-    async planTextures(sceneJsonStringOrObject, userHint, options = {}) {
-      return planTextures(sceneJsonStringOrObject, userHint, { ...defaultOptions, ...options });
-    },
-    async fillTextureUrls(sceneJsonStringOrObject, options = {}) {
-      return fillTextureUrls(sceneJsonStringOrObject, { ...defaultOptions, ...options });
+    createTexturePlanner(options = {}) {
+      return createSceneTexturePlanner({ ...defaultOptions, ...options });
     },
     async runSceneAgent(input, options = {}) {
       return runSceneAgent(input, { ...defaultOptions, ...options });
@@ -112,17 +95,12 @@ if (typeof window !== "undefined") {
     requestUpdatedSceneEditCommands,
     requestSceneRefinementStep,
     projectSceneJsonString,
-    planTextures,
-    fillTextureUrls,
-    createOpenAiImageProvider,
-    normalizeImageRawToBlob,
-    listTextureUrlPointers,
+    createSceneTexturePlanner,
+    requestSceneTexturePlan,
     resolveVisionImageUrl,
     runSceneAgent,
     validateSceneJson,
-    listTexturePointersSummary,
     summarizeSchema,
-    planTexturesDry,
     evaluateSceneCapabilityFit,
     buildIntentHints,
     THREE_JSON_AGENT_CAPABILITY_INDEX,
@@ -131,10 +109,6 @@ if (typeof window !== "undefined") {
     evaluateCapabilityFit,
     matchIntentSignals,
     buildCapabilityFixPrompt,
-    createDirectorySink,
-    createUploadSink,
-    createZipDownloadSink,
-    toSiteRelativeTexturePath,
     buildObjectSpatialCardsFromScene,
     buildObjectSpatialCardsFromSceneJson,
     buildSceneScaleProfile,
@@ -164,17 +138,12 @@ export {
   extractJsonText,
   parseSceneJsonString,
   projectSceneJsonString,
-  planTextures,
-  fillTextureUrls,
-  createOpenAiImageProvider,
-  normalizeImageRawToBlob,
-  listTextureUrlPointers,
+  createSceneTexturePlanner,
+  requestSceneTexturePlan,
   resolveVisionImageUrl,
   runSceneAgent,
   validateSceneJson,
-  listTexturePointersSummary,
   summarizeSchema,
-  planTexturesDry,
   evaluateSceneCapabilityFit,
   buildIntentHints,
   buildCommandIntentHints,
@@ -184,10 +153,6 @@ export {
   evaluateCapabilityFit,
   matchIntentSignals,
   buildCapabilityFixPrompt,
-  createDirectorySink,
-  createUploadSink,
-  createZipDownloadSink,
-  toSiteRelativeTexturePath,
   buildObjectSpatialCardsFromScene,
   buildObjectSpatialCardsFromSceneJson,
   buildSceneScaleProfile,

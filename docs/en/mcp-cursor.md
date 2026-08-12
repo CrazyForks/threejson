@@ -11,7 +11,7 @@ cd tools/mcp-threejson
 npm install
 ```
 
-Copy `tools/mcp-threejson/setting.example.json` to `setting.json` and fill `llm.apiKey`. Texture filling shares `llm.baseUrl` and optional `llm.imageModel`.
+Copy `tools/mcp-threejson/setting.example.json` to `setting.json`. `llm.*` drives scene and semantic texture planning; `texture.baseUrl` and `texture.apiKey` configure the independent texture service.
 
 The MCP settings are independent from `tools/threejson-agent/setting.json`.
 
@@ -23,13 +23,10 @@ Cursor MCP configuration can set `THREEJSON_ROOT`. If it is not set, `server.mjs
 
 Overlapping `llm` and `agent` settings have the same meaning and can be copied between the two settings files, but credentials must be maintained separately.
 
-Texture options supported by MCP include:
-
-- `texture.localOutputDir`
-- `texture.overwriteExisting`
-- `texture.concurrency`
-
-MCP uses the Node texture sink directly. Agent-only path redirection and asset search settings do not apply.
+Texture options supported by MCP include `baseUrl`, `apiKey`, `strategy`, `pbr`,
+`allowUnknownLicense`, `persistenceMode`, and `concurrency`. Acquisition always uses the neutral
+texture-service Provider contract; it does not reuse the chat provider's image endpoint or write
+through the removed local texture sink. Agent-only path redirection and asset search settings do not apply.
 
 ## Cursor Configuration
 

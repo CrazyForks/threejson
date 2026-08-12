@@ -76,22 +76,13 @@ export function formatAgentProgressLabel(progress, t) {
     case "layout_review":
       return t(
         "aiAgent.progress.layoutReview",
-        "Reviewing layout and materials ({count} texture slot(s))…",
-        { count: count ?? 0 }
+        "Reviewing layout and material semantics…"
       );
     case "execution_fallback":
       return t(
         "aiAgent.progress.executionFallback",
         "The scene is too large for one response; switching to incremental construction…"
       );
-    case "texture_review":
-      return t(
-        "aiAgent.progress.textureReview",
-        "Found {count} texture slot(s), planning textures…",
-        { count: count ?? 0 }
-      );
-    case "fill_textures":
-      return t("aiAgent.progress.fillTextures", "Filling in textures…");
     case "scene_ready":
       return t("aiAgent.progress.sceneReady", "Scene JSON ready.");
     case "stage_preview":

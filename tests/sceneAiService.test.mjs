@@ -22,7 +22,7 @@ import {
   extractPatchOperations,
   applySceneJsonPatch
 } from "../core/ai/scenePatch.js";
-import { listTextureUrlPointers } from "../core/ai/textureAiService.js";
+import { listMaterialTextureSlots } from "../core/texture/index.js";
 import { classifyTurnIntent } from "../core/ai/sceneChatSession.js";
 
 test("ThreeBox turn context sends the original prompt once, then uses the signed moderation receipt", () => {
@@ -240,17 +240,18 @@ test("extractPatchOperations accepts wrapper object", () => {
   assert.equal(ops[0].op, "remove");
 });
 
-test("listTextureUrlPointers finds material.textureUrl", () => {
-  const ptrs = listTextureUrlPointers({
+test("listMaterialTextureSlots finds standard and friendly material slots", () => {
+  const slots = listMaterialTextureSlots({
     worldInfo: {
-      boxModelList: [{ material: { textureUrl: "/tex.png" } }]
+      boxModelList: [{ threeJsonId: "friendly-box", material: { textureUrl: "/tex.png" } }]
     }
   });
-  assert.ok(ptrs.length >= 1);
-  const standardPointers = listTextureUrlPointers({
-    objectList: [{ material: { textureUrl: "/standard.png" } }]
+  assert.ok(slots.some((slot) => slot.slot === "baseColor" && slot.currentUrl === "/tex.png"));
+  const standardSlots = listMaterialTextureSlots({
+    objectList: [{ threeJsonId: "standard-box", material: { textureUrl: "/standard.png" } }]
   });
-  assert.equal(standardPointers[0], "/objectList/0/material/textureUrl");
+  assert.ok(standardSlots.some((slot) => slot.valuePointer === "/objectList/0/material/textureUrl"));
+  assert.ok(standardSlots.some((slot) => slot.slot === "normal"));
 });
 
 test("AI JSON sanitization strips optional markdown fences", () => {
@@ -843,7 +844,7 @@ test("generateSceneJsonString skips capability reference material when disabled"
   assert.equal(userContent.includes("Reference material retrieved"), false);
 });
 
-test("generateSceneJsonString disables proactive online texture prompt when requested", async () => {
+test("generateSceneJsonString keeps texture acquisition semantic and provider-neutral", async () => {
   const requestBodies = [];
   globalThis.fetch = async (url, init = {}) => {
     if (String(url) === "https://api.openai.com/v1/chat/completions") {
@@ -869,14 +870,14 @@ test("generateSceneJsonString disables proactive online texture prompt when requ
   await generateSceneJsonString("make a room with a wood floor", {
     provider: "chatgpt",
     apiKey: "test-key",
-    capabilityReview: false,
-    onlineTextureHints: false
+    capabilityReview: false
   });
 
   assert.equal(requestBodies.length, 1);
   const systemContent = requestBodies[0].messages[0].content;
-  assert.match(systemContent, /host disabled proactive online texture hints/);
-  assert.doesNotMatch(systemContent, /self-evidently incomplete as a flat color/);
+  assert.match(systemContent, /separate, optional host pipeline/);
+  assert.match(systemContent, /do not invent texture URLs or bundled filenames/);
+  assert.doesNotMatch(systemContent, /Poly Haven|Openverse|R2/);
 });
 
 test("generateSceneJsonString authors standard JSON and projects friendly output only at return", async () => {
@@ -1693,7 +1694,7 @@ test("requestSceneRefinementStep recognizes done, JSON Patch, and commands", asy
   assert.equal(commandResult.commands[0].op, "object.patch");
 });
 
-test("requestUpdatedSceneJsonString does not carry proactive online texture prompt", async () => {
+test("requestUpdatedSceneJsonString preserves the texture acquisition boundary", async () => {
   const requestBodies = [];
   globalThis.fetch = async (url, init = {}) => {
     if (String(url) === "https://api.openai.com/v1/chat/completions") {
@@ -1721,15 +1722,14 @@ test("requestUpdatedSceneJsonString does not carry proactive online texture prom
     '{"threeJsonId":"base","worldInfo":{"boxModelList":[{"name":"floor","objType":"floor","geometry":{"width":2,"height":0.1,"depth":2},"position":{"x":0,"y":0,"z":0},"material":{"color":"#777777"}}]}}',
     {
       provider: "chatgpt",
-      apiKey: "test-key",
-      onlineTextureHints: true
+      apiKey: "test-key"
     }
   );
 
   assert.equal(requestBodies.length, 1);
   const systemContent = requestBodies[0].messages[0].content;
-  assert.doesNotMatch(systemContent, /Online texture rule/);
-  assert.doesNotMatch(systemContent, /self-evidently incomplete as a flat color/);
+  assert.match(systemContent, /separate, optional host pipeline/);
+  assert.match(systemContent, /do not invent texture URLs or bundled filenames/);
 });
 
 test("requestUpdatedSceneJsonString continues a provider-truncated full JSON adjustment", async () => {

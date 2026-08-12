@@ -1804,7 +1804,7 @@ export async function bootstrapSceneHostEditor() {
       settingsModal.populateForm(editorSettings);
       ui.showMessage(t("editor.message.settingsResetToFile", "Restored setting.json defaults."), "info");
     },
-    onTestEndpoint: (kind, value) => probeEndpoint(value, "/health")
+    onTestEndpoint: (_kind, value) => probeEndpoint(value, "/health")
   });
 
   builtinPrivacyController = createBuiltinProviderPrivacyController({

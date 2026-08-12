@@ -4,6 +4,14 @@ import { LIB_PREFIX } from "./resolveTextureSource.js";
 
 const ASSET_CANDIDATE_KEYS = new Set([
   "textureUrl",
+  "normalMap",
+  "roughnessMap",
+  "metalnessMap",
+  "aoMap",
+  "emissiveMap",
+  "alphaMap",
+  "bumpMap",
+  "displacementMap",
   "texturePath",
   "modelPath",
   "map",
@@ -161,6 +169,12 @@ async function tryResolveAssetBytes(ref, options = {}) {
     const out = await resolver(ref);
     if (out instanceof Uint8Array) {
       return out;
+    }
+    if (out instanceof ArrayBuffer) {
+      return new Uint8Array(out);
+    }
+    if (typeof Blob !== "undefined" && out instanceof Blob) {
+      return new Uint8Array(await out.arrayBuffer());
     }
   }
   if (typeof ref !== "string") {

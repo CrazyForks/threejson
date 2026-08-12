@@ -17,9 +17,9 @@ test("resolveTextureSource uses non-empty textureUrl", () => {
   );
 });
 
-test("resolveTextureSource ignores empty textureUrl and map string", () => {
+test("resolveTextureSource ignores empty values and accepts the standard map string alias", () => {
   assert.equal(resolveTextureSource({ textureUrl: "" }), null);
-  assert.equal(resolveTextureSource({ map: "/legacy.png" }), null);
+  assert.equal(resolveTextureSource({ map: " /friendly-map.png " }), "/friendly-map.png");
 });
 
 test("resolveTextureSource resolves lib:// via assetRegistry", () => {
@@ -35,5 +35,6 @@ test("resolveTextureSource resolves lib:// via assetRegistry", () => {
 
 test("materialJsonHasResolvableTexture", () => {
   assert.equal(materialJsonHasResolvableTexture({ textureUrl: "/x.png" }), true);
+  assert.equal(materialJsonHasResolvableTexture({ map: "/map-alias.png" }), true);
   assert.equal(materialJsonHasResolvableTexture({ textureUrl: "" }), false);
 });

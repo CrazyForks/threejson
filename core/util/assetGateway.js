@@ -2,6 +2,14 @@
 
 const URL_KEYS = new Set([
   "textureUrl",
+  "normalMap",
+  "roughnessMap",
+  "metalnessMap",
+  "aoMap",
+  "emissiveMap",
+  "alphaMap",
+  "bumpMap",
+  "displacementMap",
   "videoUrl",
   "audioUrl",
   "modelPath",
@@ -21,7 +29,9 @@ function isProxyableUrl(value) {
 
 function inferAssetKind(key, parent) {
   const normalized = String(key || "").toLowerCase();
-  if (normalized === "textureurl") return parent?.textureKind === "video" ? "video" : "image";
+  if (["textureurl", "normalmap", "roughnessmap", "metalnessmap", "aomap", "emissivemap", "alphamap", "bumpmap", "displacementmap"].includes(normalized)) {
+    return normalized === "textureurl" && parent?.textureKind === "video" ? "video" : "image";
+  }
   if (normalized === "videourl") return "video";
   if (normalized === "audiourl") return "audio";
   if (normalized === "modelpath") return "model";

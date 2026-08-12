@@ -51,18 +51,90 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
   loadingMask.textContent = t("threebox.sceneCard.waitingForDraft", "等待场景草稿…");
   canvasWrap.appendChild(loadingMask);
 
-  // Shown once the draft renders and stays up through every incremental refine round (see
-  // core/ai/sceneAgent.js's module docblock — generation is always draft-then-refine now), cleared
-  // once the turn's final render lands. Distinct from loadingMask: the canvas is already fully
-  // interactive and showing real content while this is up, it's not a "still loading" state.
+  // Shown only when automatic negotiation selected incremental construction (or a complete output
+  // genuinely overflowed and fell back to it). Distinct from loadingMask: the canvas is already
+  // interactive and showing real content while follow-up construction is in progress.
   const draftBadge = document.createElement("div");
   draftBadge.className = "sceneCardDraftBadge";
   draftBadge.textContent = t("threebox.sceneCard.draftBadge", "草稿 · 自动细化中…");
   draftBadge.hidden = true;
   canvasWrap.appendChild(draftBadge);
 
+  const textureBadge = document.createElement("div");
+  textureBadge.className = "sceneCardTextureBadge";
+  textureBadge.hidden = true;
+  canvasWrap.appendChild(textureBadge);
+  let textureBadgeTimer = null;
+
   function setDraftState(isDraft) {
     draftBadge.hidden = !isDraft;
+  }
+
+  function setTextureProgress(event = {}) {
+    clearTimeout(textureBadgeTimer);
+    textureBadgeTimer = null;
+    const total = Math.max(0, Number(event.total) || 0);
+    const completed = Math.max(0, Number(event.completed) || 0);
+    if (event.phase === "planned" && total > 0) {
+      textureBadge.title = "";
+      textureBadge.textContent = t("threebox.sceneCard.texturePlanned", "正在完善纹理 · 0/{total}", { total });
+      textureBadge.dataset.state = "working";
+      textureBadge.hidden = false;
+      return;
+    }
+    if (event.phase === "acquiring" || event.phase === "task-complete") {
+      textureBadge.title = "";
+      textureBadge.textContent = t("threebox.sceneCard.textureProgress", "正在完善纹理 · {completed}/{total}", {
+        completed,
+        total
+      });
+      textureBadge.dataset.state = "working";
+      textureBadge.hidden = total === 0;
+      return;
+    }
+    if (event.phase === "complete") {
+      const assignments = Math.max(0, Number(event.assignments) || 0);
+      const pendingLicense = Math.max(0, Number(event.pendingLicense) || 0);
+      const pendingItems = Array.isArray(event.pendingLicenseItems) ? event.pendingLicenseItems : [];
+      if (!total) {
+        textureBadge.hidden = true;
+        return;
+      }
+      textureBadge.textContent = pendingLicense
+        ? t("threebox.sceneCard.textureLicensePending", "已完善 {assignments} 项 · {pendingLicense} 项需许可确认", {
+            assignments,
+            pendingLicense
+          })
+        : assignments
+          ? t("threebox.sceneCard.textureComplete", "纹理已完善 · {assignments}/{total}", { assignments, total })
+          : t("threebox.sceneCard.textureUnchanged", "未找到可安全应用的纹理");
+      textureBadge.dataset.state = pendingLicense ? "neutral" : assignments ? "complete" : "neutral";
+      textureBadge.title = pendingItems
+        .map((item) => [
+          item.objectName || item.query || item.taskId,
+          item.candidateName || item.candidateId,
+          item.source,
+          item.license?.id || item.license?.name || item.license?.status || "unknown"
+        ].filter(Boolean).join(" · "))
+        .join("\n");
+      textureBadge.hidden = false;
+      // Unknown-license candidates require an explicit user decision, so their details must stay
+      // inspectable instead of disappearing like a transient success notification.
+      if (!pendingLicense) {
+        textureBadgeTimer = setTimeout(() => { textureBadge.hidden = true; }, 4200);
+      }
+      return;
+    }
+    if (event.phase === "failed") {
+      textureBadge.title = "";
+      textureBadge.textContent = t("threebox.sceneCard.textureFailed", "纹理服务暂不可用，已保留基础材质");
+      textureBadge.dataset.state = "warning";
+      textureBadge.hidden = false;
+      textureBadgeTimer = setTimeout(() => { textureBadge.hidden = true; }, 5200);
+      return;
+    }
+    textureBadge.title = "";
+    textureBadge.hidden = true;
   }
 
   const actionBar = document.createElement("div");
@@ -287,6 +359,10 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
     return runtime;
   }
 
+  function updateSceneJson(sceneJson) {
+    if (sceneJson && typeof sceneJson === "object") currentSceneJson = sceneJson;
+  }
+
   async function executeCommandBatch(commands, options = {}) {
     if (!runtime || !Array.isArray(commands) || commands.length === 0) {
       return { ok: false, sceneMutated: false, results: [], error: "Scene preview runtime is not ready." };
@@ -395,6 +471,8 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
 
   function dispose() {
     renderSeq += 1;
+    clearTimeout(textureBadgeTimer);
+    textureBadgeTimer = null;
     liveResizeObserver?.disconnect();
     liveResizeObserver = null;
     runtime?.dispose?.();
@@ -426,7 +504,10 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
     exportBtn.disabled = true;
     try {
       const { packJsonSceneArchive } = await import("threejson");
-      const blob = await packJsonSceneArchive(sceneJson, { outputType: "blob" });
+      const archiveOptions = typeof cardOptions.archiveOptions === "function"
+        ? await cardOptions.archiveOptions(sceneJson)
+        : (cardOptions.archiveOptions || {});
+      const blob = await packJsonSceneArchive(sceneJson, { ...archiveOptions, outputType: "blob" });
       downloadBlob(blob, `${currentLabel}.tjz`);
     } catch (error) {
       showToast(t("threebox.sceneCard.exportFailed", "导出失败：{error}", { error: error?.message || error }), "error");
@@ -603,7 +684,9 @@ export function createThreeBoxSceneCard(cardOptions = {}) {
     exportSceneJsonString,
     finalize,
     dispose,
+    setTextureProgress,
     setLabel,
+    updateSceneJson,
     setPreviewAuxiliaryLightsEnabled: (enabled) =>
       syncThreeBoxPreviewAuxiliaryLights(runtime?.scene, enabled !== false),
     getRuntime: () => runtime

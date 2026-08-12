@@ -1,4 +1,7 @@
 import { packJsonSceneArchive } from "threejson";
+import { getCachedTextureBlob, putCachedTextureBlob } from "../../shared/js/browserTextureCache.js";
+import { createTextureProxyUrl } from "../../shared/js/textureProviderClient.js";
+import { resolveEditorTextureService } from "./editorTexturePipeline.js";
 
 export function createEditorTjzExportModal(host) {
   const modal = document.getElementById("tjzExportModal");
@@ -94,10 +97,29 @@ export function createEditorTjzExportModal(host) {
     host.closeAllDropdowns?.();
     try {
       await host.runWithLoadingMask("正在导出 .tjz 包...", async () => {
+        const textureService = resolveEditorTextureService(host.getEditorSettings());
         const archiveBlob = await packJsonSceneArchive(sceneRuntime || scene, {
           format: exportOptions.format,
           assetPolicy: exportOptions.assetPolicy,
           fetchExternalUrls: exportOptions.fetchExternalUrls,
+          resolveAsset: exportOptions.assetPolicy === "tryPack"
+            ? async (sourceUrl) => {
+                const cached = await getCachedTextureBlob(sourceUrl);
+                if (cached) return cached;
+                if (!/^https?:\/\//i.test(String(sourceUrl || ""))) return null;
+                const runtimeUrl = createTextureProxyUrl(textureService.baseUrl, textureService.apiKey, sourceUrl);
+                try {
+                  const response = await fetch(runtimeUrl);
+                  if (!response.ok) return null;
+                  const blob = await response.blob();
+                  if (!blob.size || (blob.type && !blob.type.startsWith("image/"))) return null;
+                  await putCachedTextureBlob(sourceUrl, blob, { source: "editor-tjz-export" });
+                  return blob;
+                } catch {
+                  return null;
+                }
+              }
+            : undefined,
           includeRuntimeRecords: exportOptions.includeRuntimeRecords,
           outputType: "blob"
         });

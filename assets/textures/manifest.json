@@ -1,0 +1,136 @@
+[
+  {
+    "id": "building-floor-cement",
+    "name": "Cement floor",
+    "keywords": ["cement", "concrete", "floor", "ground", "水泥", "混凝土地面"],
+    "tileable": true,
+    "maps": { "baseColor": "/assets/textures/building/floor/cement.png" },
+    "license": { "status": "known", "id": "MIT" },
+    "attribution": "@threejson/assets"
+  },
+  {
+    "id": "building-floor-wood",
+    "name": "Wood floor",
+    "keywords": ["wood", "wooden", "floor", "timber", "parquet", "木材", "木地板"],
+    "tileable": true,
+    "maps": { "baseColor": "/assets/textures/building/floor/wood_floor.webp" },
+    "license": { "status": "known", "id": "MIT" },
+    "attribution": "@threejson/assets"
+  },
+  {
+    "id": "building-wall-brick",
+    "name": "Red brick wall",
+    "keywords": ["red", "brick", "wall", "masonry", "红砖", "砖墙"],
+    "tileable": true,
+    "maps": { "baseColor": "/assets/textures/building/wall/red_brick.webp" },
+    "license": { "status": "known", "id": "MIT" },
+    "attribution": "@threejson/assets"
+  },
+  {
+    "id": "building-metal-steel",
+    "name": "Stainless steel",
+    "keywords": ["steel", "stainless", "metal", "brushed", "不锈钢", "金属"],
+    "tileable": true,
+    "maps": { "baseColor": "/assets/textures/building/metal/stainless_steel.webp" },
+    "license": { "status": "known", "id": "MIT" },
+    "attribution": "@threejson/assets"
+  },
+  {
+    "id": "nature-sea",
+    "name": "Sea surface",
+    "keywords": ["sea", "ocean", "water", "海洋", "海水"],
+    "maps": { "baseColor": "/assets/textures/environment/nature/landform/sea.jpg" },
+    "license": { "status": "known", "id": "MIT" },
+    "attribution": "@threejson/assets"
+  },
+  {
+    "id": "planet-earth",
+    "name": "Earth",
+    "keywords": ["earth", "planet", "globe", "地球"],
+    "projection": "equirectangular",
+    "maps": { "baseColor": "/assets/textures/environment/nature/planet/earth.png" },
+    "license": { "status": "known", "id": "MIT" },
+    "attribution": "@threejson/assets"
+  },
+  {
+    "id": "planet-moon",
+    "name": "Moon",
+    "keywords": ["moon", "lunar", "月球", "月亮"],
+    "projection": "equirectangular",
+    "maps": { "baseColor": "/assets/textures/environment/nature/planet/moon.png" },
+    "license": { "status": "known", "id": "MIT" },
+    "attribution": "@threejson/assets"
+  },
+  {
+    "id": "planet-sun",
+    "name": "Sun",
+    "keywords": ["sun", "solar", "star", "太阳"],
+    "projection": "equirectangular",
+    "maps": { "baseColor": "/assets/textures/environment/nature/planet/sun.png" },
+    "license": { "status": "known", "id": "MIT" },
+    "attribution": "@threejson/assets"
+  },
+  {
+    "id": "planet-mercury",
+    "name": "Mercury",
+    "keywords": ["mercury", "planet", "水星"],
+    "projection": "equirectangular",
+    "maps": { "baseColor": "/assets/textures/environment/nature/planet/mercury.png" },
+    "license": { "status": "known", "id": "MIT" },
+    "attribution": "@threejson/assets"
+  },
+  {
+    "id": "planet-venus",
+    "name": "Venus",
+    "keywords": ["venus", "planet", "金星"],
+    "projection": "equirectangular",
+    "maps": { "baseColor": "/assets/textures/environment/nature/planet/venus.png" },
+    "license": { "status": "known", "id": "MIT" },
+    "attribution": "@threejson/assets"
+  },
+  {
+    "id": "planet-mars",
+    "name": "Mars",
+    "keywords": ["mars", "planet", "火星"],
+    "projection": "equirectangular",
+    "maps": { "baseColor": "/assets/textures/environment/nature/planet/mars.png" },
+    "license": { "status": "known", "id": "MIT" },
+    "attribution": "@threejson/assets"
+  },
+  {
+    "id": "planet-jupiter",
+    "name": "Jupiter",
+    "keywords": ["jupiter", "planet", "木星"],
+    "projection": "equirectangular",
+    "maps": { "baseColor": "/assets/textures/environment/nature/planet/jupiter.png" },
+    "license": { "status": "known", "id": "MIT" },
+    "attribution": "@threejson/assets"
+  },
+  {
+    "id": "planet-saturn",
+    "name": "Saturn",
+    "keywords": ["saturn", "planet", "土星"],
+    "projection": "equirectangular",
+    "maps": { "baseColor": "/assets/textures/environment/nature/planet/saturn.png" },
+    "license": { "status": "known", "id": "MIT" },
+    "attribution": "@threejson/assets"
+  },
+  {
+    "id": "planet-uranus",
+    "name": "Uranus",
+    "keywords": ["uranus", "planet", "天王星"],
+    "projection": "equirectangular",
+    "maps": { "baseColor": "/assets/textures/environment/nature/planet/uranus.png" },
+    "license": { "status": "known", "id": "MIT" },
+    "attribution": "@threejson/assets"
+  },
+  {
+    "id": "planet-neptune",
+    "name": "Neptune",
+    "keywords": ["neptune", "planet", "海王星"],
+    "projection": "equirectangular",
+    "maps": { "baseColor": "/assets/textures/environment/nature/planet/neptune.png" },
+    "license": { "status": "known", "id": "MIT" },
+    "attribution": "@threejson/assets"
+  }
+]

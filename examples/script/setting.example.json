@@ -1,11 +1,10 @@
 {
-  "_doc": "Reference schema for ThreeJSON AI-related settings (llm with optional imageModel, agent, texture, asset). Browser demos use localStorage; tools/threejson-agent and tools/mcp-threejson each keep their own setting.json — see those packages' setting.example.json.",
+  "_doc": "Reference schema for ThreeJSON AI-related settings. Chat planning and the independent texture acquisition service use separate provider configuration.",
   "llm": {
     "provider": "chatgpt",
     "apiKey": "",
     "baseUrl": "",
     "model": "",
-    "imageModel": "dall-e-3",
     "temperature": 0.2,
     "maxTokens": 4000
   },
@@ -14,13 +13,14 @@
     "depth": "medium"
   },
   "texture": {
-    "mode": "node_bridge",
     "fillAfterAgent": false,
-    "browserMode": "directory",
-    "localOutputDir": "assets/textures/ai-generated",
-    "preferRemoteUrl": false,
-    "overwriteExisting": false,
-    "concurrency": 2
+    "baseUrl": "",
+    "apiKey": "",
+    "strategy": "semantic-hybrid",
+    "pbr": true,
+    "allowUnknownLicense": false,
+    "persistenceMode": "remote",
+    "concurrency": 3
   },
   "asset": {
     "mode": "crawl",

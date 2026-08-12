@@ -15,7 +15,7 @@
  * a few KB. The highlighter escapes HTML before tokenizing, so the per-line innerHTML is safe.
  */
 import { useCallback, useMemo, useRef, useState } from "react";
-import { projectSceneJsonString } from "threejson";
+import { projectSceneJsonString } from "threejson/ai";
 import { t } from "@threejson/host-kit/i18n/index.js";
 
 const COPY_ICON = (

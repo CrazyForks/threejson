@@ -52,17 +52,12 @@ test("buildSceneCommandUpdateSystemPrompt teaches single-round mutating commands
   assert.equal(prompt.includes("≥3"), false);
 });
 
-test("buildSceneCommandUpdateSystemPrompt respects online texture hint toggle", () => {
-  const enabled = buildSceneCommandUpdateSystemPrompt();
-  assert.match(enabled, /any public web source, not only a CDN/);
-  assert.match(enabled, /optional stable candidates, not mandatory defaults/);
-  assert.match(enabled, /never replace an existing valid remote URL/);
-  assert.match(enabled, /not limited to ThreeJSON, Three\.js, npm, or a particular CDN/);
-
-  const disabled = buildSceneCommandUpdateSystemPrompt({ onlineTextureHints: false });
-  assert.match(disabled, /Proactive online texture hints are disabled/);
-  assert.match(disabled, /Do not add new material\.textureUrl fields/);
-  assert.doesNotMatch(disabled, /any public web source, not only a CDN/);
+test("buildSceneCommandUpdateSystemPrompt delegates acquisition without inventing URLs", () => {
+  const prompt = buildSceneCommandUpdateSystemPrompt();
+  assert.match(prompt, /separate host pipeline chooses trusted texture resources/);
+  assert.match(prompt, /Do not invent or guess a texture URL/);
+  assert.match(prompt, /Preserve user-supplied and existing texture fields/);
+  assert.doesNotMatch(prompt, /Poly Haven|Openverse|R2/);
 });
 
 test("command update prompt adds requested visible text as SDF instead of metadata", () => {

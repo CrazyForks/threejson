@@ -7,7 +7,7 @@
  * call, tab-specific composer controls) stays in each panel's own file. */
 import { BUILTIN_PROVIDER_TYPE, ensureEditorBuiltinApiKey, getDisplayDeviceId } from "./editorBuiltinAiProvider.js";
 import { appendAiChatTurn, getAiChatHistory, resolveSceneKeyFromLabel } from "./editorAiChatStore.js";
-import { createThreeBoxTurnContext, parseSceneJsonString } from "threejson";
+import { createThreeBoxTurnContext, parseSceneJsonString } from "threejson/ai";
 import { t } from "../../shared/i18n/index.js";
 import { getAiErrorFeedback, renderAiErrorFeedback } from "../../shared/js/aiErrorFeedback.js";
 import {

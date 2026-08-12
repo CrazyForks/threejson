@@ -39,7 +39,7 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(loaded, path)
             self.assertEqual(data["llm"]["apiKey"], "secret")
             self.assertIn("texture", data)
-            self.assertEqual(data["texture"]["mode"], "node_bridge")
+            self.assertEqual(data["texture"]["strategy"], "semantic-hybrid")
 
     def test_default_setting_path_under_product_dir(self):
         self.assertEqual(default_setting_path(), PRODUCT_DIR / "setting.json")

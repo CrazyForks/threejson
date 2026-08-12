@@ -2,140 +2,75 @@
 
 [中文](./README.md) | [English](./README_EN.md)
 
-Browser tutorial: [`examples/html-demo/track-05-tooling/05-01-ai-scene.html`](../../examples/html-demo/track-05-tooling/05-01-ai-scene.html) (JSON updates; command mode see Scene Editor).
-
-`core/ai` provides **six** capability groups:
-
-1. **Generate** — prompt → full scene JSON string.
-2. **Image-to-scene** — reference image + optional text → full scene JSON (vision-capable chat model required).
-3. **String-level update** — prompt + existing JSON → updated JSON (`updateMode: "incremental"` optional for RFC 6902 patches).
-4. **Command-mode update** — prompt + scene context → `scene.*` / `object.*` / `material.*` / `camera.*` scripts via `requestUpdatedSceneEditCommands` (no `editor.*`).
-5. **File-level update (Node)** — prompt + scene file path → write back `.json` or export-style `.js` (`core/util/nodeSceneFile.js`).
-6. **Texture planning and filling** — `planTextures` + `fillTextureUrls` with pluggable `imageProvider` and `sink`.
-
-Supported providers: `chatgpt`, `deepseek`, `custom` (OpenAI-compatible; requires `baseUrl`).
-
-## File overview
-
-- `threeJsonCoreSkill.js` — scene generation/update system prompts (primitives, native Three.js, infoPanel / css3dPanel / shaderSurface / particleEmitter, `sceneConfig`, few-shots).
-- `sceneCapability.js` — intent hints (`buildIntentHints`) and post-generation fit review (`evaluateCapabilityFit`).
-- `sceneCommandSkill.js` — command-mode prompts and script parsing.
-- `texturePrompt.js` — texture task planning templates (RFC 6901 pointers).
-- `textureAiService.js` — `planTextures`, `fillTextureUrls`, image provider helpers.
-- `sceneAiService.js` — HTTP, `extractJsonText`, validation, `requestUpdatedSceneEditCommands`.
-- `sceneAgent.js` / `agentTools.js` — adaptive direct or incremental scene execution (`agentDepth.js` remains only for legacy compatibility).
-- `index.js` — public entry; mounts `window.ThreeJsonAI` in the browser.
-
-Human-readable skill: [`SKILL.md`](./SKILL.md). Related docs: [`docs/en/json-format.md`](../../docs/en/json-format.md), [`docs/en/extensions.md`](../../docs/en/extensions.md), [`docs/en/glossary.md`](../../docs/en/glossary.md). Gap matrix (archived): [`lab/archive/ai-skill-gap-matrix.md`](../../lab/archive/ai-skill-gap-matrix.md).
-
-## Module exports (ESM)
+`threejson/ai` provides scene generation, image-to-scene, scene updates, command output, turn negotiation, and semantic texture planning. AI is no longer statically loaded by the `threejson` or `threejson/core` root entries.
 
 ```js
 import {
   createSceneAiClient,
-  generateSceneJsonString,
-  generateSceneJsonFromImage,
-  updateSceneJsonString,
-  requestUpdatedSceneEditCommands,
-  buildSceneCommandUpdateSystemPrompt,
-  planTextures,
-  fillTextureUrls,
-  runSceneAgent,
-  createOpenAiImageProvider,
-  normalizeImageRawToBlob,
-  listTextureUrlPointers,
+  createSceneTexturePlanner,
   parseSceneJsonString,
-  extractJsonText,
-  resolveVisionImageUrl
-} from "./core/ai/index.js";
+  requestUpdatedSceneEditCommands,
+  runSceneAgent
+} from "threejson/ai";
 ```
 
-`updateSceneJsonFile` — import from `core/util/nodeSceneFile.js` (Node only).
+Core capabilities:
 
-`createSceneAiClient(defaultOptions)` merges defaults into each call:
+- `createSceneAiClient(options)` creates a generation/update client.
+- `generateSceneJsonString(prompt, options)` generates a complete scene.
+- `generateSceneJsonFromImage(input, options)` generates from a reference image.
+- `updateSceneJsonString(prompt, scene, options)` uses full JSON or RFC 6902 Patch updates.
+- `requestUpdatedSceneEditCommands(prompt, context, options)` produces core scene commands.
+- `classifyTurnIntent(input, options)` negotiates intent and direct/incremental construction. The first message in an empty conversation is generation without an intent-classification call.
+- `runSceneAgent(input, options)` executes direct or incremental construction. Numeric round settings are runaway guards, never target round counts.
+- `createSceneTexturePlanner(options)` creates the one-call semantic planner injected into the pure texture pipeline.
 
-- `generateSceneJsonString` — default `maxTokens: 6000`; optional `planFirst`, `capabilityReview`.
-- `generateSceneJsonFromImage({ prompt?, image }, options?)`
-- `updateSceneJsonString` — optional `updateMode: "incremental"`
-- `requestUpdatedSceneEditCommands` — `outputMode: "commands"|"json"`
-- `planTextures` / `fillTextureUrls`
-- `runSceneAgent` — defaults to `executionMode: "direct"`; complex/output-limited scenes can use `"draft_refine"`
+## Unified texture boundary
 
-Browser globals:
-
-```text
-window.ThreeJsonAI.createSceneAiClient
-window.ThreeJsonAI.generateSceneJsonString
-window.ThreeJsonAI.generateSceneJsonFromImage
-window.ThreeJsonAI.updateSceneJsonString
-window.ThreeJsonAI.resolveVisionImageUrl
-window.ThreeJsonAI.planTextures
-window.ThreeJsonAI.fillTextureUrls
-window.ThreeJsonAI.createOpenAiImageProvider
-window.ThreeJsonAI.normalizeImageRawToBlob
-window.ThreeJsonAI.listTextureUrlPointers
-window.ThreeJsonAI.runSceneAgent
-```
-
-`updateSceneJsonFile` is not on `window`. Prefer server-side or local scripts for texture keys.
-
-## Command-mode update
+Slot discovery, orchestration, and atomic runtime assignment live in `threejson/texture`:
 
 ```js
-import { requestUpdatedSceneEditCommands } from "./core/ai/index.js";
+import { createSceneTexturePlanner } from "threejson/ai";
+import {
+  TextureAcquisitionProvider,
+  listMaterialTextureSlots,
+  planSceneTextures,
+  runSceneTexturePipeline,
+  applyTextureAssignmentAsync
+} from "threejson/texture";
 
-const result = await requestUpdatedSceneEditCommands(
-  "Change the main building to blue-gray",
-  {
-    currentSceneJsonString: sceneJson,
-    objectList: [{ threeJsonId: "b1", name: "Main", objType: "box" }],
-    selectionId: "b1"
-  },
-  { provider: "chatgpt", apiKey: process.env.OPENAI_API_KEY, outputMode: "commands" }
-);
-// result.commands — parsed { op, args }[]
+const plan = await planSceneTextures(scene, userPrompt, {
+  planner: createSceneTexturePlanner(chatOptions)
+});
+
+const result = await runSceneTexturePipeline(scene, {
+  plan,
+  textureProvider: new TextureAcquisitionProvider({
+    capabilities,
+    search,
+    generate,
+    persist
+  })
+});
 ```
 
-Common ops: `object.patch`, `material.patch`, `object.add`, `object.reconcile`, `camera.fit`, `scene.applyPatch`. Editor wraps with `editor.*` separately.
+The planner returns semantics, slots, projection, and source preference only. It never emits or guesses URLs. Search, generation, licensing, proxying, and archival belong to a host-injected Provider or server. A conventional image model may provide base color only; full PBR maps require an explicitly declared `pbr-set` or `pbr-derive` capability.
 
-## Adaptive scene execution (`runSceneAgent`)
+Scene authoring describes object/material semantics and preserves user-supplied or existing texture fields. ThreeBox and Editor run texture acquisition after the first usable scene is visible, so texture failures never fail scene generation.
 
-Host settings use one tri-state parameter on `classifyTurnIntent(input, { sceneGenerationMode })`: `"auto"` (default; the negotiation model judges actual construction/output complexity), `"direct"` (complete generation), or `"draft_refine"` (incremental construction). The resolved `executionMode` is then passed to `runSceneAgent`. If automatic mode selects direct generation and the provider explicitly reports an output cutoff, the executor can still fall back safely to incremental construction.
+The former pointer/image-sink texture pipeline has been removed without compatibility wrappers.
 
-There is no separate single-turn/multi-turn quality switch. `executionMode: "direct"` returns one complete usable scene and is the default. `"draft_refine"` is reserved for genuinely complex scenes selected during negotiation, or for a detected direct output-limit fallback. Layout/material LLM review is off by default. The model ends incremental work with `# done`; `agent.maxRefineRounds` (default 6, hard maximum 20) is only a runaway guard, and repeated/no-op output also terminates immediately. All provider calls in one `runSceneAgent` share a total deadline (180 seconds by default, configurable through `turnTimeoutMs` or absolute `turnDeadlineAt`), so several stalled requests cannot accumulate into a many-minute hang.
+## Providers, streaming, and execution
 
-Scene adjustment completes after the first successfully applied mutation batch by default. It continues only for an explicit `# continue: <concrete remaining goal>`, required object inspection, or a real provider cutoff. Command updates have their own `commandMaxTokens` budget (default 3000) instead of inheriting the 6000-token full-scene rewrite budget. `currentSceneJsonString` remains local execution/validation/fallback state; the complete scene enters the model context only when the caller explicitly supplies `fullSceneJson`.
+Chat supports `chatgpt`, `deepseek`, and arbitrary OpenAI-compatible `custom` endpoints. Common options are `apiKey`, `model`, `baseUrl`, `temperature`, `maxTokens`, `stream`, and `signal`.
 
-```js
-const result = await aiClient.runSceneAgent(
-  { mode: "generate", prompt: "Small campus with roads and two buildings" },
-  {
-    executionMode: "direct",
-    agent: { maxRefineRounds: 6 },
-    turnTimeoutMs: 180000,
-    apiKey: "...",
-    provider: "chatgpt"
-  }
-);
-```
+Direct generation returns a complete usable scene. Incremental construction is reserved for genuinely complex scenes or explicit provider truncation. Updates prefer commands, then JSON Patch, with full JSON rewrite as a final fallback. `# done` and no-op/repeated output stop immediately.
 
-## Shared options
+## Entry and dependency boundaries
 
-- `provider`: `chatgpt` | `deepseek` | `custom`
-- `apiKey`: required
-- `model`, `baseUrl`, `temperature` (default `0.2`)
-- `maxTokens`: default `4000` for updates/textures; generation often uses **6000**
-- `segmentedOutput`: generation-only, `"auto"` by default. The pre-generation negotiation chooses `single`, `segmented`, or `compact`. Planned `segmented` generation starts the continuation/stitching protocol in the first response and uses `maxSceneSegments` (default 16, hard maximum 64); ordinary and compact scenes stay single-response. If an unsegmented response unexpectedly hits the provider output limit, the host performs at most one complete compact regeneration instead of blindly appending arbitrary cutoff fragments (`compactRetryOnTruncation: false` disables that retry).
-- `imageDetail`: `auto` | `low` | `high` (image-to-scene only)
+- Engine: `threejson` or `threejson/core`
+- AI: `threejson/ai`
+- Pure texture core: `threejson/texture`
+- Node file write-back: `core/util/nodeSceneFile.js`
 
-## Validation
-
-- Prompts ask for raw JSON; `extractJsonText()` still strips fences for resilience.
-- Loadable scenes need `worldInfo` and/or standard `objectList` + `sceneConfig`.
-- Capability catalog in prompts covers css3dPanel, shaderSurface, particleEmitter; extension **bootstrap** is host responsibility ([`docs/en/extensions.md`](../../docs/en/extensions.md)).
-
-## Manual verification
-
-See [`tests/ai-manual-verification.md`](../../tests/ai-manual-verification.md). Automated: `npm test`, `npm run verify:ai-static`; optional live: `npm run verify:ai-live`.
-
-Demos: [`docs/en/demos.md`](../../docs/en/demos.md), [`05-01-ai-scene.html`](../../examples/html-demo/track-05-tooling/05-01-ai-scene.html).
+Poly Haven, Openverse, image providers, R2, and ThreeBox server adapters must not enter the ThreeJSON package dependency graph. Without an injected texture Provider, neither the engine nor AI performs texture requests.

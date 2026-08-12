@@ -285,20 +285,12 @@ function buildCommandSceneTextFragment(options = {}) {
   return rules.join("\n");
 }
 
-function buildCommandOnlineTextureFragment(options = {}) {
-  if (options.onlineTextureHints === false) {
-    return [
-      "Online texture setting:",
-      "- Proactive online texture hints are disabled for this request.",
-      "- Do not add new material.textureUrl fields unless the user explicitly asks for/provides a texture URL.",
-      "- Preserve existing valid textureUrl values."
-    ].join("\n");
-  }
+function buildCommandTextureAcquisitionFragment() {
   return [
-    "Online texture setting:",
-    "- For newly added objects/surfaces that would be incomplete as flat colors (terrain/grass/water, asphalt, brick/concrete/wood/stone/fabric, signs/screens/maps, paintings, labels, carpets, named planets), use material.textureUrl with a suitable reachable online image URL; it may come from any public web source, not only a CDN, and https is preferred.",
-    "- For named Solar-System bodies, files under /assets/textures/environment/nature/planet/ are optional stable candidates, not mandatory defaults. Choose a bundled candidate or a more appropriate reachable https image according to the requested style, realism, resolution, projection, and scene needs; never replace an existing valid remote URL merely because a bundled candidate exists. Online resources are not limited to ThreeJSON, Three.js, npm, or a particular CDN. Use #ffffff as the material tint when the texture should not be darkened.",
-    "- Add textureRepeat for large tiled surfaces. Keep flat colors for generic blockouts and plain colored objects."
+    "Texture-acquisition setting:",
+    "- A separate host pipeline chooses trusted texture resources after this edit. Do not invent or guess a texture URL, bundled filename, domain, or asset ID.",
+    "- Preserve user-supplied and existing texture fields. For new materials, express the surface with accurate color/metalness/roughness/emissive values and textureRepeat where tiling will be useful.",
+    "- Keep flat colors for generic blockouts and plain colored objects."
   ].join("\n");
 }
 
@@ -446,7 +438,7 @@ export function buildSceneCommandAutoUpdateSystemPrompt(options = {}) {
     buildCommandPromptRulesFragment(options),
     buildCommandAnimationFragment(options),
     "",
-    buildCommandOnlineTextureFragment(options),
+    buildCommandTextureAcquisitionFragment(options),
     "",
     ...workflow,
     "",
@@ -485,7 +477,7 @@ export function buildSceneCommandUpdateSystemPrompt(options = {}) {
     buildCommandPromptRulesFragment(options),
     buildCommandAnimationFragment(options),
     "",
-    buildCommandOnlineTextureFragment(options),
+    buildCommandTextureAcquisitionFragment(options),
     "",
     buildSceneCommandSkillFragment()
   ].join("\n");

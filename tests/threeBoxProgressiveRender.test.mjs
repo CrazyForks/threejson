@@ -29,7 +29,8 @@ test("ThreeBox can start a draft preview before final AI post-processing complet
   assert.match(cardSource, /async function finalize\(/);
   assert.match(appSource, /sceneCard\.applyCommands\(progress\.commands/);
   assert.match(appSource, /sceneCard\.finalize\(outputSceneJson/);
-  assert.match(appSource, /insertBeforeBody\(textEl, api\.buildJsonCollapse\(outputSceneJsonString\), sceneCard\.el\)/);
+  assert.match(appSource, /const jsonCollapse = api\.buildJsonCollapse\(outputSceneJsonString\)/);
+  assert.match(appSource, /insertBeforeBody\(textEl, jsonCollapse, sceneCard\.el\)/);
   assert.match(panelSource, /insertBeforeBody,\s*createStreamingBlock/);
 });
 
@@ -38,4 +39,18 @@ test("ThreeBox scene-card size startup has a bounded fallback", async () => {
   assert.match(source, /setTimeout\(\(\) => \{/);
   assert.match(source, /\}, 250\);/);
   assert.match(source, /width: 320, height: 180/);
+});
+
+test("ThreeBox textures and persisted snapshots use the same projected scene shape as the card", async () => {
+  const source = await readFile(appUrl, "utf8");
+  assert.match(source, /const textureScene = outputSceneJson/);
+  assert.match(source, /scene:\s*textureScene/);
+  assert.match(source, /sceneJson:\s*outputSceneJsonString/);
+  assert.match(source, /jsonCollapse\.updateJson\?\./);
+  assert.match(source, /findChangedTextureObjectIds\([\s\S]*projectSceneForUser\(JSON\.stringify\(targetSceneJson\), settings\)[\s\S]*textureScene/);
+});
+
+test("unknown-license texture details remain visible for a real user decision", async () => {
+  const source = await readFile(cardUrl, "utf8");
+  assert.match(source, /if \(!pendingLicense\) \{\s*textureBadgeTimer = setTimeout/);
 });

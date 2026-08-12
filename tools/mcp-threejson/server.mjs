@@ -17,17 +17,16 @@ import {
   updateSceneJsonString,
   requestUpdatedSceneEditCommands,
   validateSceneJson,
-  planTextures,
-  fillTextureUrls,
-  createOpenAiImageProvider,
+  createSceneTexturePlanner,
   parseSceneJsonString
 } from "../../core/ai/index.js";
+import { planSceneTextures } from "../../core/texture/index.js";
+import { runTextureFill } from "../threejson-agent/bridge/texture-fill.mjs";
 import {
   createCommandContext,
   executeCommands,
   getCommandSpec
 } from "../../core/command/index.js";
-import { withNodeTextureSink } from "../../core/util/nodeTextureSink.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const defaultRoot = path.resolve(__dirname, "../..");
@@ -116,7 +115,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "threejson_fill_textures",
-      description: "Fill textureUrl slots (Node only; writes under resources/textures/)",
+      description: "Acquire trusted color/PBR maps through the configured texture service and update the scene",
       inputSchema: {
         type: "object",
         properties: {
@@ -221,7 +220,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     if (request.params.name === "threejson_plan_textures") {
       const scene = parseSceneJsonString(args.sceneJsonString);
-      const planned = await planTextures(scene, args.userHint || "", chat);
+      const planned = await planSceneTextures(scene, args.userHint || "", {
+        planner: createSceneTexturePlanner(chat),
+        strategy: setting.texture?.strategy || "semantic-hybrid",
+        pbr: setting.texture?.pbr !== false
+      });
       return {
         content: [{ type: "text", text: JSON.stringify(planned, null, 2) }]
       };
@@ -266,29 +269,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     if (request.params.name === "threejson_fill_textures") {
-      const tex = setting.texture || {};
-      const localOutputDir = path.resolve(
+      const filled = await runTextureFill({
         projectRoot,
-        tex.localOutputDir || "assets/textures/ai-generated"
-      );
-      const llm = setting.llm || {};
-      const imageProvider = createOpenAiImageProvider({
-        apiKey: chat.apiKey,
-        baseUrl: String(llm.baseUrl || "https://api.openai.com/v1").replace(/\/+$/, ""),
-        model: llm.imageModel || "dall-e-3"
+        sceneJsonString: args.sceneJsonString,
+        setting,
+        userHint: args.userHint || "",
+        writeScene: false
       });
-      const filled = await fillTextureUrls(
-        args.sceneJsonString,
-        withNodeTextureSink({
-          userHint: args.userHint || "",
-          localOutputDir,
-          projectRoot,
-          imageProvider,
-          overwriteExisting: Boolean(tex.overwriteExisting),
-          concurrency: tex.concurrency || 2,
-          chatOptions: chat
-        })
-      );
       if (args.outputPath) {
         const out = path.isAbsolute(args.outputPath)
           ? args.outputPath
@@ -303,8 +290,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             text: JSON.stringify(
               {
                 sceneJsonString: filled.sceneJsonString,
-                applied: filled.taskResults?.length,
-                skipped: filled.skipped?.length
+                applied: filled.applied,
+                pendingLicense: filled.pendingLicense,
+                failed: filled.failed
               },
               null,
               2

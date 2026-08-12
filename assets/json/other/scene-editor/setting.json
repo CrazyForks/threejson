@@ -131,6 +131,13 @@
     "streamPreview": true,
     "stageAutoLoad": false,
     "defaultImageModel": "dall-e-3",
-    "textureBrowserMode": "directory"
+    "texturePipelineEnabled": true,
+    "textureStrategy": "semantic-hybrid",
+    "textureServiceUrl": "",
+    "textureServiceApiKey": "",
+    "textureLocalCache": true,
+    "textureAllowUnknownLicense": false,
+    "texturePersistenceMode": "remote",
+    "texturePbr": true
   }
 }

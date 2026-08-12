@@ -2,7 +2,7 @@
  * ThreeJSON stable aggregate entry: prefer importing from this file to avoid deep path churn.
  *
  * Heatmap: symbols already exported from `modelBuilder` are not re-exported from `heatmapTexture` / `rasterizeHeatmap`.
- * AI: `./ai/index.js` is the unified surface; `requestChatCompletion` and texture pointer helpers are exported below.
+ * AI is intentionally excluded from this aggregate. Import it explicitly from `threejson/ai`.
  */
 
 export * from "./handler/businessDomainRegistry.js";
@@ -216,18 +216,13 @@ export * from "./util/boxTextureUrl.js";
 export * from "./archive/lazyArchiveApi.js";
 
 export * from "./command/index.js";
-export * from "./ai/index.js";
-export { requestChatCompletion } from "./ai/sceneAiService.js";
+export * from "./texture/index.js";
 export {
   getByPointer,
   setByPointer,
   getByPath,
   setByPath
 } from "./util/jsonPointer.js";
-export { normalizePointer, validateTasksAgainstScene } from "./ai/textureAiService.js";
-export * from "./ai/threeJsonCoreSkill.js";
-export * from "./ai/sceneCapability.js";
-export * from "./ai/texturePrompt.js";
 
 /** Heatmap APIs implemented in `modelBuilder` are not re-exported; only mesh transform helpers are added here. */
 export { applyObjectTransform } from "./builder/heatmap/heatmapTexture.js";

@@ -162,7 +162,6 @@ test("iterative command adjustment streams each model round into a separate visi
       agentOptions: { maxRefineRounds: 4 },
       updateOutputMode: "commands",
       capabilityLookup: false,
-      onlineTextureHints: false,
       resolveContextPayload: () => ({ objectList: [{ threeJsonId: "floor", objType: "box" }] }),
       applyCommands: async () => ({ ok: true, sceneMutated: true }),
       refreshContext: async () => ({

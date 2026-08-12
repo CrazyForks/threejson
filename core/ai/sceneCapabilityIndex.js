@@ -63,15 +63,15 @@ Command and patch editing:
 - Use commands for small edits and full JSON for broad restructuring. Use JSON Patch for minimal document-level edits when paths are clear.
 `;
 
-const THREE_JSON_AGENT_ONLINE_TEXTURE_INDEX = `
-Online texture hints:
-- When enabled, use material.textureUrl by default when a described object or surface would look wrong or ambiguous as a flat color: named planets, terrain/grass/water, asphalt, brick/concrete/wood/stone/fabric, signs/screens/maps, paintings, labels, carpets, and other recognizable image-bearing or patterned things. For Solar-System bodies, files under /assets/textures/environment/nature/planet/ are optional stable candidates, not mandatory defaults; choose them or a more appropriate reachable https resource according to the requested style, realism, resolution, projection, and scene needs, and never replace a valid remote URL merely because a bundled candidate exists. Online resources are not limited to ThreeJSON, Three.js, npm, or a particular CDN. Use a white material tint when the color should not darken an identity texture, add textureRepeat for large tiled surfaces, and keep flat colors for abstract/simple blockouts and plain colored objects.
+const THREE_JSON_AGENT_TEXTURE_ACQUISITION_INDEX = `
+Texture acquisition:
+- A separate host pipeline plans and acquires trusted texture resources after the scene is rendered. Scene authoring preserves supplied URLs but never invents URLs or bundled filenames. Express recognizable materials with accurate semantic names, base color, metalness, roughness, emissive properties, and textureRepeat so the later pipeline can choose an asset, trusted search result, PBR library, or capable generator.
 `;
 
 function buildAgentCapabilityIndex(options = {}) {
   return [
     THREE_JSON_AGENT_CAPABILITY_INDEX_BASE.trim(),
-    options.onlineTextureHints === true ? THREE_JSON_AGENT_ONLINE_TEXTURE_INDEX.trim() : ""
+    THREE_JSON_AGENT_TEXTURE_ACQUISITION_INDEX.trim()
   ].filter(Boolean).join("\n\n");
 }
 
@@ -91,7 +91,7 @@ Capability patterns:
 export {
   THREE_JSON_AGENT_CAPABILITY_INDEX,
   THREE_JSON_AGENT_CAPABILITY_INDEX_BASE,
-  THREE_JSON_AGENT_ONLINE_TEXTURE_INDEX,
+  THREE_JSON_AGENT_TEXTURE_ACQUISITION_INDEX,
   buildAgentCapabilityIndex,
   THREE_JSON_AGENT_EXAMPLE_INDEX
 };

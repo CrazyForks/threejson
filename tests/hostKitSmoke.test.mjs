@@ -65,11 +65,6 @@ test("hostedContainerDoor and resolveEditorEventBinding use capability-scoped Th
   assert.equal(typeof eventBinding.resolveEditorCanvasBindSceneEvents, "function");
 });
 
-test("platform/textureSink imports the capability-scoped texture sink entry", async () => {
-  const mod = await import("@threejson/host-kit/js/platform/textureSink.js");
-  assert.equal(typeof mod.createTextureSink, "function");
-});
-
 test("i18n/index exposes t()/getHostLocale() with a working default catalog", async () => {
   const { t, getHostLocale, normalizeLocale, detectNavigatorLocale } = await import("@threejson/host-kit/i18n/index.js");
   // Before initHostI18n()/loadHostLocaleCatalog() has run, currentLocale defaults to "en-US" with
@@ -240,7 +235,7 @@ test("threeBoxSessionStore exposes its CRUD surface and collision-resistant ids"
 
 test("adjust-turn inputs: envelope carries the edit intent and context stays bounded", async () => {
   const { resolveAiAdjustContextPayload } = await import("@threejson/host-kit/js/aiTurnOrchestrator.js");
-  const { buildStructuredTurnEnvelope } = await import("threejson");
+  const { buildStructuredTurnEnvelope } = await import("threejson/ai");
 
   const targetSceneJson = {
     version: 1,
@@ -276,6 +271,28 @@ test("adjust-turn inputs: envelope carries the edit intent and context stays bou
   assert.ok(
     envelope.length < JSON.stringify(targetSceneJson).length * 20,
     "envelope looks like it inlined the full scene"
+  );
+});
+
+test("changed texture detection includes later materials on the same object", async () => {
+  const { findChangedTextureObjectIds } = await import(
+    "../tools/scene-host/shared/js/sceneTextureOrchestrator.js"
+  );
+  const before = {
+    objectList: [{
+      threeJsonId: "multi-material-box",
+      objType: "box",
+      materialArr: [
+        { type: "standard", color: "#ffffff" },
+        { type: "standard", color: "#666666", roughness: 0.8 }
+      ]
+    }]
+  };
+  const after = structuredClone(before);
+  after.objectList[0].materialArr[1].roughness = 0.2;
+  assert.deepEqual(
+    Array.from(findChangedTextureObjectIds(before, after)),
+    ["multi-material-box"]
   );
 });
 

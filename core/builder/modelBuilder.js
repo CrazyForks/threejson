@@ -55,6 +55,8 @@ import { resolvePublicAssetUrl } from "../util/assetsBase.js";
 import { cloneJson } from "../util/cloneJson.js";
 import {
     loadTextureFromMaterialJson,
+    materialJsonHasAnyTexture,
+    applyMaterialTextureSetFromJson,
     TEXTURE_REPEAT_DEFAULT
 } from "../util/loadTextureFromMaterialJson.js";
 import { materialJsonHasResolvableTexture, resolveTextureSource } from "../util/resolveTextureSource.js";
@@ -129,7 +131,9 @@ function jsonMaterialPrefersStandardPbr(m) {
     if (m.type === "standard") {
         return true;
     }
-    return Object.keys(standardMaterialPbrFromJson(m)).length > 0;
+    return Object.keys(standardMaterialPbrFromJson(m)).length > 0
+        || ["normalMap", "roughnessMap", "metalnessMap", "aoMap", "emissiveMap", "bumpMap", "displacementMap"]
+            .some((field) => typeof m[field] === "string" && m[field].trim());
 }
 
 /**
@@ -179,11 +183,8 @@ function boxFaceMaterialsUniform(faces) {
  * @param {object} [opts]
  */
 function applyTextureFromMaterialJsonToThreeMaterial(threeMaterial, materialJson, opts = {}) {
-    const tex = loadTextureFromMaterialJson(materialJson, opts);
-    if (tex && threeMaterial) {
-        threeMaterial.map = tex;
-    }
-    return tex;
+    const applied = applyMaterialTextureSetFromJson(threeMaterial, materialJson, opts);
+    return applied.baseColor || null;
 }
 
 /**
@@ -2001,31 +2002,31 @@ function createTextureSphere(sphereObj) {
 
 function createCylinder(cylinderObj) {
     return createSingleMaterialPrimitiveMesh(cylinderObj, "cylinder", {
-        ensureTexture: jsonMaterialTextureUrlResolvable(getPrimitiveMaterialJson(cylinderObj))
+        ensureTexture: materialJsonHasAnyTexture(getPrimitiveMaterialJson(cylinderObj))
     });
 }
 
 function createCone(coneObj) {
     return createSingleMaterialPrimitiveMesh(coneObj, "cone", {
-        ensureTexture: jsonMaterialTextureUrlResolvable(getPrimitiveMaterialJson(coneObj))
+        ensureTexture: materialJsonHasAnyTexture(getPrimitiveMaterialJson(coneObj))
     });
 }
 
 function createRing(ringObj) {
     return createSingleMaterialPrimitiveMesh(ringObj, "ring", {
-        ensureTexture: jsonMaterialTextureUrlResolvable(getPrimitiveMaterialJson(ringObj))
+        ensureTexture: materialJsonHasAnyTexture(getPrimitiveMaterialJson(ringObj))
     });
 }
 
 function createTorus(torusObj) {
     return createSingleMaterialPrimitiveMesh(torusObj, "torus", {
-        ensureTexture: jsonMaterialTextureUrlResolvable(getPrimitiveMaterialJson(torusObj))
+        ensureTexture: materialJsonHasAnyTexture(getPrimitiveMaterialJson(torusObj))
     });
 }
 
 function createCapsule(capsuleObj) {
     return createSingleMaterialPrimitiveMesh(capsuleObj, "capsule", {
-        ensureTexture: jsonMaterialTextureUrlResolvable(getPrimitiveMaterialJson(capsuleObj))
+        ensureTexture: materialJsonHasAnyTexture(getPrimitiveMaterialJson(capsuleObj))
     });
 }
 
@@ -2067,7 +2068,7 @@ function createBox(boxObj) {
     }
     // Textured box (textureUrl, parseable URL in map, or six-face materials triggers texture resolution branch)
     if (
-        jsonMaterialTextureUrlResolvable(boxObj.material)
+        materialJsonHasAnyTexture(boxObj.material)
         || boxObj.materials
     ) {
         return createTextureBox(boxObj);
@@ -2105,7 +2106,7 @@ function createSphere(sphereObj) {
         return createPrimitiveByType(sphereObj, primitiveShapeType);
     }
     const materialJson = getPrimitiveMaterialJson(sphereObj);
-    if (materialJson && jsonMaterialTextureUrlResolvable(materialJson)) {
+    if (materialJson && materialJsonHasAnyTexture(materialJson)) {
         return createTextureSphere(sphereObj);
     }
     else {
@@ -2377,34 +2378,16 @@ function createPlane(planeObj, scene){
     const geometryInfo = planeObj.geometry || {};
     const position = normalizePosition(planeObj.position);
     const rotation = normalizeRotation(planeObj.rotation);
-    if(planeObj.material && planeObj.material.textureUrl){
-        const texUrl = String(planeObj.material.textureUrl).trim();
-        if (normalizeMaterialTextureKind(materialInfo) === "video") {
-            attachVideoTextureFromMaterialJson(materialInfo, texUrl, {
+    {
+        let material = buildSingleMaterialSurface(materialInfo, false !== planeObj.visible);
+        if (materialJsonHasAnyTexture(materialInfo)) {
+            applyMaterialTextureSetFromJson(material, materialInfo, {
+                loader: textureLoader,
                 wrapRepeat: true,
                 defaultRepeatX: valueOr((materialInfo.textureRepeat || {}).x, 1),
                 defaultRepeatY: valueOr((materialInfo.textureRepeat || {}).y, 1)
             });
-            return finishTexturedPlane(planeObj, scene, materialInfo, geometryInfo, position, rotation, materialInfo.map);
         }
-        if (normalizeMaterialTextureKind(materialInfo) === "gif") {
-            attachGifCanvasTextureFromMaterialJson(materialInfo, texUrl, {
-                wrapRepeat: true,
-                defaultRepeatX: valueOr((materialInfo.textureRepeat || {}).x, 1),
-                defaultRepeatY: valueOr((materialInfo.textureRepeat || {}).y, 1)
-            });
-            return finishTexturedPlane(planeObj, scene, materialInfo, geometryInfo, position, rotation, materialInfo.map);
-        }
-        textureLoader.load(texUrl, function(texture){
-            finishTexturedPlane(planeObj, scene, materialInfo, geometryInfo, position, rotation, texture);
-        })
-    }
-    else{
-        let material = new THREE.MeshBasicMaterial({
-            color: valueOr(materialInfo.color, '#ffffff'),
-            transparent : valueOr(materialInfo.transparent, false),
-            opacity: valueOr(materialInfo.opacity, 1)
-        });
         trackDisposableResource(material)
         if(materialInfo.side){
             if("double" === materialInfo.side){

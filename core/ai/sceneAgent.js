@@ -34,14 +34,11 @@ import {
 } from "./sceneCommandSkill.js";
 import {
   validateSceneJsonWithNormalizer,
-  listTexturePointersSummary,
   requestSceneOutline,
-  planTexturesDry,
   buildLayoutReviewPrompt,
   evaluateSceneCapabilityFit,
   buildCapabilityFixPrompt
 } from "./agentTools.js";
-import { fillTextureUrls, createOpenAiImageProvider } from "./textureAiService.js";
 import { matchIntentSignals } from "./sceneCapability.js";
 import { fetchReferenceMaterial } from "./sceneReferenceCatalog.js";
 import {
@@ -1149,7 +1146,6 @@ async function runSceneAgent(input = {}, options = {}) {
     chatOptions.turnDeadlineAt = Date.now() + turnTimeoutMs;
   }
   const applyDraftCommands = options.applyDraftCommands;
-  const textureOptions = options.texture || {};
   delete chatOptions.agent;
   delete chatOptions.onProgress;
   delete chatOptions.texture;
@@ -1176,87 +1172,8 @@ async function runSceneAgent(input = {}, options = {}) {
     allowInvalidSceneDraft: true,
     planFirst: false,
     // SceneAgent emits the first validated, asset-normalized preview itself. Letting the lower
-    // layer emit earlier would briefly render an untextured version and race the stage queue.
+    // layer emit earlier would briefly render an unvalidated version and race the stage queue.
     onSceneDraft: undefined
-  };
-
-  const maybeFillTextures = async (sceneJsonString) => {
-    if (!textureOptions.enabled) {
-      return { sceneJsonString, textureFillWarning: undefined };
-    }
-    try {
-      const sink = textureOptions.sink;
-      const imageProvider =
-        textureOptions.imageProvider ||
-        (textureOptions.imageApiKey || chatOptions.apiKey
-          ? createOpenAiImageProvider({
-              apiKey:
-                textureOptions.imageApiKey ||
-                textureOptions.image?.apiKey ||
-                chatOptions.apiKey,
-              baseUrl: textureOptions.imageBaseUrl || textureOptions.image?.baseUrl || chatOptions.baseUrl,
-              model:
-                textureOptions.imageModel ||
-                textureOptions.image?.model ||
-                chatOptions.imageModel ||
-                "dall-e-3"
-            })
-          : null);
-      if (!imageProvider) {
-        throw new Error(
-          "texture.enabled requires imageProvider or apiKey (llm.apiKey / chat apiKey)."
-        );
-      }
-      if (!sink?.saveLocal && !sink?.upload) {
-        throw new Error(
-          "texture.enabled requires sink.saveLocal or sink.upload (browser: directory/upload sink; external Node tools: core/util/nodeTextureSink)."
-        );
-      }
-      stepIndex += 1;
-      emitProgress(
-        {
-          step: stepIndex,
-          kind: "fill_textures",
-          message: "Filling textureUrl slots..."
-        },
-        onProgress
-      );
-      const filled = await fillTextureUrls(sceneJsonString, {
-        userHint: userRequest,
-        sink,
-        imageProvider,
-        projectRoot: textureOptions.projectRoot,
-        overwriteExisting: Boolean(textureOptions.overwriteExisting),
-        concurrency: textureOptions.concurrency ?? 2,
-        chatOptions: {
-          provider: chatOptions.provider,
-          apiKey: chatOptions.apiKey,
-           model: chatOptions.model,
-           baseUrl: chatOptions.baseUrl,
-           temperature: chatOptions.temperature,
-           signal: chatOptions.signal,
-           requestTimeoutMs: chatOptions.requestTimeoutMs,
-           turnDeadlineAt: chatOptions.turnDeadlineAt
-         }
-       });
-      steps.push({
-        kind: "fill_textures",
-        ok: true,
-        applied: filled.taskResults?.length ?? 0,
-        skipped: filled.skipped?.length ?? 0
-      });
-      return { sceneJsonString: filled.sceneJsonString, textureFillWarning: undefined };
-    } catch (err) {
-      steps.push({
-        kind: "fill_textures",
-        ok: false,
-        error: String(err?.message || err)
-      });
-      return {
-        sceneJsonString,
-        textureFillWarning: String(err?.message || err)
-      };
-    }
   };
 
   const emitSceneReady = (sceneJsonString) => {
@@ -1311,11 +1228,6 @@ async function runSceneAgent(input = {}, options = {}) {
       tokenBudget.layoutReviewMaxTokens,
       commonMaxTokens
     ),
-    reviewMaxTokens: resolveOptionalTokenLimit(
-      options.reviewMaxTokens,
-      tokenBudget.reviewMaxTokens,
-      commonMaxTokens
-    ),
     fullRewriteMaxTokens: resolveOptionalTokenLimit(
       options.fullRewriteMaxTokens,
       tokenBudget.fullRewriteMaxTokens,
@@ -1325,7 +1237,6 @@ async function runSceneAgent(input = {}, options = {}) {
     runRepair: true,
     runCapabilityReview: true,
     runLayoutReview: options.agent?.layoutReview === true,
-    runTextureReview: false,
     maxCapabilityReviewAttempts: MAX_CAPABILITY_REVIEW_ATTEMPTS,
     maxRepairAttempts: MAX_REPAIR_ATTEMPTS
   };
@@ -1386,11 +1297,9 @@ async function runSceneAgent(input = {}, options = {}) {
 
     if (commandResult.outputMode === "json") {
       emitSceneReady(commandResult.sceneJsonString);
-      const fillResult = await maybeFillTextures(commandResult.sceneJsonString);
       return {
         ...commandResult,
-        sceneJsonString: projectFinalScene(fillResult.sceneJsonString),
-        textureFillWarning: fillResult.textureFillWarning,
+        sceneJsonString: projectFinalScene(commandResult.sceneJsonString),
         tokenHint: commandResult.tokenHint
       };
     }
@@ -1407,7 +1316,6 @@ async function runSceneAgent(input = {}, options = {}) {
     );
     return {
       ...commandResult,
-      textureFillWarning: undefined,
       tokenHint: commandResult.tokenHint
     };
   }
@@ -1443,10 +1351,10 @@ async function runSceneAgent(input = {}, options = {}) {
             "This is the first usable blockout of an incrementally built scene, not the final detailed scene.",
             "Return one complete valid standard scheme-B JSON document. Use compact JSON formatting and ensure syntactic closure before adding secondary content.",
             "Keep only the primary visual anchors needed for a useful first render. Consolidate repeated elements with instancedList/transforms, bounded representative samples, and reusable materials; do not obey or invent an arbitrary token or object-count quota.",
-            "Include every primary subject, identity-defining texture where needed (bundled or remote, whichever best fits the scene), requested primary animation, basic lighting, and a fitted camera now. Defer secondary props, decoration, and large populations to later incremental command rounds.",
-            "Do not expand every outline bullet into separate objects and do not create a deliberately textureless placeholder."
+            "Include every primary subject, semantically accurate materials, requested primary animation, basic lighting, and a fitted camera now. Do not invent texture URLs; a separate host pipeline acquires trusted textures after this draft is visible. Defer secondary props, decoration, and large populations to later incremental command rounds.",
+            "Do not expand every outline bullet into separate objects and do not create a visually unreadable placeholder."
           ].join("\n")
-        : "\n\nReturn the complete, immediately usable scene now. Include identity-defining textures, requested animation, lighting, and a fitted camera in this response; do not reserve ordinary work for later review rounds.";
+        : "\n\nReturn the complete, immediately usable scene now. Include semantically accurate materials, requested animation, lighting, and a fitted camera; do not invent texture URLs or reserve ordinary scene work for later review rounds. A separate host pipeline may acquire trusted textures after first render.";
     return (
       (outline && effectiveExecutionMode === "draft_refine" ? `${prompt}\n\nFollow this outline:\n${outline}` : prompt) +
       (mode === "generate" || mode === "fromImage" ? draftHint : "") +
@@ -1705,21 +1613,18 @@ async function runSceneAgent(input = {}, options = {}) {
 
   if (validation.ok && preset.runLayoutReview) {
     stepIndex += 1;
-    const pointerSummary = listTexturePointersSummary(sceneJsonString);
     const capabilityFit = evaluateSceneCapabilityFit(userRequest, parseSceneJsonString(sceneJsonString));
     emitProgress(
       {
         step: stepIndex,
         kind: "layout_review",
-        count: pointerSummary.count,
-        message: `Layout/material review (${pointerSummary.count} texture slot(s))...`
+        message: "Layout/material review..."
       },
       onProgress
     );
     const reviewPrompt = buildLayoutReviewPrompt(
       sceneJsonString,
       userRequest,
-      pointerSummary,
       capabilityFit
     );
     sceneJsonString = await runTargetedFixRound(reviewPrompt, sceneJsonString, {
@@ -1747,38 +1652,6 @@ async function runSceneAgent(input = {}, options = {}) {
     }
   }
 
-  if (preset.runTextureReview && validation.ok) {
-    stepIndex += 1;
-    const summary = listTexturePointersSummary(sceneJsonString);
-    emitProgress(
-      {
-        step: stepIndex,
-        kind: "texture_review",
-        count: summary.count,
-        message: `Found ${summary.count} textureUrl slot(s). Planning dry-run...`
-      },
-      onProgress
-    );
-    try {
-      const dry = await planTexturesDry(sceneJsonString, userRequest, {
-        ...chatOptions,
-        maxTokens: preset.reviewMaxTokens
-      });
-      steps.push({
-        kind: "texture_review",
-        ok: true,
-        taskCount: dry.taskCount,
-        note: dry.note
-      });
-    } catch (err) {
-      steps.push({
-        kind: "texture_review",
-        ok: false,
-        error: String(err?.message || err)
-      });
-    }
-  }
-
   if (!validation.ok) {
     throw new Error(validation.error || "Scene JSON validation failed after agent run.");
   }
@@ -1788,11 +1661,9 @@ async function runSceneAgent(input = {}, options = {}) {
   }
 
   emitSceneReady(sceneJsonString);
-  const fillResult = await maybeFillTextures(sceneJsonString);
 
   return {
-    sceneJsonString: projectFinalScene(fillResult.sceneJsonString),
-    textureFillWarning: fillResult.textureFillWarning,
+    sceneJsonString: projectFinalScene(sceneJsonString),
     steps,
     agentUsed: true,
     executionMode: effectiveExecutionMode,

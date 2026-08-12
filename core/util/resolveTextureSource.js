@@ -1,6 +1,6 @@
 /**
  * Resolve texture source URL from material JSON slot (read-only, does not write back to POJO).
- * Supports textureUrl only (including lib://); does not support map string.
+ * Supports canonical `textureUrl` and the standard friendly `map` string alias.
  */
 import { resolveLibTokenToUrl } from "../cache/assetRegistry.js";
 
@@ -14,7 +14,9 @@ function resolveTextureSource(materialJson) {
   if (!materialJson || typeof materialJson !== "object" || Array.isArray(materialJson)) {
     return null;
   }
-  const raw = materialJson.textureUrl;
+  const raw = typeof materialJson.textureUrl === "string"
+    ? materialJson.textureUrl
+    : materialJson.map;
   if (typeof raw !== "string") {
     return null;
   }

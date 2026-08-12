@@ -11,14 +11,12 @@
  * import would need import-attribute syntax that isn't universally supported — a literal is the one
  * representation guaranteed to work in every runtime this module ships to.
  *
- * `@threejson/assets` IS still tracked as a real dependency, just a devDependency (see package.json)
- * — that keeps it out of downstream installs (devDependencies never propagate to consumers of a
- * published package) while still surfacing version bumps to `npm outdated`/Dependabot/Renovate.
- * tests/assetsBase.test.mjs asserts this literal matches the installed devDependency's actual
- * version, so a bump to one without the other fails the test suite instead of silently going stale
- * (as happened once already — 1.0.0 was pinned here well after 1.1.2 had shipped).
+ * `@threejson/assets` is tracked as a local file devDependency (see package.json), so it never
+ * propagates to engine consumers. tests/assetsBase.test.mjs asserts this literal matches the
+ * independently published assets/package.json version; a release must publish that assets version
+ * before publishing an engine version that pins its CDN URL.
  */
-export const ASSETS_PACKAGE_VERSION = "1.1.3";
+export const ASSETS_PACKAGE_VERSION = "1.1.4";
 
 export const DEFAULT_CDN_ASSETS_BASE =
   `https://cdn.jsdelivr.net/npm/@threejson/assets@${ASSETS_PACKAGE_VERSION}`;

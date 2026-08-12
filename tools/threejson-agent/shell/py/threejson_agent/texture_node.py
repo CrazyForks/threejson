@@ -1,4 +1,4 @@
-"""Invoke Node bridge/texture-fill.mjs for fillTextureUrls."""
+"""Invoke the Node unified semantic texture pipeline bridge."""
 from __future__ import annotations
 
 import json

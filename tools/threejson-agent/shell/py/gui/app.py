@@ -16,7 +16,6 @@ from threejson_agent.config import (  # noqa: E402
 )
 from threejson_agent.node_scene_bridge import run_scene_agent_node  # noqa: E402
 from threejson_agent.texture_node import fill_textures_node  # noqa: E402
-from threejson_agent.texture_python import fill_textures_python  # noqa: E402
 
 try:
     import gradio as gr
@@ -42,8 +41,8 @@ def ui_save_settings(
     max_tokens,
     agent_enabled,
     agent_depth,
-    texture_mode,
-    local_output_dir,
+    texture_base_url,
+    texture_api_key,
 ) -> str:
     setting, path = _load()
     setting["llm"] = {
@@ -55,8 +54,8 @@ def ui_save_settings(
         "maxTokens": int(max_tokens),
     }
     setting["agent"] = {"enabled": agent_enabled, "depth": agent_depth}
-    setting["texture"]["mode"] = texture_mode
-    setting["texture"]["localOutputDir"] = local_output_dir
+    setting["texture"]["baseUrl"] = texture_base_url
+    setting["texture"]["apiKey"] = texture_api_key
     return _save(setting, path)
 
 
@@ -74,7 +73,7 @@ def ui_generate(prompt, agent_enabled, agent_depth) -> str:
     return result["sceneJsonString"]
 
 
-def ui_texture_fill(scene_json, hint, texture_mode) -> str:
+def ui_texture_fill(scene_json, hint) -> str:
     setting, path = _load()
     ps = path_settings_from_config(setting, path)
     root = ps.workspace_root
@@ -84,14 +83,9 @@ def ui_texture_fill(scene_json, hint, texture_mode) -> str:
         )
     tmp = root / ".threejson-agent-gui-scene.json"
     tmp.write_text(scene_json, encoding="utf-8")
-    if texture_mode == "python":
-        result = fill_textures_python(
-            scene_path=tmp, setting=setting, project_root=root, user_hint=hint
-        )
-    else:
-        result = fill_textures_node(
-            project_root=root, scene_path=tmp, setting=setting, user_hint=hint
-        )
+    result = fill_textures_node(
+        project_root=root, scene_path=tmp, setting=setting, user_hint=hint
+    )
     return json.dumps(result, ensure_ascii=False, indent=2)
 
 
@@ -120,15 +114,8 @@ def build_app() -> gr.Blocks:
                 value=agent.get("depth", "medium"),
                 label="Agent depth",
             )
-            texture_mode = gr.Dropdown(
-                ["node_bridge", "python"],
-                value=tex.get("mode", "node_bridge"),
-                label="Texture mode",
-            )
-            local_output_dir = gr.Textbox(
-                value=tex.get("localOutputDir", "assets/textures/ai-generated"),
-                label="Local output dir",
-            )
+            texture_base_url = gr.Textbox(value=tex.get("baseUrl", ""), label="Texture service URL")
+            texture_api_key = gr.Textbox(value=tex.get("apiKey", ""), label="Texture service API Key", type="password")
             save_btn = gr.Button("Save setting.json")
             save_out = gr.Textbox(label="Status")
             save_btn.click(
@@ -142,8 +129,8 @@ def build_app() -> gr.Blocks:
                     max_tokens,
                     agent_enabled,
                     agent_depth,
-                    texture_mode,
-                    local_output_dir,
+                    texture_base_url,
+                    texture_api_key,
                 ],
                 save_out,
             )
@@ -157,10 +144,9 @@ def build_app() -> gr.Blocks:
         with gr.Tab("Texture fill"):
             scene_json = gr.Code(label="Scene JSON", language="json", lines=12)
             hint = gr.Textbox(label="Hint")
-            tex_mode = gr.Dropdown(["node_bridge", "python"], value=tex.get("mode", "node_bridge"))
             fill_btn = gr.Button("Fill textures")
             fill_out = gr.Textbox(label="Result")
-            fill_btn.click(ui_texture_fill, [scene_json, hint, tex_mode], fill_out)
+            fill_btn.click(ui_texture_fill, [scene_json, hint], fill_out)
     return demo
 
 

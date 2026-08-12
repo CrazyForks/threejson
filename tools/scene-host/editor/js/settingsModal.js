@@ -705,6 +705,17 @@ export function createSettingsModalController({ host, onSave, onReset, onTestEnd
       return;
     }
     readFormInto(draft);
+    const previousAllowsUnknown = host?.getEditorSettings?.()?.ai?.textureAllowUnknownLicense === true;
+    if (
+      draft?.ai?.textureAllowUnknownLicense === true
+      && !previousAllowsUnknown
+      && !window.confirm(settingsText(
+        "settings.textureUnknownLicenseConfirm",
+        "许可信息未知的图片可能存在版权风险。确定要允许场景编辑器自动应用吗？"
+      ))
+    ) {
+      draft.ai.textureAllowUnknownLicense = false;
+    }
     onSave?.(cloneEditorSettings(draft));
     close();
   });

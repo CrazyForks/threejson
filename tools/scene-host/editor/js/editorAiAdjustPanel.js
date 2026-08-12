@@ -1,4 +1,5 @@
-import { buildStructuredTurnEnvelope, parseSceneJsonString, sceneToStandardJsonSimple } from "threejson";
+import { buildStructuredTurnEnvelope, parseSceneJsonString } from "threejson/ai";
+import { sceneToStandardJsonSimple } from "threejson";
 import {
   batchResultsHaveSceneMutation,
   batchResultsHaveSuccessfulAdjustment,
@@ -21,6 +22,7 @@ import {
 } from "./editorAiChatShared.js";
 import { t } from "../../shared/i18n/index.js";
 import { formatAgentProgressLabel } from "../../shared/js/aiAgentProgressLabels.js";
+import { runEditorSceneTexturePipeline } from "./editorTexturePipeline.js";
 
 /** "AI 调整" tab: always adjusts the currently loaded scene in place — never generates a fresh
  * one. Split out from the old merged "AI 编辑" tab (editorAiEditPanel.js, now removed) specifically
@@ -438,7 +440,6 @@ export function createEditorAiAdjustPanel(host) {
           };
         },
         capabilityLookup: true,
-        onlineTextureHints: true,
         signal: abortController.signal
       });
       if (result.liveApplied === true) {
@@ -453,6 +454,17 @@ export function createEditorAiAdjustPanel(host) {
         );
         host.showMessage(resultText, "warning");
       }
+
+      await runEditorSceneTexturePipeline(host, {
+        prompt: effectivePrompt,
+        providerOptions,
+        previousScene: targetSceneJson,
+        signal: abortController.signal,
+        onProgress: (text) => {
+          assistantBody.textContent = text;
+          historyCtl.scrollToBottom();
+        }
+      });
 
       historyCtl.updateMessage(assistantBody, resultText);
       void historyCtl.persistTurn("assistant", resultText);

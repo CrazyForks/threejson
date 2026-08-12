@@ -111,6 +111,10 @@ function materialPersistSignature(material) {
   } else if (typeof material.map === "string" && materialMapStringResolvableAsUrl(material.map)) {
     parts.push(`m:${material.map.trim()}`);
   }
+  for (const field of ["normalMap", "roughnessMap", "metalnessMap", "aoMap", "emissiveMap", "alphaMap", "bumpMap", "displacementMap"]) {
+    const value = typeof material[field] === "string" ? material[field].trim() : "";
+    if (value) parts.push(`${field}:${value}`);
+  }
   const tr = material.textureRepeat;
   if (tr && typeof tr === "object" && !isDefaultTextureRepeat(tr)) {
     parts.push(`r:${tr.x ?? ""},${tr.y ?? ""}`);

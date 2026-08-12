@@ -104,7 +104,7 @@ export function buildResultDigest(sceneJson) {
  * returns a complete usable scene in one generation call; `draft_refine` is reserved for scenes
  * that genuinely need incremental construction. A direct output-limit failure may still escalate
  * safely inside core/ai. Raw deltas are forwarded only for the direct generation call.
- * @param {{ userPrompt: string, providerOptions: object, onDelta?: (delta:string, metadata?:object)=>void, onGenerationPhase?: (phase:object)=>void|Promise<void>, onSceneDraft?: (sceneJsonString:string)=>void|Promise<void>, signal?: AbortSignal, globalPromptPrefix?: string, agentOptions?: {maxRefineRounds?: number}, onAgentProgress?: (p: object)=>void, includeReferenceLinks?: boolean, locale?: string, onlineTextureHints?: boolean, generationStrategy?: "single"|"segmented"|"compact", executionMode?: "direct"|"draft_refine", refinementGoals?: string[], estimatedSegments?: number, maxSceneSegments?: number }} input
+ * @param {{ userPrompt: string, providerOptions: object, onDelta?: (delta:string, metadata?:object)=>void, onGenerationPhase?: (phase:object)=>void|Promise<void>, onSceneDraft?: (sceneJsonString:string)=>void|Promise<void>, signal?: AbortSignal, globalPromptPrefix?: string, agentOptions?: {maxRefineRounds?: number}, onAgentProgress?: (p: object)=>void, includeReferenceLinks?: boolean, locale?: string, generationStrategy?: "single"|"segmented"|"compact", executionMode?: "direct"|"draft_refine", refinementGoals?: string[], estimatedSegments?: number, maxSceneSegments?: number }} input
  */
 export async function runAiGenerateTurn({
   userPrompt,
@@ -119,7 +119,6 @@ export async function runAiGenerateTurn({
   includeReferenceLinks,
   locale,
   capabilityLookup,
-  onlineTextureHints,
   generationStrategy = "single",
   executionMode = "direct",
   refinementGoals = [],
@@ -158,7 +157,6 @@ export async function runAiGenerateTurn({
       refinementGoals,
       resolveReferenceUrl: resolveSceneAiReferenceUrl,
       capabilityLookup,
-      onlineTextureHints,
       // Full-JSON transport metadata remains independent from the execution policy above.
       generationStrategy,
       estimatedSegments,
@@ -182,7 +180,7 @@ export async function runAiGenerateTurn({
  * requested `mode: "fromImage"`); this is ported from editor's pre-existing `aiSidebar.js`
  * `onImageGenerate`/`runSidebarSceneAgent(..., {mode:"fromImage", ...})` flow, generalized the
  * same way `runAiGenerateTurn` above is.
- * @param {{ prompt?: string, image: string|{base64:string, mimeType?:string}, providerOptions: object, agentOptions?: object, imageDetail?: "auto"|"low"|"high", maxTokens?: number, executionMode?: "direct"|"draft_refine", refinementGoals?: string[], selectedCapabilityIds?: string[], requiresAnimation?: boolean, onAgentProgress?: (p:object)=>void, onGenerationPhase?: (phase:object)=>void|Promise<void>, onSceneDraft?: (sceneJsonString:string, meta?:object)=>void|Promise<void>, signal?: AbortSignal, locale?: string, capabilityLookup?: boolean, onlineTextureHints?: boolean }} input
+ * @param {{ prompt?: string, image: string|{base64:string, mimeType?:string}, providerOptions: object, agentOptions?: object, imageDetail?: "auto"|"low"|"high", maxTokens?: number, executionMode?: "direct"|"draft_refine", refinementGoals?: string[], selectedCapabilityIds?: string[], requiresAnimation?: boolean, onAgentProgress?: (p:object)=>void, onGenerationPhase?: (phase:object)=>void|Promise<void>, onSceneDraft?: (sceneJsonString:string, meta?:object)=>void|Promise<void>, signal?: AbortSignal, locale?: string, capabilityLookup?: boolean }} input
  */
 export async function runAiImageGenerateTurn({
   prompt = "",
@@ -200,8 +198,7 @@ export async function runAiImageGenerateTurn({
   onSceneDraft,
   signal,
   locale,
-  capabilityLookup,
-  onlineTextureHints
+  capabilityLookup
 }) {
   if (!image) {
     throw new Error("runAiImageGenerateTurn: image is required.");
@@ -225,7 +222,6 @@ export async function runAiImageGenerateTurn({
       agent: { maxRefineRounds: agentOptions?.maxRefineRounds },
       resolveReferenceUrl: resolveSceneAiReferenceUrl,
       capabilityLookup,
-      onlineTextureHints,
       selectedCapabilityIds,
       animationCapabilities,
       onGenerationPhase,
@@ -445,7 +441,6 @@ async function runAiAgentAdjustTurn({
   onAgentProgress,
   locale,
   capabilityLookup,
-  onlineTextureHints,
   selectedCapabilityIds,
   animationCapabilities,
   generationStrategy,
@@ -481,7 +476,6 @@ async function runAiAgentAdjustTurn({
         agent: { maxRefineRounds: agentOptions?.maxRefineRounds },
         resolveReferenceUrl: resolveSceneAiReferenceUrl,
         capabilityLookup,
-        onlineTextureHints,
         selectedCapabilityIds,
         animationCapabilities,
         generationStrategy,
@@ -558,7 +552,6 @@ async function runAiAgentAdjustTurn({
         agent: { maxRefineRounds: agentOptions?.maxRefineRounds },
         resolveReferenceUrl: resolveSceneAiReferenceUrl,
         capabilityLookup,
-        onlineTextureHints,
         selectedCapabilityIds,
         animationCapabilities,
         generationStrategy,
@@ -642,7 +635,6 @@ async function runAiAgentAdjustTurn({
  *   refreshContext?: () => object|Promise<object>,
  *   onAgentProgress?: (p: object) => void,
  *   locale?: string,
- *   onlineTextureHints?: boolean,
  *   signal?: AbortSignal
  * }} input
  * @returns {Promise<
@@ -664,7 +656,6 @@ export async function runAiAdjustTurn({
   onAgentProgress,
   locale,
   capabilityLookup,
-  onlineTextureHints,
   selectedCapabilityIds,
   animationCapabilities,
   generationStrategy,
@@ -693,7 +684,6 @@ export async function runAiAdjustTurn({
         signal,
         resolveReferenceUrl: resolveSceneAiReferenceUrl,
         capabilityLookup,
-        onlineTextureHints,
         selectedCapabilityIds,
         animationCapabilities,
         locale
@@ -713,7 +703,6 @@ export async function runAiAdjustTurn({
           signal,
           resolveReferenceUrl: resolveSceneAiReferenceUrl,
           capabilityLookup,
-          onlineTextureHints,
           selectedCapabilityIds,
           animationCapabilities,
           locale
@@ -740,7 +729,6 @@ export async function runAiAdjustTurn({
         signal,
         resolveReferenceUrl: resolveSceneAiReferenceUrl,
         capabilityLookup,
-        onlineTextureHints,
         selectedCapabilityIds,
         animationCapabilities,
         locale
@@ -791,7 +779,6 @@ export async function runAiAdjustTurn({
       onAgentProgress,
       locale,
       capabilityLookup,
-      onlineTextureHints,
       selectedCapabilityIds,
       animationCapabilities,
       generationStrategy,
@@ -810,7 +797,6 @@ export async function runAiAdjustTurn({
       signal,
       resolveReferenceUrl: resolveSceneAiReferenceUrl,
       capabilityLookup,
-      onlineTextureHints,
       selectedCapabilityIds,
       animationCapabilities,
       locale

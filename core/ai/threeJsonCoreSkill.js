@@ -185,7 +185,7 @@ Scene authoring rules:
 9. Never add decorative lineList, particleEmitter, shaderSurface, native geometry, domains, audio, events, or lifecycle scripts merely to use more capabilities; every non-basic capability must map to a requested or clearly implied scene element.
 10. For edits and patches, preserve unspecified geometry/material/position fields. When changing box height, keep width/depth unchanged and update y only if needed to keep the base on the same ground.
 11. New grounded physical scenes should usually include exactly one unobtrusive support surface (floor/ground/road/slab/plinth) sized to the layout unless the prompt describes a floating, space, abstract, or supportless scene.
-12. URL-bearing fields (material.textureUrl, externalModel modelPath, audioUrl, css3dPanel url, text mesh fontJsonUrl, etc.) may be a full https:// URL — a real public image/model/audio/page online is valid and often exactly what the user wants, not just a repo-local path. When the user gives or implies a specific URL, use it verbatim. During repair/review/patch passes, never replace an existing valid URL (local or remote) with an invented placeholder path just to "normalize" it — only change a URL when the user's request calls for a different one.
+12. Preserve URL-bearing fields supplied by the user or already present in the scene. Never invent, guess, or normalize a texture URL: when the user did not supply one, describe the intended surface using material color/metalness/roughness and let the host texture-acquisition pipeline select a licensed resource after the scene is visible. Other explicit resource URLs (external models, audio, CSS3D pages, fonts) may still be copied verbatim from the user request.
 13. When the user asks to add/show/write text, words, a title, caption, name, or label in the 3D scene, actually create objType:"text" with content. Default to mode:"sdf" for clean pure text. Use infoPanel only for an explicitly panel-backed sign/card/screen, mode:"mesh" only for explicit solid/extruded/beveled TextGeometry, and mode:"texture" only when a canvas-text plane/sprite is specifically useful. Never satisfy visible-text intent with name/label metadata alone.
 14. Light intensity is on TWO DIFFERENT SCALES depending on type — using the wrong scale is the single most common cause of "geometry is correct but the scene renders pitch black": intensity values are used exactly as written, with NO automatic rescaling by the engine.
     - ambient/directional lights are NOT distance-attenuated: use small values, typically 0.4-1.3 (e.g. ambient 0.4-0.6, directional 0.8-1.3). This is the range you see in most reference scenes.
@@ -196,17 +196,9 @@ Scene authoring rules:
 16. Keep one coherent spatial scale across the whole scene. Estimate the real relative dimensions of the largest container (room/site/floor) and its contents before writing records; size the support surface from the occupied bounds plus margins, not from an unrelated primitive example. Repeated full-size objects must have distinct planned positions. Before output, check object footprints for accidental overlap, confirm that walls/ceilings contain their contents, and fit camera position/target to the complete scene bounds. Domain defaults and generic primitive examples may use different scales, so never mix them blindly.
 `;
 
-const THREE_JSON_ONLINE_TEXTURE_RULE = `
-Online texture rule:
-Use image textures when the object's identity or material would be self-evidently incomplete as a flat color. If the user names a specific recognizable subject or surface — a celestial body, terrain, grass, water, asphalt, brick, concrete, wood, stone, fabric, signage, maps/screens, labels, paintings, carpets, or a recognizable pattern — actively set material.textureUrl; this is expected default behavior and does not require the user to say "texture".
-For named Solar-System bodies, ThreeJSON provides optional stable same-origin candidates under /assets/textures/environment/nature/planet/: earth.png, moon.png, sun.png, mercury.png, venus.png, mars.png, jupiter.png, saturn.png, uranus.png, neptune.png, plus saturn_ring.png. Treat these only as candidates, never as mandatory defaults: choose either a suitable bundled candidate or a more appropriate reachable https image URL according to the requested style, realism, resolution, projection, and scene needs. Do not replace a valid remote URL merely because a bundled candidate exists. Keep material.color white (#ffffff) when it should not tint an identity texture dark.
-For any subject, use an appropriate reachable https image URL when it better fits the scene; online resources are not limited to ThreeJSON, Three.js, npm, or a particular CDN. For tiled floors, walls, roads, grass, water, wood, stone, concrete, brick, and fabric, include sensible textureRepeat when the surface is large. Keep material.color as a tint/fallback only. Do not force a textureUrl onto generic/abstract shapes, blockouts, simple colored primitives, placeholder furniture, or UI-like objects where a flat color already satisfies the request (see rule 1).
-Always use the ThreeJSON field material.textureUrl for an image URL. Do not emit the Three.js-native material.map:{url:"..."} shape; if such a shape is encountered during repair, convert it to textureUrl and preserve repeat values as textureRepeat.
-`;
-
-const THREE_JSON_ONLINE_TEXTURE_DISABLED_RULE = `
-Online texture rule:
-The host disabled proactive online texture hints for this request. Do not add new material.textureUrl fields merely because an object or surface could benefit from a photographic/pattern texture. Preserve existing valid textureUrl values, and still use a URL verbatim when the user explicitly provides or asks for a specific online texture/resource.
+const THREE_JSON_TEXTURE_ACQUISITION_RULE = `
+Texture-acquisition rule:
+Texture acquisition is a separate, optional host pipeline that runs only after the first usable scene is visible. Express recognizable subjects and surface intent accurately through object names, material color, metalness, roughness, emissive properties, and sensible textureRepeat for tiled surfaces, but do not invent texture URLs or bundled filenames. Preserve a material.textureUrl (and normalMap/roughnessMap/metalnessMap/aoMap/emissiveMap/alphaMap/bumpMap/displacementMap) only when the user supplied it or it already exists. When enabled, the acquisition pipeline—not this scene-authoring call—chooses between the ThreeJSON asset manifest, trusted search, PBR libraries, or an explicitly capable image generator and verifies licensing.
 `;
 
 const THREE_JSON_SCENE_SCHEMA_DESCRIPTION = `
@@ -463,14 +455,6 @@ Optional ThreeJSON animation/event capability (include only when negotiated for 
 - Multi-part character motion requires pivot groups at hips/shoulders/neck; animate pivots and the root group, not limb geometry around its center.
 `;
 
-function onlineTextureHintsEnabled(options = {}) {
-  return options.onlineTextureHints !== false;
-}
-
-function onlineTextureHintsExplicitlyEnabled(options = {}) {
-  return options.onlineTextureHints === true;
-}
-
 function filterParticleCapabilityLines(text, options = {}) {
   if (options.particleEffects !== false) {
     return String(text || "").trim();
@@ -486,7 +470,7 @@ function filterParticleCapabilityLines(text, options = {}) {
 /** @returns {string} Shared catalog block for scene prompts. */
 function buildSceneCapabilityCatalog(options = {}) {
   const blocks = [
-    buildAgentCapabilityIndex({ onlineTextureHints: onlineTextureHintsExplicitlyEnabled(options) }).trim(),
+    buildAgentCapabilityIndex().trim(),
     THREE_JSON_STANDARD_AI_CAPABILITY_CATALOG.trim(),
     THREE_JSON_PRIMITIVE_GEOMETRY.trim(),
     THREE_JSON_AGENT_EXAMPLE_INDEX.trim(),
@@ -505,15 +489,9 @@ function buildSceneCapabilityCatalog(options = {}) {
   return blocks.map((block) => filterParticleCapabilityLines(block, options)).join("\n\n");
 }
 
-/** @returns {string} Scene authoring rules plus optional host-configured online texture guidance. */
+/** @returns {string} Scene authoring rules, including the provider-neutral texture boundary. */
 function buildSceneAuthoringRules(options = {}) {
-  const blocks = [THREE_JSON_SCENE_AUTHORING_RULES.trim()];
-  if (options.onlineTextureHints === true) {
-    blocks.push(THREE_JSON_ONLINE_TEXTURE_RULE.trim());
-  } else if (options.onlineTextureHints === false && options.includeOnlineTextureDisabledRule === true) {
-    blocks.push(THREE_JSON_ONLINE_TEXTURE_DISABLED_RULE.trim());
-  }
-  return blocks.join("\n\n");
+  return [THREE_JSON_SCENE_AUTHORING_RULES.trim(), THREE_JSON_TEXTURE_ACQUISITION_RULE.trim()].join("\n\n");
 }
 
 /** @returns {string} System prompt for scene outline / planning step. */
@@ -534,11 +512,7 @@ function buildSceneOutlineSystemPrompt(options = {}) {
 
 /** @returns {string} English system prompt for generating a new scene. */
 function buildSceneGenerationSystemPrompt(options = {}) {
-  const promptOptions = {
-    ...options,
-    onlineTextureHints: onlineTextureHintsEnabled(options),
-    includeOnlineTextureDisabledRule: true
-  };
+  const promptOptions = { ...options };
   return [
     "You are an expert ThreeJSON scene JSON generator. Author standard scheme-B JSON only: threeJsonId + sceneConfig + one heterogeneous objectList with an explicit objType on every item.",
     buildSceneCapabilityCatalog(promptOptions),
@@ -551,11 +525,7 @@ function buildSceneGenerationSystemPrompt(options = {}) {
 
 /** @returns {string} English system prompt for generating a new scene from a reference image. */
 function buildSceneImageGenerationSystemPrompt(options = {}) {
-  const promptOptions = {
-    ...options,
-    onlineTextureHints: onlineTextureHintsEnabled(options),
-    includeOnlineTextureDisabledRule: true
-  };
+  const promptOptions = { ...options };
   return [
     "You are an expert ThreeJSON scene JSON generator. Combine the user's text prompt with the embedded reference image.",
     buildSceneCapabilityCatalog(promptOptions),
@@ -568,7 +538,7 @@ function buildSceneImageGenerationSystemPrompt(options = {}) {
 
 /** @returns {string} English system prompt for editing an existing scene. */
 function buildSceneUpdateSystemPrompt(options = {}) {
-  const promptOptions = { ...options, onlineTextureHints: false };
+  const promptOptions = { ...options };
   return [
     "You are a ThreeJSON scene JSON editor.",
     "You will receive an existing JSON scene and a user modification request.",
@@ -584,7 +554,7 @@ function buildSceneUpdateSystemPrompt(options = {}) {
 
 /** @returns {string} RFC 6902 patch output for incremental updates (smaller diffs). */
 function buildSceneIncrementalUpdateSystemPrompt(options = {}) {
-  const promptOptions = { ...options, onlineTextureHints: false };
+  const promptOptions = { ...options };
   return [
     "You are a ThreeJSON scene editor. Apply the user request with minimal changes.",
     "Output ONLY a JSON array of RFC 6902 operations (add | replace | remove) against the scene root.",
@@ -616,8 +586,7 @@ export {
   THREE_JSON_DOMAIN_USAGE,
   THREE_JSON_INTENT_GUIDE,
   THREE_JSON_SCENE_AUTHORING_RULES,
-  THREE_JSON_ONLINE_TEXTURE_RULE,
-  THREE_JSON_ONLINE_TEXTURE_DISABLED_RULE,
+  THREE_JSON_TEXTURE_ACQUISITION_RULE,
   THREE_JSON_SCENE_SCHEMA_DESCRIPTION,
   THREE_JSON_STANDARD_SCENE_SCHEMA_DESCRIPTION,
   THREE_JSON_CORE_CAPABILITIES,

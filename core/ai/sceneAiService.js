@@ -1585,12 +1585,10 @@ async function requestUpdatedSceneEditCommands(prompt, context = {}, options = {
     ? buildSceneCommandAutoUpdateSystemPrompt({
         agentRound: agentRound || iterativeApply,
         iterativeApply,
-        onlineTextureHints: options.onlineTextureHints,
         animationCapabilities: options.animationCapabilities,
         selectedCapabilityIds: options.selectedCapabilityIds
       })
     : buildSceneCommandUpdateSystemPrompt({
-        onlineTextureHints: options.onlineTextureHints,
         animationCapabilities: options.animationCapabilities,
         selectedCapabilityIds: options.selectedCapabilityIds
       });
@@ -1748,7 +1746,6 @@ async function requestSceneRefinementStep(userPrompt, currentSceneJsonString, op
     buildSceneCommandAutoUpdateSystemPrompt({
       agentRound: true,
       iterativeApply: true,
-      onlineTextureHints: options.onlineTextureHints,
       animationCapabilities: options.animationCapabilities
     }),
     "",

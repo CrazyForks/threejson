@@ -168,6 +168,7 @@ export function persistEditorSettings(settings, { rememberAiKey = false } = {}) 
     toSave.ai.providers = toSave.ai.providers.map((p) =>
       p.provider === BUILTIN_PROVIDER_TYPE ? p : { ...p, apiKey: "" }
     );
+    toSave.ai.textureServiceApiKey = "";
   }
   saveEditorSettingsCache(toSave);
 }

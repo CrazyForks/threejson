@@ -19,6 +19,7 @@ import {
 } from "./editorAiChatShared.js";
 import { t } from "../../shared/i18n/index.js";
 import { formatAgentProgressLabel } from "../../shared/js/aiAgentProgressLabels.js";
+import { runEditorSceneTexturePipeline } from "./editorTexturePipeline.js";
 
 const ATTACHMENT_ICON = { image: "🖼", json: "📄", tjz: "📦" };
 
@@ -465,6 +466,7 @@ export function createEditorAiGeneratePanel(host) {
         }
       );
       let resultText;
+      let finalSceneResult = null;
       let lastQueuedPreviewSceneJsonString = "";
       let lastAppliedPreviewSceneJsonString = "";
       let previewQueue = Promise.resolve();
@@ -526,7 +528,6 @@ export function createEditorAiGeneratePanel(host) {
           refinementGoals: negotiation.refinementGoals,
           selectedCapabilityIds: negotiation.selectedCapabilityIds,
           requiresAnimation: negotiation.requiresAnimation,
-          onlineTextureHints: true,
           onGenerationPhase: updateGenerateStatus,
           onAgentProgress: updateGenerateStatus,
           onSceneDraft: queueScenePreview,
@@ -547,6 +548,7 @@ export function createEditorAiGeneratePanel(host) {
             );
           }
           host.showMessage(resultText, result.agentResult?.completed === false ? "warning" : "success");
+          finalSceneResult = result;
         }
       } else {
         const dirty = host.getEditorDocumentState?.()?.isDirty?.();
@@ -573,7 +575,6 @@ export function createEditorAiGeneratePanel(host) {
           estimatedOutputTokens: negotiation.estimatedOutputTokens,
           selectedCapabilityIds: negotiation.selectedCapabilityIds,
           requiresAnimation: negotiation.requiresAnimation,
-          onlineTextureHints: true,
           onGenerationPhase: updateGenerateStatus,
           onAgentProgress: updateGenerateStatus,
           onSceneDraft: queueScenePreview,
@@ -593,7 +594,20 @@ export function createEditorAiGeneratePanel(host) {
           }
           host.markSceneDirty?.();
           host.showMessage(resultText, result.agentResult?.completed === false ? "warning" : "success");
+          finalSceneResult = result;
         }
+      }
+
+      if (finalSceneResult) {
+        await runEditorSceneTexturePipeline(host, {
+          prompt: userText,
+          providerOptions,
+          signal: abortController.signal,
+          onProgress: (text) => {
+            assistantBody.textContent = text;
+            historyCtl.scrollToBottom();
+          }
+        });
       }
 
       historyCtl.updateMessage(assistantBody, resultText);

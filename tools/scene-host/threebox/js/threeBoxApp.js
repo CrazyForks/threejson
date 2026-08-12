@@ -33,7 +33,7 @@ import {
   isUnsuccessfulTurn,
   resolveThreeBoxNegotiatedRoute
 } from "./threeBoxTurnState.js";
-import { buildStructuredTurnEnvelope, createThreeBoxTurnContext, projectSceneJsonString } from "threejson";
+import { buildStructuredTurnEnvelope, createThreeBoxTurnContext, projectSceneJsonString } from "threejson/ai";
 import { initHostI18n, applyShellI18n, getHostLocale, normalizeLocale, t } from "../../shared/i18n/index.js";
 import {
   BUILTIN_PRIVACY_ACCEPTED,
@@ -43,6 +43,12 @@ import {
 import { getAiErrorFeedback } from "../../shared/js/aiErrorFeedback.js";
 import { probeEndpoint } from "../../shared/js/endpointProbe.js";
 import { formatAgentProgressLabel } from "../../shared/js/aiAgentProgressLabels.js";
+import {
+  findChangedTextureObjectIds,
+  runHostSceneTexturePipeline
+} from "../../shared/js/sceneTextureOrchestrator.js";
+import { createTextureProxyUrl } from "../../shared/js/textureProviderClient.js";
+import { getCachedTextureBlob, putCachedTextureBlob } from "../../shared/js/browserTextureCache.js";
 
 function readRequestedLocaleFromUrl() {
   try {
@@ -263,8 +269,119 @@ async function main() {
         ? settings?.ai?.providers?.find((provider) => provider.provider === "threebox-builtin")?.apiKey
         : "";
       return apiKey ? { baseUrl, apiKey } : { baseUrl };
+    },
+    archiveOptions: () => {
+      const settings = settingsModal.getSettings();
+      const assetPolicy = settings?.io?.tjzAssetPolicy === "tryPack" ? "tryPack" : "preserve";
+      if (assetPolicy !== "tryPack") return { assetPolicy };
+      const service = resolveTextureServiceSettings(settings);
+      return {
+        assetPolicy,
+        fetchExternalUrls: false,
+        resolveAsset: async (sourceUrl) => {
+          const cached = await getCachedTextureBlob(sourceUrl);
+          if (cached) return cached;
+          if (!/^https?:\/\//i.test(String(sourceUrl || ""))) return null;
+          const runtimeUrl = createTextureProxyUrl(service.baseUrl, service.apiKey, sourceUrl);
+          try {
+            const response = await fetch(runtimeUrl);
+            if (!response.ok) return null;
+            const blob = await response.blob();
+            if (!blob.size) return null;
+            await putCachedTextureBlob(sourceUrl, blob, { source: "tjz-export" });
+            return blob;
+          } catch {
+            return null;
+          }
+        }
+      };
     }
   });
+
+  function resolveTextureServiceSettings(settings = settingsModal.getSettings()) {
+    const customUrl = String(settings?.ai?.textureServiceUrl || "").trim();
+    const customKey = String(settings?.ai?.textureServiceApiKey || "").trim();
+    const builtin = settings?.ai?.providers?.find((provider) => provider.provider === "threebox-builtin");
+    const mayUseBuiltin = isBuiltinPrivacyAccepted("threebox");
+    return {
+      baseUrl: customUrl || (mayUseBuiltin ? String(settings?.ai?.builtinBackendUrl || "").trim() : ""),
+      apiKey: customKey || (mayUseBuiltin ? String(builtin?.apiKey || "").trim() : "")
+    };
+  }
+
+  const textureJobsByTurnId = new Map();
+  const turnMutationQueues = new Map();
+
+  function updateStoredTurn(turnId, updater) {
+    const previous = turnMutationQueues.get(turnId) || Promise.resolve();
+    const mutation = previous.catch(() => {}).then(async () => {
+      const current = await getTurn(turnId);
+      if (!current) return null;
+      const updated = updater(current);
+      if (!updated) return current;
+      return putTurn(updated);
+    });
+    const tracked = mutation.finally(() => {
+      if (turnMutationQueues.get(turnId) === tracked) turnMutationQueues.delete(turnId);
+    });
+    turnMutationQueues.set(turnId, tracked);
+    return tracked;
+  }
+
+  function abortTextureJob(turnId) {
+    const job = textureJobsByTurnId.get(turnId);
+    job?.abort();
+    textureJobsByTurnId.delete(turnId);
+  }
+
+  function startTurnTexturePipeline({
+    turnId,
+    prompt,
+    scene,
+    sceneCard,
+    providerOptions,
+    changedObjectIds,
+    onSceneUpdated
+  }) {
+    const settings = settingsModal.getSettings();
+    if (settings?.ai?.texturePipelineEnabled === false || !sceneCard?.getRuntime?.()) return;
+    abortTextureJob(turnId);
+    const controller = new AbortController();
+    textureJobsByTurnId.set(turnId, controller);
+    const revision = Symbol(turnId);
+    void runHostSceneTexturePipeline({
+      scene,
+      runtime: sceneCard.getRuntime(),
+      prompt,
+      aiProviderOptions: providerOptions,
+      textureService: resolveTextureServiceSettings(settings),
+      enabled: true,
+      strategy: settings.ai?.textureStrategy || "semantic-hybrid",
+      pbr: settings.ai?.texturePbr !== false,
+      allowUnknownLicense: settings.ai?.textureAllowUnknownLicense === true,
+      persistenceMode: settings.ai?.texturePersistenceMode || "remote",
+      cache: settings.ai?.textureLocalCache !== false,
+      changedObjectIds,
+      signal: controller.signal,
+      revision,
+      isCurrent: (candidate) => candidate === revision && textureJobsByTurnId.get(turnId) === controller,
+      onProgress: (event) => sceneCard.setTextureProgress(event),
+      onAssignment: async (_assignment, updatedScene) => {
+        if (textureJobsByTurnId.get(turnId) !== controller) return;
+        const sceneJson = JSON.stringify(updatedScene, null, 2);
+        sceneCard.updateSceneJson(updatedScene);
+        onSceneUpdated?.(updatedScene);
+        await updateStoredTurn(turnId, (turn) => {
+          if (textureJobsByTurnId.get(turnId) !== controller) return null;
+          return { ...turn, sceneJson };
+        });
+      }
+    }).catch((error) => {
+      if (!isAbortError(error)) console.warn("[threebox] texture pipeline failed:", error);
+    }).finally(() => {
+      if (textureJobsByTurnId.get(turnId) === controller) textureJobsByTurnId.delete(turnId);
+    });
+  }
 
   function syncPreviewAuxiliaryLightsFromSettings(settings = settingsModal.getSettings()) {
     const enabled = settings?.general?.previewAuxiliaryLights !== false;
@@ -628,7 +745,6 @@ async function main() {
         includeReferenceLinks: settings.ai?.attachReferenceLinks !== false,
         locale: getHostLocale(),
         capabilityLookup: settings.ai?.capabilityLookupEnabled !== false,
-        onlineTextureHints: settings.ai?.onlineTextureHints !== false,
         generationStrategy,
         executionMode,
         refinementGoals,
@@ -650,7 +766,8 @@ async function main() {
       if (agentSummary) {
         api.appendToBody(textEl, api.buildSummaryBlock(agentSummary));
       }
-      api.insertBeforeBody(textEl, api.buildJsonCollapse(outputSceneJsonString), sceneCard.el);
+      const jsonCollapse = api.buildJsonCollapse(outputSceneJsonString);
+      api.insertBeforeBody(textEl, jsonCollapse, sceneCard.el);
 
       // Title and recap are independent AI calls that both only need `digest`. Start them in
       // parallel, but never make the visible scene card wait for either network round-trip: the
@@ -697,17 +814,14 @@ async function main() {
       await sceneCard.finalize(outputSceneJson, { label: text });
       sceneCardsByTurnId.set(turnId, sceneCard);
 
-      const sceneTitle = await resolvedTitlePromise;
+      // Texture assignments must target the same descriptor shape that the card rendered and
+      // later exports. In friendly-output mode this intentionally differs from the Agent's
+      // canonical standard scene object.
+      const textureScene = outputSceneJson;
 
-      let recap = "";
-      if (settings.ai?.includeTurnSummary !== false) {
-        recap = (await recapPromise) || t("threebox.app.defaultGenerateRecap", "已根据您的描述生成场景。");
-        api.appendToBody(textEl, api.buildSummaryBlock(recap));
-      }
-
-      // The first turn of a conversation is always the reconstruction anchor for any later
-      // diff-cached ("commands"-only) turns, so it always keeps a full sceneJson regardless of
-      // io.turnCacheMode.
+      // Persist and expose the usable scene before waiting on optional title/recap calls. Texture
+      // enrichment can now start immediately; all later snapshot writes share one mutation queue
+      // so metadata and texture assignments cannot overwrite one another.
       await putTurn({
         id: turnId,
         conversationId,
@@ -716,13 +830,37 @@ async function main() {
         mode: "generate",
         targetTurnId: null,
         stage: "generate",
-        sceneJson: sceneJsonString,
+        sceneJson: outputSceneJsonString,
         commands: null,
         spatialSummary: "",
-        recapSummary: recap,
-        sceneTitle,
+        recapSummary: "",
+        sceneTitle: "",
         createdAt: Date.now()
       });
+      startTurnTexturePipeline({
+        turnId,
+        prompt: text,
+        scene: textureScene,
+        sceneCard,
+        providerOptions,
+        onSceneUpdated: (updatedScene) => {
+          jsonCollapse.updateJson?.(JSON.stringify(updatedScene, null, 2));
+        }
+      });
+
+      const sceneTitle = await resolvedTitlePromise;
+
+      let recap = "";
+      if (settings.ai?.includeTurnSummary !== false) {
+        recap = (await recapPromise) || t("threebox.app.defaultGenerateRecap", "已根据您的描述生成场景。");
+        api.appendToBody(textEl, api.buildSummaryBlock(recap));
+      }
+
+      await updateStoredTurn(turnId, (turn) => ({
+        ...turn,
+        recapSummary: recap,
+        sceneTitle
+      }));
       sidebar.touchActiveConversation(text);
       api.finishTurnScroll();
     } catch (error) {
@@ -808,6 +946,7 @@ async function main() {
       });
     }
     const targetSceneJson = JSON.parse(targetSceneJsonString);
+    abortTextureJob(targetTurnId);
 
     const initialActivity = api.takeInitialActivity?.();
     const textEl = initialActivity?.textEl || api.appendAssistantMessage("");
@@ -902,7 +1041,6 @@ async function main() {
         onDelta: outputStream.onDelta,
         locale: getHostLocale(),
         capabilityLookup: settings.ai?.capabilityLookupEnabled !== false,
-        onlineTextureHints: settings.ai?.onlineTextureHints !== false,
         selectedCapabilityIds,
         animationCapabilities: requiresAnimation === true,
         // Transport metadata remains useful for full-JSON fallbacks, but ordinary adjustment is
@@ -956,7 +1094,8 @@ async function main() {
       } else if (result.stage === "json-incremental" && result.patch) {
         api.insertBeforeBody(textEl, api.buildDiffCollapse("patch", JSON.stringify(result.patch, null, 2)), sceneCard.el);
       }
-      api.insertBeforeBody(textEl, api.buildJsonCollapse(outputSceneJsonString), sceneCard.el);
+      const jsonCollapse = api.buildJsonCollapse(outputSceneJsonString);
+      api.insertBeforeBody(textEl, jsonCollapse, sceneCard.el);
 
       // Preserve the target title. An adjustment must not spend two extra model calls inventing a
       // title and a prose recap from an object-count digest; that recap could claim a property
@@ -969,6 +1108,10 @@ async function main() {
       });
       await sceneCard.finalize(outputSceneJson, { label: text });
       sceneCardsByTurnId.set(turnId, sceneCard);
+
+      // Keep the texture document aligned with the scene-card descriptor shape. This matters
+      // when the user selected friendly JSON output instead of canonical standard JSON.
+      const textureScene = outputSceneJson;
 
       let recap = "";
       if (settings.ai?.includeTurnSummary !== false) {
@@ -996,13 +1139,27 @@ async function main() {
         mode: "adjust",
         targetTurnId,
         stage: result.stage,
-        sceneJson: useDiffCache ? null : sceneJsonString,
+        sceneJson: useDiffCache ? null : outputSceneJsonString,
         commands: result.stage === "commands" ? result.commands || null : null,
         patch: result.stage === "json-incremental" ? result.patch || null : null,
         spatialSummary: "",
         recapSummary: recap,
         sceneTitle,
         createdAt: Date.now()
+      });
+      startTurnTexturePipeline({
+        turnId,
+        prompt: text,
+        scene: textureScene,
+        sceneCard,
+        providerOptions,
+        changedObjectIds: findChangedTextureObjectIds(
+          JSON.parse(projectSceneForUser(JSON.stringify(targetSceneJson), settings)),
+          textureScene
+        ),
+        onSceneUpdated: (updatedScene) => {
+          jsonCollapse.updateJson?.(JSON.stringify(updatedScene, null, 2));
+        }
       });
       sidebar.touchActiveConversation(text);
       api.finishTurnScroll();
@@ -1252,6 +1409,8 @@ async function main() {
    * plain `Map.clear()` alone leaks a live renderer per turn (browsers cap concurrent WebGL
    * contexts, so repeated "新聊天" without this would eventually start silently losing contexts). */
   function disposeAllSceneCards() {
+    for (const controller of textureJobsByTurnId.values()) controller.abort();
+    textureJobsByTurnId.clear();
     for (const card of sceneCardsByTurnId.values()) {
       card.dispose?.();
     }

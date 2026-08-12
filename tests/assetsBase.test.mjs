@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
@@ -18,18 +19,16 @@ import {
   setAssetsBaseUrl
 } from "../core/util/assetsBase.js";
 import { loadTextureFromMaterialJson } from "../core/util/loadTextureFromMaterialJson.js";
-import { createRequire } from "node:module";
-
-const require = createRequire(import.meta.url);
-
-test("ASSETS_PACKAGE_VERSION matches the installed @threejson/assets devDependency", () => {
+test("ASSETS_PACKAGE_VERSION matches the workspace @threejson/assets package", () => {
   // Catches exactly the drift that once let this go stale (pinned to 1.0.0 well after 1.1.2 had
   // shipped, silently missing files the newer version had) — see assetsBase.js's docblock.
-  const installedVersion = require("@threejson/assets/package.json").version;
+  const workspaceVersion = JSON.parse(
+    readFileSync(new URL("../assets/package.json", import.meta.url), "utf8")
+  ).version;
   assert.equal(
     ASSETS_PACKAGE_VERSION,
-    installedVersion,
-    `ASSETS_PACKAGE_VERSION ("${ASSETS_PACKAGE_VERSION}") in core/util/assetsBase.js no longer matches the "@threejson/assets" devDependency ("${installedVersion}") in package.json — update whichever one is behind.`
+    workspaceVersion,
+    `ASSETS_PACKAGE_VERSION ("${ASSETS_PACKAGE_VERSION}") in core/util/assetsBase.js no longer matches assets/package.json ("${workspaceVersion}") — publish @threejson/assets before publishing a ThreeJSON release that pins it.`
   );
 });
 

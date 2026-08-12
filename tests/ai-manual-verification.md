@@ -61,7 +61,7 @@
 | **C3** | 全量 update | CLI `scene update` | C2 或夹具 base | 保留 sceneConfig；对象按 prompt 变化 | prompt、全量模式 |
 | **C4** | 增量 update | `--update-mode incremental` | base 夹具 | Patch 应用成功或返回合法全量 JSON | `scenePatch.js`、模型是否遵守 patch |
 | **C5** | texture plan | `texture plan -i scene-with-texture-slots.json` | Key | stdout JSON 含 `tasks` 数组 | 空 slot 是否被识别 |
-| **C6** | texture fill | `texture fill` + hint | Key、Node | `textureUrl` 被写入或 dry-run 有规划 | `texture-fill.mjs`、`llm.apiKey` / `llm.imageModel` |
+| **C6** | texture fill | `texture fill` + hint | LLM Key、纹理服务 Key、Node | 已知许可纹理被写入；未知许可纹理保持待确认 | `texture-fill.mjs`、`texture.baseUrl` / `texture.apiKey` |
 | **C7** | Agent 多步 | `scene generate --agent --depth medium` | Key | stderr 多步进度；`agentUsed: true` | `sceneAgent.js`、depth |
 | **C8** | run 编排 | `run --prompt ... --agent --fill-textures` | Key | 生成 + 可选纹理闭环 | CLI `run`、texture 配置 |
 | **C9** | 流式 CLI | `scene generate --stream --stream-preview` | Key | stderr 有增量 delta | bridge `streamPreview` |
@@ -115,7 +115,7 @@ python -m threejson_agent --config ../../setting.json scene generate \
 | **C13** | 机位保持 | 05-01 调整后 | 同页 | 相机/controls 未异常重置 | `createJsonScene` 重载逻辑 |
 | **C14** | 编辑器生成 | [`tools/scene-host/editor/index.html`](../tools/scene-host/editor/index.html) 左栏 AI | localStorage Key | 场景载入画布 | 浏览器 Network |
 | **C15** | 增量+流式+中止 | editer 勾选增量/流式/中止 | 同页 | 增量仅改部分；流式有字；中止不 toast 报错 | Phase E 控件 |
-| **C16** | 纹理 sink | editer 纹理目录/ZIP + 自定义网关 | 用户授权目录；`llm.baseUrl` 与 chat 一致 | Network 请求 host 为自定义网关（非 `api.openai.com`）；fill 后材质可见；无 CORS 时仍载入场景 + warning | `browserTextureSink`、关「完成后填充纹理」或 CLI |
+| **C16** | 渐进纹理管线 | Editor 生成后自动完善纹理 | 已配置独立纹理服务 | 首屏先显示场景；任务按实际数量进度；单槽失败不影响场景 | `editorTexturePipeline.js`、纹理服务 capabilities/CORS |
 | **P1** | 05-01 签收 | 上列 C11–C13 | — | 目视通过 | — |
 | **P2** | editer 签收 | 上列 C14–C16 | — | 目视通过 | — |
 
@@ -156,9 +156,9 @@ python -m threejson_agent --config ../../setting.json scene generate \
 | `AI request failed (404)` | `llm.baseUrl` 根 URL 是否与 provider 匹配（见 setting example 提示） |
 | 非 JSON / 解析失败 | 模型输出；`extractJsonText`；换 `--no-agent` 对比 |
 | 看图失败 | 模型是否支持 vision；API Key |
-| 纹理全跳过 | 空 `textureUrl` slot；`llm.apiKey`；`texture fill` hint |
-| 浏览器纹理 CORS / Failed to fetch | 网关未对 `/images/generations` 返回 CORS；场景应仍载入（warning）；改用 CLI/MCP 或关闭纹理填充 |
-| 纹理 401 | Key 或 `llm.imageModel` 与网关不匹配 |
+| 纹理全跳过 | 语义规划是否有任务；`texture.baseUrl` / `texture.apiKey`；服务端 capabilities |
+| 浏览器纹理 CORS / Failed to fetch | 纹理服务是否允许当前 origin；场景应仍正常载入并保留基础材质 |
+| 纹理 401 | 独立纹理服务 Key 是否有效；不要填写聊天供应商 Key |
 | Agent 无多步 | `--agent`、`agent.enabled`、depth |
 | 增量 patch 失败 | 模型是否输出 RFC6902；改全量对比 |
 | MCP 找不到仓库 | `THREEJSON_ROOT`、MCP `setting.json` 路径 |

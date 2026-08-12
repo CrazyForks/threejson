@@ -72,3 +72,20 @@ test("rewriteRefsToPack rewrites scriptUrl legacy field", () => {
   const next = rewriteRefsToPack(payload, rewriteMap);
   assert.equal(next.events.click.scriptUrl, "pack://assets/item_1.dsl");
 });
+
+test("collectAssetsFromPayload accepts a browser-cache Blob resolver for tryPack", async () => {
+  const payload = {
+    objectList: [{
+      threeJsonId: "textured-box",
+      objType: "box",
+      material: { textureUrl: "https://textures.test/wood.png" }
+    }]
+  };
+  const result = await collectAssetsFromPayload(payload, {
+    payload,
+    resolveAsset: async () => new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" })
+  });
+  assert.equal(result.rewrittenCount, 1);
+  assert.match(result.payload.objectList[0].material.textureUrl, /^pack:\/\/assets\/item_1\.png$/);
+  assert.deepEqual(Array.from(result.assets["assets/item_1.png"]), [137, 80, 78, 71]);
+});

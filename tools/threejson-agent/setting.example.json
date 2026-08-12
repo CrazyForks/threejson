@@ -10,7 +10,6 @@
     "apiKey": "",
     "baseUrl": "",
     "model": "",
-    "imageModel": "dall-e-3",
     "temperature": 0.2,
     "maxTokens": 4000
   },
@@ -19,12 +18,14 @@
     "depth": "medium"
   },
   "texture": {
-    "mode": "node_bridge",
     "fillAfterAgent": false,
-    "localOutputDir": "assets/textures/ai-generated",
-    "preferRemoteUrl": false,
-    "overwriteExisting": false,
-    "concurrency": 2
+    "baseUrl": "",
+    "apiKey": "",
+    "strategy": "semantic-hybrid",
+    "pbr": true,
+    "allowUnknownLicense": false,
+    "persistenceMode": "remote",
+    "concurrency": 3
   },
   "asset": {
     "mode": "crawl",

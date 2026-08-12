@@ -86,7 +86,7 @@ flowchart LR
 - 本次修复计划：`.cursor/plans` / 对话归档「Box 纹理导出重载修复」
 - 导出清洗实现：[`core/util/descriptorExportSanitize.js`](../core/util/descriptorExportSanitize.js)
 - Box 默认贴图 URL 解析：[`core/util/boxTextureUrl.js`](../core/util/boxTextureUrl.js)
-- 纹理 AI 指针：[`core/ai/textureAiService.js`](../core/ai/textureAiService.js)（`material` / `materials[]` / `joins` 嵌套）
+- 当前纹理槽位扫描与运行时约束：[`core/texture/textureSlots.js`](../core/texture/textureSlots.js)（`material`、`materials[]`、`materialArr` 与实际可渲染的 CSG 根材质）
 
 ## 退出条件（整项 lab 主题）
 

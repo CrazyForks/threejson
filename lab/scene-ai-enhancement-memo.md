@@ -29,7 +29,7 @@
 - **Agent 迭代应用到画布（Phase 1）**：`agent.iterativeApply` + [`runEditorAiUpdate`](../tools/common/editor-single/ai/runEditorAiUpdate.js)；详见 [scene-ai-agent-iterative-improvement-memo.md](./scene-ai-agent-iterative-improvement-memo.md)。
 - **工具与 ThreeJSON 对齐**：只读查询 schema（`sceneFriendlyMap`、objType 列表）、校验 `parseSceneJsonString`、可选调用 `normalizeScenePayload` 预览 canonical 形态。
 - **增量修改**：`updateSceneJsonString(..., { updateMode: "incremental" })`（RFC 6902，`core/ai/scenePatch.js`）；CLI `scene update --update-mode incremental`；**默认仍为 full**。
-- **纹理与生成闭环**：强化现有 `planTextures` / `fillTextureUrls` 与场景生成的编排（一键「生成场景 + 补纹理」）。
+- **统一纹理闭环（已替代旧设想）**：场景先显示，再由 `planSceneTextures` / `runSceneTexturePipeline` 通过宿主 Provider 渐进完善；场景模型不编造 URL，纹理失败不影响场景成功。
 - **Provider 与可观测性**：流式输出、取消、重试、用量日志；与编辑器凭据存储策略（仅 localStorage）的安全边界。
 
 ### 2.2 AI JSON 表达式与引用语法（远期，非数据模型）

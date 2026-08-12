@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test, mock } from "node:test";
-import { validateSceneJson, listTexturePointersSummary } from "../core/ai/agentTools.js";
+import { validateSceneJson } from "../core/ai/agentTools.js";
 import { runSceneAgent } from "../core/ai/sceneAgent.js";
 
 const MINIMAL_SCENE = {
@@ -35,11 +35,6 @@ test("validateSceneJson accepts minimal scene", () => {
   const r = validateSceneJson(JSON.stringify(MINIMAL_SCENE));
   assert.equal(r.ok, true);
   assert.equal(r.boxCount, 1);
-});
-
-test("listTexturePointersSummary on scene with material", () => {
-  const r = listTexturePointersSummary(MINIMAL_SCENE);
-  assert.equal(r.count, 1);
 });
 
 // Direct generation is the default. Tests that exercise incremental construction opt into
@@ -220,7 +215,6 @@ test("runSceneAgent preserves the model's planet texture choices without forced 
       {
         apiKey: "test-key",
         provider: "deepseek",
-        onlineTextureHints: true,
         onProgress: (event) => progress.push(event)
       }
     );
@@ -439,7 +433,7 @@ test("runSceneAgent respects a caller-configured maxRefineRounds cap", async () 
   }
 });
 
-test("runSceneAgent texture fill soft-fails and keeps scene JSON", async () => {
+test("runSceneAgent leaves texture acquisition to the host pipeline", async () => {
   const scenePayload = JSON.stringify(MINIMAL_SCENE);
   const originalFetch = globalThis.fetch;
   globalThis.fetch = mock.fn(async () => ({
@@ -456,22 +450,12 @@ test("runSceneAgent texture fill soft-fails and keeps scene JSON", async () => {
         executionMode: "draft_refine",
         agent: { maxRefineRounds: 1 },
         generationStrategy: "segmented",
-        texture: {
-          enabled: true,
-          imageProvider: {
-            async generateImage() {
-              throw new Error("Failed to fetch");
-            }
-          },
-          sink: {
-            saveLocal: async () => "assets/textures/ai-generated/x.png"
-          }
-        }
+        texture: { enabled: true }
       }
     );
     assert.ok(result.sceneJsonString.includes("objectList"));
-    assert.ok(result.textureFillWarning);
-    assert.ok(result.steps.some((s) => s.kind === "fill_textures" && s.ok === false));
+    assert.equal(result.textureFillWarning, undefined);
+    assert.equal(result.steps.some((s) => s.kind === "fill_textures"), false);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -650,7 +634,7 @@ test("runSceneAgent update auto accepts JSON output in agent session", async () 
   }
 });
 
-test("runSceneAgent emits scene_ready before texture fill", async () => {
+test("runSceneAgent emits scene_ready independently of the host texture pipeline", async () => {
   const scenePayload = JSON.stringify(MINIMAL_SCENE);
   const progress = [];
   const fetchMock = mock.fn(async () => {

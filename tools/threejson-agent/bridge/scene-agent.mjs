@@ -6,8 +6,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runSceneAgent, requestUpdatedSceneEditCommands } from "../../../core/ai/index.js";
-import { createOpenAiImageProvider } from "../../../core/ai/textureAiService.js";
-import { withNodeTextureSink } from "../../../core/util/nodeTextureSink.js";
+import { runTextureFill } from "./texture-fill.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../../..");
@@ -104,28 +103,6 @@ const fillTextures =
     ? Boolean(opts.fillTextures)
     : Boolean(textureCfg.fillAfterAgent) || Boolean(textureCfg.enabled);
 
-let texture;
-if (fillTextures) {
-  const localOutputDir = path.resolve(
-    projectRoot,
-    textureCfg.localOutputDir || "assets/textures/ai-generated"
-  );
-  const sunk = withNodeTextureSink({ localOutputDir, projectRoot });
-  const imageBase = String(llm.baseUrl || "https://api.openai.com/v1").replace(/\/+$/, "");
-  texture = {
-    enabled: true,
-    sink: sunk.sink,
-    projectRoot,
-    imageProvider: createOpenAiImageProvider({
-      apiKey,
-      baseUrl: imageBase,
-      model: llm.imageModel || "dall-e-3"
-    }),
-    overwriteExisting: Boolean(textureCfg.overwriteExisting),
-    concurrency: Number(textureCfg.concurrency) || 2
-  };
-}
-
 const runOptions = {
   ...chatOptions,
   agent: { enabled: agentEnabled, depth },
@@ -141,9 +118,6 @@ const runOptions = {
     }
   }
 };
-if (texture) {
-  runOptions.texture = texture;
-}
 
 let result;
 if (
@@ -169,6 +143,18 @@ if (
   result = await runSceneAgent(input, runOptions);
 }
 
+if (fillTextures && result.sceneJsonString) {
+  const textureResult = await runTextureFill({
+    projectRoot,
+    sceneJsonString: result.sceneJsonString,
+    setting,
+    userHint: prompt,
+    writeScene: false
+  });
+  result.sceneJsonString = textureResult.sceneJsonString;
+  result.textureResult = textureResult;
+}
+
 if (opts.scenePath && opts.writeScene !== false && result.sceneJsonString) {
   const scenePath = path.isAbsolute(opts.scenePath)
     ? opts.scenePath
@@ -185,7 +171,7 @@ process.stdout.write(
     outputMode: result.outputMode,
     fallbackUsed: result.fallbackUsed,
     fallbackReason: result.fallbackReason,
-    textureFillWarning: result.textureFillWarning,
+    textureResult: result.textureResult,
     agentUsed: result.agentUsed,
     steps: result.steps,
     tokenHint: result.tokenHint
