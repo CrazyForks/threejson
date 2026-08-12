@@ -55,8 +55,9 @@ test("buildSceneCommandUpdateSystemPrompt teaches single-round mutating commands
 test("buildSceneCommandUpdateSystemPrompt respects online texture hint toggle", () => {
   const enabled = buildSceneCommandUpdateSystemPrompt();
   assert.match(enabled, /any public web source, not only a CDN/);
-  assert.match(enabled, /bundled same-origin assets/);
-  assert.match(enabled, /do not need the external texture proxy/);
+  assert.match(enabled, /optional stable candidates, not mandatory defaults/);
+  assert.match(enabled, /never replace an existing valid remote URL/);
+  assert.match(enabled, /not limited to ThreeJSON, Three\.js, npm, or a particular CDN/);
 
   const disabled = buildSceneCommandUpdateSystemPrompt({ onlineTextureHints: false });
   assert.match(disabled, /Proactive online texture hints are disabled/);

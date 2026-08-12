@@ -182,7 +182,7 @@ test("runSceneAgent streams direct scene JSON through an isolated visible-output
   }
 });
 
-test("runSceneAgent fills bundled planet textures before the first direct preview", async () => {
+test("runSceneAgent preserves the model's planet texture choices without forced local replacement", async () => {
   const scenePayload = JSON.stringify({
     threeJsonId: "earth-moon",
     worldInfo: {
@@ -228,12 +228,13 @@ test("runSceneAgent fills bundled planet textures before the first direct previe
     const earth = scene.objectList.find((item) => item.threeJsonId === "earth");
     const moon = scene.objectList.find((item) => item.threeJsonId === "moon");
     const saturnRing = scene.objectList.find((item) => item.threeJsonId === "saturn-ring");
-    assert.equal(earth.material.textureUrl, "/assets/textures/environment/nature/planet/earth.png");
-    assert.equal(moon.material.textureUrl, "/assets/textures/environment/nature/planet/moon.png");
-    assert.equal(saturnRing.material.textureUrl, "/assets/textures/environment/nature/planet/saturn_ring.png");
-    assert.equal(earth.material.color, "#ffffff");
+    assert.equal(earth.material.textureUrl, "https://unreliable.example/earth.jpg");
+    assert.equal(moon.material.textureUrl, undefined);
+    assert.equal(saturnRing.material.textureUrl, undefined);
+    assert.equal(earth.material.color, "#000000");
     const preview = progress.find((event) => event.kind === "stage_preview");
-    assert.match(preview.sceneJsonString, /planet\/earth\.png/);
+    assert.match(preview.sceneJsonString, /https:\/\/unreliable\.example\/earth\.jpg/);
+    assert.doesNotMatch(preview.sceneJsonString, /\/assets\/textures\/environment\/nature\/planet\//);
     assert.equal(fetchMock.mock.calls.length, 1);
   } finally {
     globalThis.fetch = originalFetch;

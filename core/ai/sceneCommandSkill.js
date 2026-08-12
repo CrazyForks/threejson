@@ -297,7 +297,7 @@ function buildCommandOnlineTextureFragment(options = {}) {
   return [
     "Online texture setting:",
     "- For newly added objects/surfaces that would be incomplete as flat colors (terrain/grass/water, asphalt, brick/concrete/wood/stone/fabric, signs/screens/maps, paintings, labels, carpets, named planets), use material.textureUrl with a suitable reachable online image URL; it may come from any public web source, not only a CDN, and https is preferred.",
-    "- For named Solar-System bodies prefer bundled same-origin assets under /assets/textures/environment/nature/planet/ (earth.png, moon.png, sun.png, mercury.png, venus.png, mars.png, jupiter.png, saturn.png, saturn_ring.png, uranus.png, neptune.png). They do not need the external texture proxy; use #ffffff as the material tint so the texture is not darkened.",
+    "- For named Solar-System bodies, files under /assets/textures/environment/nature/planet/ are optional stable candidates, not mandatory defaults. Choose a bundled candidate or a more appropriate reachable https image according to the requested style, realism, resolution, projection, and scene needs; never replace an existing valid remote URL merely because a bundled candidate exists. Online resources are not limited to ThreeJSON, Three.js, npm, or a particular CDN. Use #ffffff as the material tint when the texture should not be darkened.",
     "- Add textureRepeat for large tiled surfaces. Keep flat colors for generic blockouts and plain colored objects."
   ].join("\n");
 }

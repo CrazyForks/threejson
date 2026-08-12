@@ -132,123 +132,6 @@ function completionReasonIndicatesCutoff(reason) {
   return /length|max[_ -]?tokens?|token[_ -]?limit|incomplete|truncat/i.test(String(reason || ""));
 }
 
-const KNOWN_PLANET_TEXTURES = Object.freeze([
-  { file: "earth.png", aliases: ["earth", "地球"] },
-  { file: "moon.png", aliases: ["moon", "月球"] },
-  { file: "sun.png", aliases: ["sun", "太阳"] },
-  { file: "mercury.png", aliases: ["mercury", "水星"] },
-  { file: "venus.png", aliases: ["venus", "金星"] },
-  { file: "mars.png", aliases: ["mars", "火星"] },
-  { file: "jupiter.png", aliases: ["jupiter", "木星"] },
-  { file: "saturn.png", aliases: ["saturn", "土星"] },
-  { file: "uranus.png", aliases: ["uranus", "天王星"] },
-  { file: "neptune.png", aliases: ["neptune", "海王星"] }
-]);
-
-function textContainsAlias(text, alias) {
-  const haystack = String(text || "").toLowerCase();
-  const needle = String(alias || "").toLowerCase();
-  if (!needle) return false;
-  if (/^[a-z]+$/.test(needle)) {
-    return new RegExp(`(^|[^a-z])${needle}([^a-z]|$)`, "i").test(haystack);
-  }
-  return haystack.includes(needle);
-}
-
-/**
- * Applies deterministic same-origin textures for named spherical Solar-System bodies. This is a
- * narrow asset-catalog fallback, not a general semantic rewrite: it only runs when texture hints
- * are enabled and both the user request and descriptor name identify the same body. Unless the
- * user explicitly supplied a URL, a remote/model-invented planet map is normalized to the stable
- * local asset as well. A white tint avoids the common black-map failure.
- */
-function applyKnownPlanetTextureDefaults(sceneJsonString, userPrompt, enabled) {
-  if (enabled !== true) {
-    return { sceneJsonString, applied: [] };
-  }
-  let scene;
-  try {
-    scene = parseSceneJsonString(sceneJsonString);
-  } catch {
-    return { sceneJsonString, applied: [] };
-  }
-  const promptText = String(userPrompt || "");
-  const wholeSolarSystem = /solar\s+system|太阳系/i.test(promptText);
-  const earthMoonSystem = /earth\s*[-+&/]?\s*moon\s+system|地月系统/i.test(promptText);
-  const requested = KNOWN_PLANET_TEXTURES.filter((entry) =>
-    wholeSolarSystem ||
-    (earthMoonSystem && ["earth.png", "moon.png"].includes(entry.file)) ||
-    entry.aliases.some((alias) => textContainsAlias(promptText, alias))
-  );
-  if (!requested.length) {
-    return { sceneJsonString, applied: [] };
-  }
-  const userProvidedTextureUrl = /(?:https?:\/\/|data:image\/|blob:|\/assets\/)/i.test(String(userPrompt || ""));
-  const applied = [];
-  const visit = (descriptor, listName = "") => {
-    if (!descriptor || typeof descriptor !== "object") return;
-    const semanticText = [descriptor.threeJsonId, descriptor.name, descriptor.label].filter(Boolean).join(" ");
-    const looksSpherical =
-      descriptor.objType === "sphere" ||
-      descriptor.geometry?.type === "sphere" ||
-      listName === "sphereModelList" ||
-      Number.isFinite(Number(descriptor.geometry?.radius));
-    if (looksSpherical) {
-      const match = requested.find((entry) =>
-        entry.aliases.some((alias) => textContainsAlias(semanticText, alias))
-      );
-      const targetTextureUrl = match
-        ? `/assets/textures/environment/nature/planet/${match.file}`
-        : "";
-      const currentTextureUrl = String(descriptor.material?.textureUrl || "").trim();
-      const currentColor = String(descriptor.material?.color || "").trim().toLowerCase();
-      if (
-        match &&
-        !userProvidedTextureUrl &&
-        (currentTextureUrl !== targetTextureUrl || currentColor !== "#ffffff")
-      ) {
-        if (!descriptor.material || typeof descriptor.material !== "object") {
-          descriptor.material = { type: "standard" };
-        }
-        descriptor.material.textureUrl = targetTextureUrl;
-        descriptor.material.color = "#ffffff";
-        applied.push({ threeJsonId: descriptor.threeJsonId || "", textureUrl: descriptor.material.textureUrl });
-      }
-    }
-    const saturnRequested = requested.some((entry) => entry.file === "saturn.png");
-    const looksLikeSaturnRing =
-      saturnRequested &&
-      (textContainsAlias(semanticText, "saturn ring") || textContainsAlias(semanticText, "土星环")) &&
-      (descriptor.objType === "ring" || descriptor.objType === "torus" || /ring|torus/i.test(String(descriptor.geometry?.type || "")));
-    if (looksLikeSaturnRing && !userProvidedTextureUrl) {
-      if (!descriptor.material || typeof descriptor.material !== "object") {
-        descriptor.material = { type: "standard" };
-      }
-      const ringTextureUrl = "/assets/textures/environment/nature/planet/saturn_ring.png";
-      if (descriptor.material.textureUrl !== ringTextureUrl || String(descriptor.material.color || "").toLowerCase() !== "#ffffff") {
-        descriptor.material.textureUrl = ringTextureUrl;
-        descriptor.material.color = "#ffffff";
-        applied.push({ threeJsonId: descriptor.threeJsonId || "", textureUrl: ringTextureUrl });
-      }
-    }
-    for (const key of ["children", "objectList", "joins", "inters", "holes"]) {
-      if (Array.isArray(descriptor[key])) descriptor[key].forEach((child) => visit(child, key));
-    }
-  };
-  if (Array.isArray(scene.objectList)) scene.objectList.forEach((descriptor) => visit(descriptor, "objectList"));
-  if (scene.worldInfo && typeof scene.worldInfo === "object") {
-    for (const [listName, descriptors] of Object.entries(scene.worldInfo)) {
-      if (Array.isArray(descriptors)) {
-        descriptors.forEach((descriptor) => visit(descriptor, listName));
-      }
-    }
-  }
-  if (!applied.length) {
-    return { sceneJsonString, applied };
-  }
-  return { sceneJsonString: JSON.stringify(scene, null, 2), applied };
-}
-
 /**
  * @param {SceneAgentProgress|undefined} payload
  * @param {((p: SceneAgentProgress) => void)|undefined} onProgress
@@ -1033,12 +916,6 @@ async function runAutomaticDraftRefinement(params) {
       }
     }
 
-    const knownAssetResult = applyKnownPlanetTextureDefaults(
-      candidate,
-      userPrompt,
-      chatOptions?.onlineTextureHints === true
-    );
-    candidate = knownAssetResult.sceneJsonString;
     const validation = await validateSceneJsonWithNormalizer(candidate);
     steps.push({
       kind: "draft_refinement",
@@ -1075,11 +952,8 @@ async function runAutomaticDraftRefinement(params) {
       stage: "draft_refinement",
       round,
       maxRounds,
-      commands:
-        refinement.outputMode === "commands" && knownAssetResult.applied.length === 0
-          ? refinement.commands
-          : undefined,
-      outputMode: knownAssetResult.applied.length > 0 ? "json" : refinement.outputMode,
+      commands: refinement.outputMode === "commands" ? refinement.commands : undefined,
+      outputMode: refinement.outputMode,
       message: `Draft refinement preview ${round} (${refinement.outputMode}).`
     });
     if (modelSaysDone) {
@@ -1569,7 +1443,7 @@ async function runSceneAgent(input = {}, options = {}) {
             "This is the first usable blockout of an incrementally built scene, not the final detailed scene.",
             "Return one complete valid standard scheme-B JSON document. Use compact JSON formatting and ensure syntactic closure before adding secondary content.",
             "Keep only the primary visual anchors needed for a useful first render. Consolidate repeated elements with instancedList/transforms, bounded representative samples, and reusable materials; do not obey or invent an arbitrary token or object-count quota.",
-            "Include every primary subject, identity-defining bundled texture (especially named planets), requested primary animation, basic lighting, and a fitted camera now. Defer secondary props, decoration, and large populations to later incremental command rounds.",
+            "Include every primary subject, identity-defining texture where needed (bundled or remote, whichever best fits the scene), requested primary animation, basic lighting, and a fitted camera now. Defer secondary props, decoration, and large populations to later incremental command rounds.",
             "Do not expand every outline bullet into separate objects and do not create a deliberately textureless placeholder."
           ].join("\n")
         : "\n\nReturn the complete, immediately usable scene now. Include identity-defining textures, requested animation, lighting, and a fitted camera in this response; do not reserve ordinary work for later review rounds.";
@@ -1640,17 +1514,10 @@ async function runSceneAgent(input = {}, options = {}) {
     sceneJsonString = await generateInitialScene();
   }
 
-  const knownAssetResult = applyKnownPlanetTextureDefaults(
-    sceneJsonString,
-    userRequest,
-    chatOptions.onlineTextureHints === true
-  );
-  sceneJsonString = knownAssetResult.sceneJsonString;
   steps.push({
     kind: "generate",
     ok: true,
-    executionMode: effectiveExecutionMode,
-    knownAssetsApplied: knownAssetResult.applied.length
+    executionMode: effectiveExecutionMode
   });
 
   let validation = await validateSceneJsonWithNormalizer(sceneJsonString);
@@ -1710,11 +1577,7 @@ async function runSceneAgent(input = {}, options = {}) {
       steps.push({ kind: "repair", attempt: repairAttempt, ok: false, error: String(error?.message || error) });
       continue;
     }
-    sceneJsonString = applyKnownPlanetTextureDefaults(
-      repairedSceneJsonString,
-      userRequest,
-      chatOptions.onlineTextureHints === true
-    ).sceneJsonString;
+    sceneJsonString = repairedSceneJsonString;
     validation = await validateSceneJsonWithNormalizer(sceneJsonString);
     steps.push({
       kind: "repair",
@@ -1807,11 +1670,6 @@ async function runSceneAgent(input = {}, options = {}) {
         streamStage: "capability_fix",
         streamRound: capAttempt
       });
-      sceneJsonString = applyKnownPlanetTextureDefaults(
-        sceneJsonString,
-        userRequest,
-        chatOptions.onlineTextureHints === true
-      ).sceneJsonString;
       capabilityFixApplied = normalizedSceneSignature(sceneJsonString) !== beforeFixSignature;
       validation = await validateSceneJsonWithNormalizer(sceneJsonString);
       const refit = validation.ok
