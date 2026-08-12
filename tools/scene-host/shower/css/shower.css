@@ -124,6 +124,7 @@ button { font: inherit; }
 .catalogItemDesc { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; line-height: 1.35; }
 
 .editorPanel, .treePanel { min-height: 0; overflow: hidden; }
+.editorPanel { height: 100%; }
 .editorLoadingPlaceholder, .editorLoadError {
   display: flex;
   align-items: center;
@@ -135,7 +136,10 @@ button { font: inherit; }
   color: var(--muted);
   font-size: 13px;
 }
-.CodeMirror { height: 100%; font-size: 13px; line-height: 1.55; }
+/* CodeMirror's stylesheet is intentionally loaded after startup so scene rendering never waits on
+ * the editor CDN. Scope this rule through the host to outrank CodeMirror's later `.CodeMirror {
+ * height: 300px }` default regardless of stylesheet arrival order. */
+.editorPanel > .CodeMirror { height: 100%; font-size: 13px; line-height: 1.55; }
 .treePanel { padding: 12px; overflow: auto; background: var(--editor-bg); }
 .treeGroup { margin: 0 0 14px; }
 .treeGroup summary { margin: 0 0 8px; color: var(--muted); font-size: 13px; cursor: pointer; }

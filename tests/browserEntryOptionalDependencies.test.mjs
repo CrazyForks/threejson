@@ -6,8 +6,11 @@ import test from "node:test";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-function collectStaticModuleReferences(source) {
+function collectStaticModuleReferences(source, { includeDynamic = false } = {}) {
   const code = source
+    // Template builders contain complete JavaScript source files inside backtick strings. Those
+    // imports belong to the generated application, not to the scene host executing this module.
+    .replace(/`(?:\\[\s\S]|[^\\`])*`/g, "\"\"")
     // Remove whole-line comments first: text such as `apps/*` inside a `//` comment must not be
     // mistaken for the beginning of a block comment that hides subsequent exports.
     .replace(/^[ \t]*\/\/.*$/gm, "")
@@ -17,6 +20,7 @@ function collectStaticModuleReferences(source) {
     /^[ \t]*import\s+(?:[^"'()]*?\s+from\s*)?["']([^"']+)["']/gm,
     /^[ \t]*export\s+(?:\*|\{[\s\S]*?\})\s+from\s*["']([^"']+)["']/gm
   ];
+  if (includeDynamic) patterns.push(/\bimport\s*\(\s*["']([^"']+)["']\s*\)/g);
   for (const pattern of patterns) {
     for (const match of code.matchAll(pattern)) references.push(match[1]);
   }
@@ -40,7 +44,7 @@ function resolveLocalModule(importer, specifier) {
   throw new Error(`Cannot resolve static module ${specifier} from ${path.relative(REPO_ROOT, importer)}`);
 }
 
-function collectTransitiveBareSpecifiers(entryFile) {
+function collectTransitiveBareSpecifiers(entryFile, options = {}) {
   const pending = [entryFile];
   const visited = new Set();
   const bareSpecifiers = new Set();
@@ -49,7 +53,7 @@ function collectTransitiveBareSpecifiers(entryFile) {
     if (visited.has(file)) continue;
     visited.add(file);
     const source = fs.readFileSync(file, "utf8");
-    for (const specifier of collectStaticModuleReferences(source)) {
+    for (const specifier of collectStaticModuleReferences(source, options)) {
       const localFile = resolveLocalModule(file, specifier);
       if (localFile) pending.push(localFile);
       else bareSpecifiers.add(specifier);
@@ -92,6 +96,25 @@ test("ordinary browser entries keep optional fflate outside their static depende
       [],
       `${path.relative(REPO_ROOT, demo)} is missing mappings for static browser dependencies`
     );
+  }
+});
+
+test("native scene-host import maps cover every bare specifier in their application graph", () => {
+  const hosts = [
+    ["editor", "tools/scene-host/editor/js/main.js", "tools/scene-host/editor/index.html"],
+    ["player", "tools/scene-host/player/js/main.js", "tools/scene-host/player/index.html"],
+    ["shower", "tools/scene-host/shower/js/main.js", "tools/scene-host/shower/index.html"],
+    ["threebox", "tools/scene-host/threebox/js/threeBoxApp.js", "tools/scene-host/threebox/index.html"]
+  ];
+
+  for (const [name, entryRelative, htmlRelative] of hosts) {
+    const entry = path.join(REPO_ROOT, ...entryRelative.split("/"));
+    const html = path.join(REPO_ROOT, ...htmlRelative.split("/"));
+    const imports = readImportMap(html);
+    const missing = [...collectTransitiveBareSpecifiers(entry, { includeDynamic: true })]
+      .filter((specifier) => !importMapCovers(imports, specifier))
+      .sort();
+    assert.deepEqual(missing, [], `${name} import map is missing mappings for its application graph`);
   }
 });
 

@@ -4,7 +4,7 @@ import { sceneHighlight, trackDisposableResource } from "threejson";
 import {
   HIGHLIGHT_ALARM_RED,
   HIGHLIGHT_LOCATE_AMBER
-} from "../../../../../domains/sceneHighlight/channels.js";
+} from "../../../../domains/sceneHighlight/channels.js";
 
 export function getPlayerHighlightChannelOptions(playerSettings) {
   const ch = playerSettings?.highlight?.channels || {};

@@ -31,6 +31,12 @@ test("shower has a light no-JavaScript fallback and an immediate loading state",
   assert.match(css, /#loadingMask\.visible\s*\{\s*display:\s*flex;/);
 });
 
+test("shower editor fills its pane even when CodeMirror CSS loads after host CSS", () => {
+  const css = read("tools/scene-host/shower/css/shower.css");
+  assert.match(css, /\.editorPanel\s*\{\s*height:\s*100%;\s*\}/);
+  assert.match(css, /\.editorPanel\s*>\s*\.CodeMirror\s*\{[^}]*height:\s*100%;/s);
+});
+
 test("shower startup excludes export-only dependencies and the aggregate core entry", () => {
   const main = read("tools/scene-host/shower/js/main.js");
 
